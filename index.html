@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Job Digest Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="config.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-badge">JD</div>
+          <div>
+            <div class="brand-title">Job Digest</div>
+            <div class="brand-subtitle">London + Remote</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-item nav-item--active">Live Roles</button>
+          <button class="nav-item">Top Picks</button>
+          <button class="nav-item">Preparation</button>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="status-dot"></div>
+          <span>Updated daily at 08:40</span>
+        </div>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <h1>Daily Job Intelligence</h1>
+            <p id="summary-line">Loading sources…</p>
+          </div>
+          <div class="topbar-actions">
+            <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
+          </div>
+        </header>
+
+        <section class="filters">
+          <div class="filter">
+            <label for="search">Search</label>
+            <input id="search" type="text" placeholder="Product manager, onboarding, KYC…" />
+          </div>
+          <div class="filter">
+            <label for="minFit">Min Fit</label>
+            <select id="minFit">
+              <option value="60">60%</option>
+              <option value="65">65%</option>
+              <option value="70" selected>70%</option>
+              <option value="75">75%</option>
+              <option value="80">80%</option>
+            </select>
+          </div>
+          <div class="filter">
+            <label for="source">Source</label>
+            <select id="source"></select>
+          </div>
+          <div class="filter">
+            <label for="location">Location</label>
+            <select id="location"></select>
+          </div>
+        </section>
+
+        <section id="top-pick" class="top-pick hidden"></section>
+
+        <section id="jobs" class="job-grid"></section>
+      </main>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
