@@ -129,10 +129,24 @@ body {
   cursor: pointer;
 }
 
+.btn-primary {
+  background: #0f172a;
+  color: #fff;
+}
+
 .btn-secondary {
   background: #fff;
   border: 1px solid #e2e8f0;
   color: #0f172a;
+}
+
+.btn-tertiary {
+  margin-top: 8px;
+  background: #eef2ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+  font-size: 12px;
+  padding: 6px 10px;
 }
 
 .filters {
@@ -257,6 +271,48 @@ body {
   border: 1px solid #e2e8f0;
   font-size: 13px;
   color: #334155;
+}
+
+.detail-box ul {
+  padding-left: 18px;
+}
+
+.long-text {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.tracking {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+.tracking-grid {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.tracking-grid input,
+.tracking-grid textarea,
+.tracking-grid select {
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: #fff;
+}
+
+.tracking-status-msg {
+  font-size: 12px;
+  color: #475569;
+  margin-top: 6px;
 }
 
 .job-card__actions {
