@@ -15,6 +15,7 @@ const jobsContainer = document.getElementById("jobs");
 const topPickContainer = document.getElementById("top-pick");
 const sourceStatsContainer = document.getElementById("source-stats");
 const roleSuggestionsContainer = document.getElementById("role-suggestions");
+const candidatePrepContainer = document.getElementById("candidate-prep");
 const refreshBtn = document.getElementById("refresh-btn");
 
 const searchInput = document.getElementById("search");
@@ -28,6 +29,7 @@ let db = null;
 let collectionName = "jobs";
 let statsCollection = "job_stats";
 let suggestionsCollection = "role_suggestions";
+let candidatePrepCollection = "candidate_prep";
 
 const state = {
   jobs: [],
@@ -182,6 +184,8 @@ const renderJobs = () => {
 
     const bulletList = formatList(job.tailored_cv_bullets || []);
     const requirementsList = formatList(job.key_requirements || []);
+    const talkingPoints = formatList(job.key_talking_points || []);
+    const starStories = formatList(job.star_stories || []);
     const statusValue = (job.application_status || "saved").toLowerCase();
     const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
     const lastTouchDate = job.last_touch_date ? job.last_touch_date.slice(0, 10) : "";
@@ -239,6 +243,22 @@ const renderJobs = () => {
           <div>${escapeHtml(job.match_notes || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
+          <div class="section-title">Interview focus</div>
+          <div>${escapeHtml(job.interview_focus || "Not available yet.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Quick pitch</div>
+          <div>${escapeHtml(job.quick_pitch || "Not available yet.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Key talking points</div>
+          ${talkingPoints}
+        </div>
+        <div class="detail-box">
+          <div class="section-title">STAR stories (10/10)</div>
+          ${starStories}
+        </div>
+        <div class="detail-box">
           <div class="section-title">Company insights</div>
           <div>${escapeHtml(job.company_insights || "Not available yet.")}</div>
         </div>
@@ -249,6 +269,10 @@ const renderJobs = () => {
         <div class="detail-box">
           <div class="section-title">How to apply</div>
           <div>${escapeHtml(job.apply_tips || "Apply with CV tailored to onboarding + KYC impact.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">CV edits (exact changes)</div>
+          <div>${escapeHtml(job.cv_edit_notes || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Cover letter</div>
@@ -397,6 +421,26 @@ const renderRoleSuggestions = (doc) => {
   `;
 };
 
+const renderCandidatePrep = (doc) => {
+  if (!doc) {
+    candidatePrepContainer.classList.add("hidden");
+    candidatePrepContainer.innerHTML = "";
+    return;
+  }
+  candidatePrepContainer.classList.remove("hidden");
+  candidatePrepContainer.innerHTML = `
+    <div class="section-title">Your interview cheat sheet</div>
+    <div><strong>Quick pitch</strong></div>
+    <div>${escapeHtml(doc.quick_pitch || "Not available yet.")}</div>
+    <div style="margin-top:8px;"><strong>Key stats</strong></div>
+    ${formatList(doc.key_stats || [])}
+    <div style="margin-top:8px;"><strong>Key talking points</strong></div>
+    ${formatList(doc.key_talking_points || [])}
+    <div style="margin-top:8px;"><strong>STAR stories (10/10)</strong></div>
+    ${formatList(doc.star_stories || [])}
+  `;
+};
+
 const loadJobs = async () => {
   summaryLine.textContent = "Fetching latest roles…";
 
@@ -410,6 +454,7 @@ const loadJobs = async () => {
   collectionName = window.FIREBASE_COLLECTION || "jobs";
   statsCollection = window.FIREBASE_STATS_COLLECTION || "job_stats";
   suggestionsCollection = window.FIREBASE_SUGGESTIONS_COLLECTION || "role_suggestions";
+  candidatePrepCollection = window.FIREBASE_CANDIDATE_PREP_COLLECTION || "candidate_prep";
 
   const jobsRef = collection(db, collectionName);
   const jobsQuery = query(jobsRef, orderBy("fit_score", "desc"), limit(200));
@@ -440,6 +485,12 @@ const loadJobs = async () => {
   const suggestionsSnap = await getDocs(suggestionsQuery);
   const suggestionDoc = suggestionsSnap.docs[0]?.data();
   renderRoleSuggestions(suggestionDoc);
+
+  const prepRef = collection(db, candidatePrepCollection);
+  const prepQuery = query(prepRef, orderBy("date", "desc"), limit(1));
+  const prepSnap = await getDocs(prepQuery);
+  const prepDoc = prepSnap.docs[0]?.data();
+  renderCandidatePrep(prepDoc);
 
   summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
 };
