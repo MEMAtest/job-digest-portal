@@ -199,6 +199,7 @@ const renderJobs = () => {
         <div class="job-card__badges">
           <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
           <div class="${getLocationBadgeClass(job.location)}" title="${escapeHtml(job.location)}">${escapeHtml(job.location || "Unknown")}</div>
+          ${job.apply_method ? `<span class="badge badge--method">${escapeHtml(job.apply_method)}</span>` : ""}
         </div>
       </div>
       <div class="job-card__details">
@@ -224,6 +225,10 @@ const renderJobs = () => {
         <div class="detail-box">
           <div class="section-title">Potential gaps</div>
           <div>${escapeHtml(job.cv_gap)}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">CV edits for this role</div>
+          <div>${escapeHtml(job.cv_edit_notes || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Key requirements</div>
