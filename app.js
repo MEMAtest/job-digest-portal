@@ -22,6 +22,7 @@ const minFitSelect = document.getElementById("minFit");
 const sourceSelect = document.getElementById("source");
 const locationSelect = document.getElementById("location");
 const statusSelect = document.getElementById("status");
+const ukOnlyCheckbox = document.getElementById("ukOnly");
 
 let db = null;
 let collectionName = "jobs";
@@ -38,6 +39,38 @@ const formatFitBadge = (score) => {
   if (score >= 80) return "badge badge--green";
   if (score >= 72) return "badge badge--blue";
   return "badge badge--amber";
+};
+
+const getLocationBadgeClass = (location) => {
+  if (!location) return "badge badge--amber badge--location";
+  const loc = location.toLowerCase();
+  if (loc.includes("remote") || loc.includes("hybrid")) return "badge badge--green badge--location";
+  if (
+    loc.includes("london") ||
+    loc.includes(" uk") ||
+    loc.startsWith("uk") ||
+    loc.includes("united kingdom") ||
+    loc.includes("england") ||
+    loc.includes("scotland") ||
+    loc.includes("wales")
+  )
+    return "badge badge--blue badge--location";
+  return "badge badge--amber badge--location";
+};
+
+const isUkOrRemote = (location) => {
+  if (!location) return false;
+  const loc = location.toLowerCase();
+  return (
+    loc.includes("london") ||
+    loc.includes("uk") ||
+    loc.includes("united kingdom") ||
+    loc.includes("remote") ||
+    loc.includes("hybrid") ||
+    loc.includes("england") ||
+    loc.includes("scotland") ||
+    loc.includes("wales")
+  );
 };
 
 const escapeHtml = (value) => {
@@ -118,6 +151,7 @@ const renderJobs = () => {
   const sourceFilter = sourceSelect.value;
   const locationFilter = locationSelect.value;
   const statusFilter = statusSelect.value;
+  const ukOnly = ukOnlyCheckbox.checked;
 
   const filtered = state.jobs.filter((job) => {
     const jobStatus = (job.application_status || "saved").toLowerCase();
@@ -133,8 +167,9 @@ const renderJobs = () => {
     const matchesSource = !sourceFilter || job.source === sourceFilter;
     const matchesLocation = !locationFilter || job.location === locationFilter;
     const matchesStatus = !statusFilter || jobStatus === statusFilter;
+    const matchesUkOnly = !ukOnly || isUkOrRemote(job.location);
 
-    return matchesSearch && matchesFit && matchesSource && matchesLocation && matchesStatus;
+    return matchesSearch && matchesFit && matchesSource && matchesLocation && matchesStatus && matchesUkOnly;
   });
 
   jobsContainer.innerHTML = "";
@@ -157,11 +192,14 @@ const renderJobs = () => {
       <div class="job-card__header">
         <div>
           <div class="job-card__title">${escapeHtml(job.role)}</div>
-          <div class="job-card__meta">${escapeHtml(job.company)} · ${escapeHtml(job.location)}</div>
+          <div class="job-card__meta">${escapeHtml(job.company)}</div>
           <div class="job-card__meta">${escapeHtml(job.posted)} · ${escapeHtml(job.source)}</div>
           <div class="job-card__meta">Status: ${escapeHtml(statusValue)}</div>
         </div>
-        <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
+        <div class="job-card__badges">
+          <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
+          <div class="${getLocationBadgeClass(job.location)}" title="${escapeHtml(job.location)}">${escapeHtml(job.location || "Unknown")}</div>
+        </div>
       </div>
       <div class="job-card__details">
         <div class="detail-box">
@@ -407,5 +445,6 @@ minFitSelect.addEventListener("change", renderJobs);
 sourceSelect.addEventListener("change", renderJobs);
 locationSelect.addEventListener("change", renderJobs);
 statusSelect.addEventListener("change", renderJobs);
+ukOnlyCheckbox.addEventListener("change", renderJobs);
 
 loadJobs();

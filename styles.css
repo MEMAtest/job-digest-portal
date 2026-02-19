@@ -252,6 +252,28 @@ body {
   gap: 16px;
 }
 
+.job-card__badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.filter--toggle {
+  justify-content: center;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 500;
+}
+
 .job-card__title {
   font-size: 18px;
   font-weight: 600;
@@ -283,6 +305,15 @@ body {
 .badge--amber {
   background: #fef3c7;
   color: #92400e;
+}
+
+.badge--location {
+  font-size: 11px;
+  padding: 4px 8px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .section-title {
