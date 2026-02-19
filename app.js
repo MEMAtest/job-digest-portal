@@ -13,6 +13,8 @@ import {
 const summaryLine = document.getElementById("summary-line");
 const jobsContainer = document.getElementById("jobs");
 const topPickContainer = document.getElementById("top-pick");
+const sourceStatsContainer = document.getElementById("source-stats");
+const roleSuggestionsContainer = document.getElementById("role-suggestions");
 const refreshBtn = document.getElementById("refresh-btn");
 
 const searchInput = document.getElementById("search");
@@ -23,6 +25,8 @@ const statusSelect = document.getElementById("status");
 
 let db = null;
 let collectionName = "jobs";
+let statsCollection = "job_stats";
+let suggestionsCollection = "role_suggestions";
 
 const state = {
   jobs: [],
@@ -303,6 +307,53 @@ const renderJobs = () => {
   }
 };
 
+const renderSourceStats = (statsDocs) => {
+  if (!statsDocs.length) {
+    sourceStatsContainer.innerHTML = "";
+    return;
+  }
+  const latest = statsDocs[0];
+  const counts = latest.counts || {};
+  const total = latest.total || 0;
+  const sevenDayTotal = statsDocs.reduce((acc, doc) => acc + (doc.total || 0), 0);
+  const avg = statsDocs.length ? Math.round(sevenDayTotal / statsDocs.length) : 0;
+
+  const cards = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(
+      ([source, count]) => `
+      <div class="stat-card">
+        <div class="stat-card__label">${escapeHtml(source)}</div>
+        <div class="stat-card__value">${count}</div>
+        <div class="stat-card__trend">7‑day avg: ${avg}</div>
+      </div>`
+    )
+    .join("");
+
+  sourceStatsContainer.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-card__label">Total (today)</div>
+      <div class="stat-card__value">${total}</div>
+      <div class="stat-card__trend">7‑day total: ${sevenDayTotal}</div>
+    </div>
+    ${cards}
+  `;
+};
+
+const renderRoleSuggestions = (doc) => {
+  if (!doc || !doc.roles || !doc.roles.length) {
+    roleSuggestionsContainer.classList.add("hidden");
+    roleSuggestionsContainer.innerHTML = "";
+    return;
+  }
+  roleSuggestionsContainer.classList.remove("hidden");
+  roleSuggestionsContainer.innerHTML = `
+    <div class="section-title">Adjacent roles to consider</div>
+    <div>${formatList(doc.roles)}</div>
+    <div style="margin-top:8px;">${escapeHtml(doc.rationale || "")}</div>
+  `;
+};
+
 const loadJobs = async () => {
   summaryLine.textContent = "Fetching latest roles…";
 
@@ -314,6 +365,8 @@ const loadJobs = async () => {
   const app = initializeApp(window.FIREBASE_CONFIG);
   db = getFirestore(app);
   collectionName = window.FIREBASE_COLLECTION || "jobs";
+  statsCollection = window.FIREBASE_STATS_COLLECTION || "job_stats";
+  suggestionsCollection = window.FIREBASE_SUGGESTIONS_COLLECTION || "role_suggestions";
 
   const jobsRef = collection(db, collectionName);
   const jobsQuery = query(jobsRef, orderBy("fit_score", "desc"), limit(200));
@@ -332,6 +385,18 @@ const loadJobs = async () => {
   renderFilters();
   renderTopPick(jobs[0]);
   renderJobs();
+
+  const statsRef = collection(db, statsCollection);
+  const statsQuery = query(statsRef, orderBy("date", "desc"), limit(7));
+  const statsSnap = await getDocs(statsQuery);
+  const statsDocs = statsSnap.docs.map((doc) => doc.data());
+  renderSourceStats(statsDocs);
+
+  const suggestionsRef = collection(db, suggestionsCollection);
+  const suggestionsQuery = query(suggestionsRef, orderBy("date", "desc"), limit(1));
+  const suggestionsSnap = await getDocs(suggestionsQuery);
+  const suggestionDoc = suggestionsSnap.docs[0]?.data();
+  renderRoleSuggestions(suggestionDoc);
 
   summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
 };

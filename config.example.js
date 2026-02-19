@@ -8,3 +8,5 @@ window.FIREBASE_CONFIG = {
 };
 
 window.FIREBASE_COLLECTION = "jobs";
+window.FIREBASE_STATS_COLLECTION = "job_stats";
+window.FIREBASE_SUGGESTIONS_COLLECTION = "role_suggestions";
