@@ -22,6 +22,8 @@ const refreshBtn = document.getElementById("refresh-btn");
 const runNowBtn = document.getElementById("run-now-btn");
 const runStatusLine = document.getElementById("run-status-line");
 const dashboardStatsContainer = document.getElementById("dashboard-stats");
+const breadcrumbLine = document.getElementById("breadcrumb");
+const alertBanner = document.getElementById("alert-banner");
 
 const searchInput = document.getElementById("search");
 const minFitSelect = document.getElementById("minFit");
@@ -772,6 +774,11 @@ const setActiveTab = (tabId) => {
   document.querySelectorAll(".tab-section").forEach((section) => {
     section.classList.toggle("hidden", section.dataset.tab !== tabId);
   });
+  if (breadcrumbLine) {
+    const activeBtn = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+    const label = activeBtn ? activeBtn.textContent.trim() : tabId;
+    breadcrumbLine.textContent = `Home / ${label}`;
+  }
 };
 
 document.querySelectorAll(".nav-item").forEach((btn) => {
@@ -784,9 +791,18 @@ setActiveTab("dashboard");
 
 const loadJobs = async () => {
   summaryLine.textContent = "Fetching latest roles…";
+  if (alertBanner) {
+    alertBanner.classList.add("hidden");
+    alertBanner.textContent = "";
+  }
 
   if (!window.FIREBASE_CONFIG) {
     summaryLine.textContent = "Missing Firebase config. Add config.js first.";
+    if (alertBanner) {
+      alertBanner.classList.remove("hidden");
+      alertBanner.innerHTML =
+        "<strong>Setup required:</strong> Add your Firebase config in <code>config.js</code>.";
+    }
     return;
   }
 
@@ -839,7 +855,17 @@ const loadJobs = async () => {
     summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
   } catch (error) {
     console.error(error);
-    summaryLine.textContent = `Failed to load roles: ${error.message || "Unknown error"}`;
+    const message = error?.message || "Unknown error";
+    summaryLine.textContent = `Failed to load roles: ${message}`;
+    if (alertBanner) {
+      alertBanner.classList.remove("hidden");
+      if (String(message).toLowerCase().includes("permissions")) {
+        alertBanner.innerHTML =
+          "<strong>Permission error:</strong> Update your Firestore rules to allow read access to the jobs collections. See README for the exact rules snippet.";
+      } else {
+        alertBanner.innerHTML = `<strong>Load error:</strong> ${escapeHtml(message)}`;
+      }
+    }
   }
 };
 

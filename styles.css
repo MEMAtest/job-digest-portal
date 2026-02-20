@@ -538,6 +538,26 @@ body {
   margin-top: 8px;
 }
 
+.breadcrumb {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.alert {
+  margin-top: 12px;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #9f1239;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.alert strong {
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .app {
     grid-template-columns: 1fr;
