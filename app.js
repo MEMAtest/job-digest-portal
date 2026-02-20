@@ -70,6 +70,24 @@ const getLocationBadgeClass = (location) => {
   return "badge badge--amber badge--location";
 };
 
+const formatPosted = (value) => {
+  if (!value) return "Date unavailable";
+  const text = String(value);
+  const lower = text.toLowerCase();
+  if (lower.includes("ago") || lower.includes("yesterday") || lower.includes("today")) {
+    return text;
+  }
+  const date = new Date(text);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }
+  return text;
+};
+
 const isUkOrRemote = (location) => {
   if (!location) return false;
   const loc = location.toLowerCase();
@@ -191,7 +209,9 @@ const renderTopPick = (job) => {
   topPickContainer.innerHTML = `
     <div class="section-title">Top Pick</div>
     <h2>${escapeHtml(job.role)}</h2>
-    <p class="job-card__meta">${escapeHtml(job.company)} · ${escapeHtml(job.location)} · ${escapeHtml(job.posted)}</p>
+    <p class="job-card__meta">${escapeHtml(job.company)} · ${escapeHtml(job.location)} · ${escapeHtml(
+      formatPosted(job.posted)
+    )}</p>
     <div class="job-card__details" style="margin-top:12px;">
       <div class="detail-box">
         <div class="section-title">Why you fit</div>
@@ -274,7 +294,7 @@ const renderJobs = () => {
         <div>
           <div class="job-card__title">${escapeHtml(job.role)}</div>
           <div class="job-card__meta">${escapeHtml(job.company)}</div>
-          <div class="job-card__meta">${escapeHtml(job.posted)} · ${escapeHtml(job.source)}</div>
+          <div class="job-card__meta">${escapeHtml(formatPosted(job.posted))} · ${escapeHtml(job.source)}</div>
           <div class="job-card__meta">Status: ${escapeHtml(statusValue)}</div>
         </div>
         <div class="job-card__badges">
@@ -862,7 +882,8 @@ runNowBtn.addEventListener("click", async () => {
       runStatusLine.textContent = "Complete.";
     } else if (status === "error") {
       clearInterval(poll);
-      runStatusLine.textContent = "Run failed — check watcher log on Mac.";
+      const tail = data?.error_tail ? `\n${data.error_tail}` : "";
+      runStatusLine.textContent = `Run failed — check watcher log on Mac.${tail}`;
       runNowBtn.disabled = false;
       runNowBtn.textContent = "Run now";
     } else if (Date.now() - start > 300_000) {
