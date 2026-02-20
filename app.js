@@ -164,6 +164,15 @@ const escapeHtml = (value) => {
     .replaceAll("'", "&#39;");
 };
 
+const formatInlineText = (value) => {
+  if (!value) return "";
+  const safe = escapeHtml(String(value));
+  return safe
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\\n/g, "<br>")
+    .replace(/\r?\n/g, "<br>");
+};
+
 const showToast = (message, duration = 2500) => {
   const existing = document.querySelector(".toast");
   if (existing) existing.remove();
@@ -451,12 +460,25 @@ const quickApply = async (job, card) => {
   showToast(shouldMarkApplied && db ? "Copied + marked applied" : "Copied + opened link");
 };
 
+const normaliseList = (items) => {
+  if (!items) return [];
+  if (Array.isArray(items)) return items;
+  if (typeof items === "string") {
+    return items
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+  return [String(items)];
+};
+
 const formatList = (items) => {
-  if (!items || !items.length) return "Not available yet.";
-  return `<ul>${items
+  const list = normaliseList(items);
+  if (!list.length) return "Not available yet.";
+  return `<ul>${list
     .map((item) => {
-      const safe = escapeHtml(item).replaceAll("\\n", "<br>");
-      return `<li>${safe}</li>`;
+      const cleaned = String(item).replace(/^\s*[•*-]\s+/, "");
+      return `<li>${formatInlineText(cleaned)}</li>`;
     })
     .join("")}</ul>`;
 };
@@ -539,11 +561,11 @@ const renderTopPick = (job) => {
     <div class="job-card__details" style="margin-top:12px;">
       <div class="detail-box">
         <div class="section-title">Why you fit</div>
-        <div>${escapeHtml(job.why_fit)}</div>
+        <div>${formatInlineText(job.why_fit || "Not available yet.")}</div>
       </div>
       <div class="detail-box">
         <div class="section-title">Potential gaps</div>
-        <div>${escapeHtml(job.cv_gap)}</div>
+        <div>${formatInlineText(job.cv_gap || "Not available yet.")}</div>
       </div>
     </div>
   `;
@@ -641,11 +663,11 @@ const renderJobs = () => {
         <div class="job-card__details detail-carousel" id="carousel-${escapeHtml(job.id)}">
         <div class="detail-box">
           <div class="section-title">Role summary</div>
-          <div>${escapeHtml(job.role_summary || "Not available yet.")}</div>
+          <div>${formatInlineText(job.role_summary || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Tailored summary</div>
-          <div>${escapeHtml(job.tailored_summary || "Not available yet.")}</div>
+          <div>${formatInlineText(job.tailored_summary || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Tailored CV bullets (ATS-ready)</div>
@@ -656,15 +678,15 @@ const renderJobs = () => {
         </div>
         <div class="detail-box">
           <div class="section-title">Why you fit</div>
-          <div>${escapeHtml(job.why_fit)}</div>
+          <div>${formatInlineText(job.why_fit || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Potential gaps</div>
-          <div>${escapeHtml(job.cv_gap)}</div>
+          <div>${formatInlineText(job.cv_gap || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">CV edits for this role</div>
-          <div>${escapeHtml(job.cv_edit_notes || "Not available yet.")}</div>
+          <div>${formatInlineText(job.cv_edit_notes || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Key requirements</div>
@@ -672,15 +694,15 @@ const renderJobs = () => {
         </div>
         <div class="detail-box">
           <div class="section-title">Match notes</div>
-          <div>${escapeHtml(job.match_notes || "Not available yet.")}</div>
+          <div>${formatInlineText(job.match_notes || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Interview focus</div>
-          <div>${escapeHtml(job.interview_focus || "Not available yet.")}</div>
+          <div>${formatInlineText(job.interview_focus || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Quick pitch</div>
-          <div>${escapeHtml(job.quick_pitch || "Not available yet.")}</div>
+          <div>${formatInlineText(job.quick_pitch || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Key talking points</div>
@@ -692,7 +714,7 @@ const renderJobs = () => {
         </div>
         <div class="detail-box">
           <div class="section-title">Company insights</div>
-          <div>${escapeHtml(job.company_insights || "Not available yet.")}</div>
+          <div>${formatInlineText(job.company_insights || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Interview Q&amp;A (8–10/10)</div>
@@ -704,15 +726,15 @@ const renderJobs = () => {
         </div>
         <div class="detail-box">
           <div class="section-title">How to apply</div>
-          <div>${escapeHtml(job.apply_tips || "Apply with CV tailored to onboarding + KYC impact.")}</div>
+          <div>${formatInlineText(job.apply_tips || "Apply with CV tailored to onboarding + KYC impact.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">CV edits (exact changes)</div>
-          <div>${escapeHtml(job.cv_edit_notes || "Not available yet.")}</div>
+          <div>${formatInlineText(job.cv_edit_notes || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Cover letter</div>
-          <pre class="long-text">${escapeHtml(job.cover_letter || "Not available yet.")}</pre>
+          <div class="long-text">${formatInlineText(job.cover_letter || "Not available yet.")}</div>
           <button class="btn btn-tertiary copy-btn" data-copy-type="cover_letter" data-job-id="${escapeHtml(
             job.id
           )}">Copy cover letter</button>
@@ -1179,7 +1201,7 @@ const renderRoleSuggestions = (doc) => {
   roleSuggestionsContainer.innerHTML = `
     <div class="section-title">Adjacent roles to consider</div>
     <div>${formatList(doc.roles)}</div>
-    <div style="margin-top:8px;">${escapeHtml(doc.rationale || "")}</div>
+    <div style="margin-top:8px;">${formatInlineText(doc.rationale || "")}</div>
   `;
 };
 
@@ -1193,7 +1215,7 @@ const renderCandidatePrep = (doc) => {
   candidatePrepContainer.innerHTML = `
     <div class="section-title">Your interview cheat sheet</div>
     <div><strong>Quick pitch</strong></div>
-    <div>${escapeHtml(doc.quick_pitch || "Not available yet.")}</div>
+    <div>${formatInlineText(doc.quick_pitch || "Not available yet.")}</div>
     <div style="margin-top:8px;"><strong>Key stats</strong></div>
     ${formatList(doc.key_stats || [])}
     <div style="margin-top:8px;"><strong>Key talking points</strong></div>

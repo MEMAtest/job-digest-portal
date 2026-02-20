@@ -513,6 +513,15 @@ body {
   padding-left: 18px;
 }
 
+.detail-box li {
+  margin-bottom: 6px;
+  line-height: 1.45;
+}
+
+.detail-box li:last-child {
+  margin-bottom: 0;
+}
+
 .long-text {
   white-space: pre-wrap;
   font-family: inherit;
@@ -924,8 +933,10 @@ body {
     grid-template-rows: auto 1fr auto;
     padding: 12px;
     gap: 10px;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     position: relative;
+    overscroll-behavior: contain;
   }
   .job-card__header {
     flex-direction: column;
@@ -954,6 +965,7 @@ body {
   .detail-carousel-wrap {
     margin-top: 8px;
     overflow-y: auto;
+    min-height: 0;
   }
   .job-card__details.detail-carousel {
     display: flex;
