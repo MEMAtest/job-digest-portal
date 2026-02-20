@@ -8,6 +8,8 @@ import {
   query,
   limit,
   updateDoc,
+  setDoc,
+  getDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const summaryLine = document.getElementById("summary-line");
@@ -17,6 +19,8 @@ const sourceStatsContainer = document.getElementById("source-stats");
 const roleSuggestionsContainer = document.getElementById("role-suggestions");
 const candidatePrepContainer = document.getElementById("candidate-prep");
 const refreshBtn = document.getElementById("refresh-btn");
+const runNowBtn = document.getElementById("run-now-btn");
+const runStatusLine = document.getElementById("run-status-line");
 
 const searchInput = document.getElementById("search");
 const minFitSelect = document.getElementById("minFit");
@@ -30,6 +34,7 @@ let collectionName = "jobs";
 let statsCollection = "job_stats";
 let suggestionsCollection = "role_suggestions";
 let candidatePrepCollection = "candidate_prep";
+let runRequestsCollection = "run_requests";
 
 const state = {
   jobs: [],
@@ -206,7 +211,7 @@ const renderJobs = () => {
           ${job.apply_method ? `<span class="badge badge--method">${escapeHtml(job.apply_method)}</span>` : ""}
         </div>
       </div>
-      <div class="job-card__details">
+      <div class="job-card__details detail-carousel">
         <div class="detail-box">
           <div class="section-title">Role summary</div>
           <div>${escapeHtml(job.role_summary || "Not available yet.")}</div>
@@ -455,6 +460,7 @@ const loadJobs = async () => {
   statsCollection = window.FIREBASE_STATS_COLLECTION || "job_stats";
   suggestionsCollection = window.FIREBASE_SUGGESTIONS_COLLECTION || "role_suggestions";
   candidatePrepCollection = window.FIREBASE_CANDIDATE_PREP_COLLECTION || "candidate_prep";
+  runRequestsCollection = window.FIREBASE_RUN_REQUESTS_COLLECTION || "run_requests";
 
   const jobsRef = collection(db, collectionName);
   const jobsQuery = query(jobsRef, orderBy("fit_score", "desc"), limit(200));
@@ -502,5 +508,48 @@ sourceSelect.addEventListener("change", renderJobs);
 locationSelect.addEventListener("change", renderJobs);
 statusSelect.addEventListener("change", renderJobs);
 ukOnlyCheckbox.addEventListener("change", renderJobs);
+
+runNowBtn.addEventListener("click", async () => {
+  if (!db) {
+    runStatusLine.textContent = "Not connected.";
+    runStatusLine.classList.remove("hidden");
+    return;
+  }
+  runNowBtn.disabled = true;
+  runNowBtn.textContent = "Triggering…";
+  runStatusLine.textContent = "Sending run request…";
+  runStatusLine.classList.remove("hidden");
+
+  const ref = doc(db, runRequestsCollection, "latest");
+  await setDoc(ref, { status: "pending", requested_at: new Date().toISOString() });
+
+  runStatusLine.textContent = "Run triggered — waiting for Mac watcher (~2 min)…";
+  const start = Date.now();
+  const poll = setInterval(async () => {
+    const snap = await getDoc(ref);
+    const data = snap.data();
+    const status = data?.status;
+    if (status === "running") {
+      runStatusLine.textContent = "Running — fetching jobs…";
+    } else if (status === "done") {
+      clearInterval(poll);
+      runStatusLine.textContent = "Done — refreshing results…";
+      runNowBtn.disabled = false;
+      runNowBtn.textContent = "Run now";
+      await loadJobs();
+      runStatusLine.textContent = "Complete.";
+    } else if (status === "error") {
+      clearInterval(poll);
+      runStatusLine.textContent = "Run failed — check watcher log on Mac.";
+      runNowBtn.disabled = false;
+      runNowBtn.textContent = "Run now";
+    } else if (Date.now() - start > 300_000) {
+      clearInterval(poll);
+      runStatusLine.textContent = "Timed out — run may still complete in background.";
+      runNowBtn.disabled = false;
+      runNowBtn.textContent = "Run now";
+    }
+  }, 10_000);
+});
 
 loadJobs();
