@@ -456,6 +456,43 @@ const formatList = (items) => {
   return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
 };
 
+const buildPrepQa = (job) => {
+  const questions = job.prep_questions || [];
+  if (!questions.length) {
+    return "Not available yet.";
+  }
+
+  const answerSets = Array.isArray(job.prep_answer_sets) ? job.prep_answer_sets : [];
+  const fallbackAnswers = Array.isArray(job.prep_answers) ? job.prep_answers : [];
+
+  return questions
+    .map((question, idx) => {
+      let answers = [];
+      if (Array.isArray(answerSets[idx])) {
+        answers = answerSets[idx];
+      } else if (fallbackAnswers[idx]) {
+        answers = [fallbackAnswers[idx]];
+      }
+
+      const options = [8, 9, 10]
+        .map((score, optIdx) => {
+          const answerText = answers[optIdx] || answers[0] || "";
+          return `<option value="${score}" data-answer="${escapeHtml(answerText)}">${score}/10</option>`;
+        })
+        .join("");
+
+      const initialAnswer = answers[0] || "";
+      return `
+        <div class="prep-qa">
+          <div class="prep-qa__question">${escapeHtml(question)}</div>
+          <select class="prep-qa__select">${options}</select>
+          <div class="prep-qa__answer">${escapeHtml(initialAnswer || "Not available yet.")}</div>
+        </div>
+      `;
+    })
+    .join("");
+};
+
 const renderFilters = () => {
   sourceSelect.innerHTML = '<option value="">All sources</option>';
   Array.from(state.sources)
@@ -559,17 +596,11 @@ const renderJobs = () => {
   const isMobile = window.matchMedia("(max-width: 900px)").matches;
 
   filtered.forEach((job) => {
-    const prepList = job.prep_questions?.length
-      ? `<ul>${job.prep_questions
-          .map((question) => `<li>${escapeHtml(question)}</li>`)
-          .join("")}</ul>`
-      : "Not available yet.";
-
     const bulletList = formatList(job.tailored_cv_bullets || []);
     const requirementsList = formatList(job.key_requirements || []);
     const talkingPoints = formatList(job.key_talking_points || []);
     const starStories = formatList(job.star_stories || []);
-    const prepAnswers = formatList(job.prep_answers || []);
+    const prepQaBlocks = buildPrepQa(job);
     const scorecardList = formatList(job.scorecard || []);
     const statusValue = (job.application_status || "saved").toLowerCase();
     const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
@@ -656,12 +687,8 @@ const renderJobs = () => {
           <div>${escapeHtml(job.company_insights || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
-          <div class="section-title">Prep questions</div>
-          ${prepList}
-        </div>
-        <div class="detail-box">
-          <div class="section-title">Answer outlines</div>
-          ${prepAnswers}
+          <div class="section-title">Interview Q&amp;A (8–10/10)</div>
+          ${prepQaBlocks}
         </div>
         <div class="detail-box">
           <div class="section-title">Hiring scorecard</div>
@@ -907,6 +934,15 @@ const renderJobs = () => {
             ? (target.tailored_cv_bullets || []).join("\n")
             : target.cover_letter || "";
         copyToClipboard(text);
+      });
+    });
+
+    card.querySelectorAll(".prep-qa__select").forEach((select) => {
+      const answerEl = select.closest(".prep-qa")?.querySelector(".prep-qa__answer");
+      select.addEventListener("change", () => {
+        const selected = select.selectedOptions[0];
+        if (!answerEl) return;
+        answerEl.textContent = selected?.dataset?.answer || "Not available yet.";
       });
     });
 

@@ -181,6 +181,37 @@ body {
   font-weight: 600;
 }
 
+.prep-qa {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #ffffff;
+}
+
+.prep-qa__question {
+  font-weight: 600;
+  font-size: 13px;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.prep-qa__select {
+  width: 100%;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  margin-bottom: 6px;
+  background: #f8fafc;
+}
+
+.prep-qa__answer {
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.5;
+}
+
 .filter {
   background: #fff;
   padding: 12px 14px;
