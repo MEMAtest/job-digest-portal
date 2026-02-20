@@ -236,6 +236,17 @@ body {
   color: #475569;
 }
 
+.stat-card--clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.stat-card--clickable:hover {
+  transform: translateY(-2px);
+  border-color: #c7d2fe;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
 .job-card {
   background: #fff;
   border: 1px solid #e2e8f0;
@@ -517,5 +528,38 @@ body {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+  }
+  .nav {
+    flex-direction: row;
+    gap: 8px;
+  }
+  .nav-item {
+    flex: 1;
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+  .content {
+    padding: 16px;
+  }
+  .job-grid {
+    display: block;
+    max-height: calc(100vh - 340px);
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    padding-bottom: 12px;
+  }
+  .job-card {
+    scroll-snap-align: start;
+    min-height: calc(100vh - 360px);
+  }
+  .job-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .detail-box {
+    flex: 0 0 85%;
+    max-width: 85%;
   }
 }

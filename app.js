@@ -21,6 +21,7 @@ const candidatePrepContainer = document.getElementById("candidate-prep");
 const refreshBtn = document.getElementById("refresh-btn");
 const runNowBtn = document.getElementById("run-now-btn");
 const runStatusLine = document.getElementById("run-status-line");
+const dashboardStatsContainer = document.getElementById("dashboard-stats");
 
 const searchInput = document.getElementById("search");
 const minFitSelect = document.getElementById("minFit");
@@ -522,6 +523,96 @@ const renderCandidatePrep = (doc) => {
   `;
 };
 
+const renderDashboardStats = (jobs) => {
+  if (!dashboardStatsContainer) return;
+
+  const now = new Date();
+  const startToday = new Date(now);
+  startToday.setHours(0, 0, 0, 0);
+  const startYesterday = new Date(startToday);
+  startYesterday.setDate(startYesterday.getDate() - 1);
+  const last24 = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const last72 = new Date(now.getTime() - 72 * 60 * 60 * 1000);
+
+  const parseDate = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) return date;
+    return null;
+  };
+
+  const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
+  const updatedDates = jobs.map((job) => parseDate(job.updated_at)).filter(Boolean);
+
+  const newLast24 = updatedDates.filter((dt) => dt >= last24).length;
+  const newLast72 = updatedDates.filter((dt) => dt >= last72).length;
+
+  const appliedToday = jobs.filter((job) => {
+    if (safeStatus(job) !== "applied") return false;
+    const dt = parseDate(job.application_date);
+    return dt && dt >= startToday;
+  }).length;
+
+  const appliedYesterday = jobs.filter((job) => {
+    if (safeStatus(job) !== "applied") return false;
+    const dt = parseDate(job.application_date);
+    return dt && dt >= startYesterday && dt < startToday;
+  }).length;
+
+  const savedCount = jobs.filter((job) => safeStatus(job) === "saved").length;
+  const interviewCount = jobs.filter((job) => safeStatus(job) === "interview").length;
+  const offerCount = jobs.filter((job) => safeStatus(job) === "offer").length;
+  const uniqueCompanies = new Set(jobs.map((job) => job.company).filter(Boolean)).size;
+
+  dashboardStatsContainer.innerHTML = `
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">Links sent</div>
+      <div class="stat-card__value">${jobs.length}</div>
+      <div class="stat-card__trend">Live roles in feed</div>
+    </div>
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">New (24h)</div>
+      <div class="stat-card__value">${newLast24}</div>
+      <div class="stat-card__trend">Updated in last day</div>
+    </div>
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">New (72h)</div>
+      <div class="stat-card__value">${newLast72}</div>
+      <div class="stat-card__trend">Updated in last 3 days</div>
+    </div>
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">Applied today</div>
+      <div class="stat-card__value">${appliedToday}</div>
+      <div class="stat-card__trend">Since midnight</div>
+    </div>
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">Applied yesterday</div>
+      <div class="stat-card__value">${appliedYesterday}</div>
+      <div class="stat-card__trend">Previous day</div>
+    </div>
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">Saved</div>
+      <div class="stat-card__value">${savedCount}</div>
+      <div class="stat-card__trend">Not yet applied</div>
+    </div>
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">Interviews</div>
+      <div class="stat-card__value">${interviewCount}</div>
+      <div class="stat-card__trend">Active</div>
+    </div>
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">Offers</div>
+      <div class="stat-card__value">${offerCount}</div>
+      <div class="stat-card__trend">Win rate tracker</div>
+    </div>
+    <div class="stat-card stat-card--clickable">
+      <div class="stat-card__label">Unique companies</div>
+      <div class="stat-card__value">${uniqueCompanies}</div>
+      <div class="stat-card__trend">Company spread</div>
+    </div>
+  `;
+};
+
 const setActiveTab = (tabId) => {
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.classList.toggle("nav-item--active", btn.dataset.tab === tabId);
@@ -537,7 +628,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
   });
 });
 
-setActiveTab("live");
+setActiveTab("dashboard");
 
 const loadJobs = async () => {
   summaryLine.textContent = "Fetching latest roles…";
@@ -570,6 +661,7 @@ const loadJobs = async () => {
     state.sources = new Set(jobs.map((job) => job.source).filter(Boolean));
     state.locations = new Set(jobs.map((job) => job.location).filter(Boolean));
 
+    renderDashboardStats(jobs);
     renderFilters();
     renderTopPick(jobs[0]);
     renderJobs();
