@@ -569,24 +569,24 @@ const parseStarStory = (text) => {
   return { situation, task, action, result, raw };
 };
 
-const getConfidenceKey = (jobId, index) => `prep_confidence_${jobId}_${index}`;
+const getConfidenceKey = (jobId, seed) => `prep_confidence_${jobId}_${seed}`;
 
-const getConfidenceStats = (jobId, count) => {
+const getConfidenceStats = (jobId, items) => {
   const stats = { green: 0, amber: 0, red: 0 };
   if (!jobId) return stats;
-  for (let i = 0; i < count; i += 1) {
-    const key = getConfidenceKey(jobId, i);
+  items.forEach((item) => {
+    const key = getConfidenceKey(jobId, item.key);
     const value = safeLocalStorageGet(key);
     if (value === "green") stats.green += 1;
     if (value === "amber") stats.amber += 1;
     if (value === "red") stats.red += 1;
-  }
+  });
   return stats;
 };
 
-const buildConfidenceSummary = (jobId, count) => {
-  const stats = getConfidenceStats(jobId, count);
-  const total = Math.max(count, 1);
+const buildConfidenceSummary = (jobId, items) => {
+  const stats = getConfidenceStats(jobId, items);
+  const total = Math.max(items.length, 1);
   const greenPct = Math.round((stats.green / total) * 100);
   const amberPct = Math.round((stats.amber / total) * 100);
   const redPct = Math.max(0, 100 - greenPct - amberPct);
@@ -626,24 +626,59 @@ const getAnswerForScore = (answers, score) => {
   return (target || answers[0] || { text: "Not available yet." }).text;
 };
 
+const slugify = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 60);
+
+const normaliseQuestionList = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  const lines = trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const looksLikeBullets = lines.some((line) => /^[-*•]\s+/.test(line));
+  if (!looksLikeBullets) {
+    return [trimmed];
+  }
+  return lines.map((line) => line.replace(/^[-*•]\s+/, ""));
+};
+
 const buildStudyDeckItems = (job) => {
   const items = [];
   const starStories = normaliseList(job.star_stories || []);
-  starStories.forEach((story) => {
+  starStories.forEach((story, idx) => {
     const parsed = parseStarStory(story);
     const topicSource = parsed.situation || parsed.raw || "Key achievement";
     const prompt = topicSource.split(/\r?\n/)[0].slice(0, 160);
-    items.push({ type: "star", prompt, story });
+    items.push({
+      type: "star",
+      prompt,
+      story,
+      key: `star-${idx}-${slugify(prompt)}`,
+    });
   });
 
-  const questions = normaliseList(job.prep_questions || []);
+  const questions = normaliseQuestionList(job.prep_questions || []);
   questions.forEach((question, idx) => {
-    items.push({ type: "question", prompt: question, qIndex: idx });
+    items.push({
+      type: "question",
+      prompt: question,
+      qIndex: idx,
+      key: `q-${idx}-${slugify(question)}`,
+    });
   });
 
   const talkingPoints = normaliseList(job.key_talking_points || []);
-  talkingPoints.forEach((point) => {
-    items.push({ type: "talking", prompt: point, point });
+  talkingPoints.forEach((point, idx) => {
+    items.push({
+      type: "talking",
+      prompt: point,
+      point,
+      key: `talk-${idx}-${slugify(point)}`,
+    });
   });
 
   return items.slice(0, 12);
@@ -675,6 +710,55 @@ const buildStarAnswerHtml = (story) => {
   `;
 };
 
+const buildFallbackDeckItems = (job) => {
+  const items = [];
+  const prep = state.candidatePrep || {};
+
+  normaliseList(prep.star_stories || []).forEach((story, idx) => {
+    const parsed = parseStarStory(story);
+    const topicSource = parsed.situation || parsed.raw || "Key achievement";
+    const prompt = topicSource.split(/\r?\n/)[0].slice(0, 160);
+    items.push({
+      type: "star",
+      prompt,
+      story,
+      key: `cstar-${idx}-${slugify(prompt)}`,
+    });
+  });
+
+  normaliseList(prep.interview_questions || []).forEach((question, idx) => {
+    items.push({
+      type: "question",
+      prompt: question,
+      qIndex: idx,
+      key: `cquestion-${idx}-${slugify(question)}`,
+    });
+  });
+
+  normaliseList(prep.key_talking_points || []).forEach((point, idx) => {
+    items.push({
+      type: "talking",
+      prompt: point,
+      point,
+      key: `ctalk-${idx}-${slugify(point)}`,
+    });
+  });
+
+  if (!items.length) {
+    const pitch = job.quick_pitch || prep.quick_pitch || "";
+    if (pitch) {
+      items.push({
+        type: "talking",
+        prompt: "Quick pitch",
+        point: pitch,
+        key: `cpitch-${slugify(pitch)}`,
+      });
+    }
+  }
+
+  return items.slice(0, 12);
+};
+
 const renderStudyDeck = (container, job, prebuiltItems = null) => {
   const items = prebuiltItems || buildStudyDeckItems(job);
   if (!items.length) {
@@ -690,7 +774,7 @@ const renderStudyDeck = (container, job, prebuiltItems = null) => {
         <div class="deck-complete">
           <h3>Session complete</h3>
           <p>You covered ${items.length} items.</p>
-          ${buildConfidenceSummary(job.id, items.length)}
+          ${buildConfidenceSummary(job.id, items)}
           <button class="btn btn-primary deck-restart">Restart session</button>
         </div>
       `;
@@ -706,7 +790,7 @@ const renderStudyDeck = (container, job, prebuiltItems = null) => {
 
     const item = items[currentIndex];
     const progress = Math.round(((currentIndex + 1) / items.length) * 100);
-    const confidence = safeLocalStorageGet(getConfidenceKey(job.id, currentIndex)) || "";
+    const confidence = safeLocalStorageGet(getConfidenceKey(job.id, item.key)) || "";
     const keyPoints = getKeyPoints(job);
 
     let label = "Interview question";
@@ -730,7 +814,7 @@ const renderStudyDeck = (container, job, prebuiltItems = null) => {
 
     container.innerHTML = `
       <div class="study-deck">
-        ${buildConfidenceSummary(job.id, items.length)}
+        ${buildConfidenceSummary(job.id, items)}
         <div class="deck-progress">
           <div>Item ${currentIndex + 1} of ${items.length}</div>
           <div>10–15 min session</div>
@@ -782,7 +866,7 @@ const renderStudyDeck = (container, job, prebuiltItems = null) => {
       btn.addEventListener("click", (event) => {
         event.stopPropagation();
         const value = btn.dataset.conf;
-        safeLocalStorageSet(getConfidenceKey(job.id, currentIndex), value);
+        safeLocalStorageSet(getConfidenceKey(job.id, item.key), value);
         setTimeout(() => {
           if (currentIndex < items.length - 1) {
             currentIndex += 1;
@@ -827,7 +911,19 @@ const openPrepMode = (jobId) => {
   }
   const items = buildStudyDeckItems(job);
   if (!items.length) {
-    showToast("No prep data yet.");
+    const fallbackItems = buildFallbackDeckItems(job);
+    if (!fallbackItems.length) {
+      showToast("No prep data yet.");
+      return;
+    }
+    if (prepOverlayTitle) prepOverlayTitle.textContent = job.role || "Prep Mode";
+    if (prepOverlayMeta) prepOverlayMeta.textContent = job.company || "";
+    prepOverlay.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    state.activePrepJob = job;
+    if (prepOverlayContent) {
+      renderStudyDeck(prepOverlayContent, job, fallbackItems);
+    }
     return;
   }
   if (prepOverlayTitle) prepOverlayTitle.textContent = job.role || "Prep Mode";
