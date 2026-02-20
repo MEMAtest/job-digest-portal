@@ -863,37 +863,141 @@ body {
   color: #0f172a;
 }
 
-.prep-tabs {
-  display: flex;
-  gap: 0;
-  border-bottom: 2px solid #e2e8f0;
-  padding: 0 24px;
-}
-
-.prep-tab {
-  padding: 12px 20px;
-  background: none;
-  border: none;
-  font-size: 14px;
-  font-weight: 500;
-  color: #64748b;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-}
-
-.prep-tab--active {
-  color: #4f46e5;
-  border-bottom-color: #4f46e5;
-  font-weight: 600;
-}
-
 .prep-content {
   flex: 1;
   padding: 24px;
   max-width: 720px;
   margin: 0 auto;
   width: 100%;
+}
+
+/* Study Deck */
+.study-deck {
+  display: grid;
+  gap: 16px;
+}
+
+.deck-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.deck-progress-bar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.deck-progress-fill {
+  height: 100%;
+  background: #4f46e5;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.deck-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.deck-card__label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.deck-card__prompt {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.deck-reveal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.deck-answer {
+  margin-top: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.deck-answer__block {
+  margin-bottom: 8px;
+}
+
+.deck-answer__block:last-child {
+  margin-bottom: 0;
+}
+
+.deck-answer__hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.deck-keypoints {
+  margin-top: 12px;
+}
+
+.deck-keypoints h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.deck-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.deck-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.deck-complete {
+  text-align: center;
+  padding: 32px 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+}
+
+.deck-complete h3 {
+  font-size: 20px;
+  margin-bottom: 8px;
+  color: #0f172a;
 }
 
 /* Flashcards */
@@ -1162,9 +1266,7 @@ body {
   .prep-overlay {
     position: static;
   }
-  .prep-overlay__close,
-  .prep-tabs,
-  .cheatsheet__actions {
+  .prep-overlay__close {
     display: none !important;
   }
 }

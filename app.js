@@ -49,6 +49,7 @@ const state = {
   sources: new Set(),
   locations: new Set(),
   candidatePrep: {},
+  activePrepJob: null,
 };
 
 let quickFilterPredicate = null;
@@ -625,309 +626,207 @@ const getAnswerForScore = (answers, score) => {
   return (target || answers[0] || { text: "Not available yet." }).text;
 };
 
-const renderFlashcards = (container, job) => {
-  const stories = normaliseList(job.star_stories || []);
-  if (!stories.length) {
-    container.innerHTML = `<div class="detail-box">No STAR stories yet.</div>`;
-    return;
-  }
+const buildStudyDeckItems = (job) => {
+  const items = [];
+  const starStories = normaliseList(job.star_stories || []);
+  starStories.forEach((story) => {
+    const parsed = parseStarStory(story);
+    const topicSource = parsed.situation || parsed.raw || "Key achievement";
+    const prompt = topicSource.split(/\r?\n/)[0].slice(0, 160);
+    items.push({ type: "star", prompt, story });
+  });
 
-  let currentIndex = 0;
+  const questions = normaliseList(job.prep_questions || []);
+  questions.forEach((question, idx) => {
+    items.push({ type: "question", prompt: question, qIndex: idx });
+  });
 
-  const renderCard = () => {
-    const story = parseStarStory(stories[currentIndex]);
-    const topicSource = story.situation || story.raw || "";
-    const topic = topicSource.split(/\r?\n/)[0].slice(0, 120);
-    const confidence = safeLocalStorageGet(getConfidenceKey(job.id, currentIndex)) || "";
+  const talkingPoints = normaliseList(job.key_talking_points || []);
+  talkingPoints.forEach((point) => {
+    items.push({ type: "talking", prompt: point, point });
+  });
 
-    container.innerHTML = `
-      ${buildConfidenceSummary(job.id, stories.length)}
-      <div class="flashcard" data-index="${currentIndex}">
-        <div class="flashcard__front">
-          <div class="flashcard__prompt">What's your STAR story for:</div>
-          <div class="flashcard__topic">${formatInlineText(topic || "Key achievement")}</div>
-          <div class="flashcard__hint">Click to reveal answer</div>
-        </div>
-        <div class="flashcard__back hidden">
-          ${
-            story.situation || story.task || story.action || story.result
-              ? `
-                <div class="flashcard__section"><strong>Situation:</strong> ${formatInlineText(
-                  story.situation || "Not available yet."
-                )}</div>
-                <div class="flashcard__section"><strong>Task:</strong> ${formatInlineText(
-                  story.task || "Not available yet."
-                )}</div>
-                <div class="flashcard__section"><strong>Action:</strong> ${formatInlineText(
-                  story.action || "Not available yet."
-                )}</div>
-                <div class="flashcard__section"><strong>Result:</strong> ${formatInlineText(
-                  story.result || "Not available yet."
-                )}</div>
-              `
-              : `<div class="flashcard__section">${formatInlineText(story.raw)}</div>`
-          }
-        </div>
-        <div class="flashcard__confidence">
-          <span>How confident?</span>
-          <button class="conf-btn conf-btn--red ${confidence === "red" ? "active" : ""}" data-conf="red">Needs work</button>
-          <button class="conf-btn conf-btn--amber ${confidence === "amber" ? "active" : ""}" data-conf="amber">Getting there</button>
-          <button class="conf-btn conf-btn--green ${confidence === "green" ? "active" : ""}" data-conf="green">Nailed it</button>
-        </div>
-      </div>
-      <div class="flashcard-nav">
-        <button class="btn btn-secondary flashcard-prev" ${currentIndex === 0 ? "disabled" : ""}>Previous</button>
-        <div class="flashcard-progress">${currentIndex + 1} / ${stories.length} stories</div>
-        <button class="btn btn-primary flashcard-next" ${currentIndex === stories.length - 1 ? "disabled" : ""}>Next</button>
-      </div>
-    `;
-
-    const card = container.querySelector(".flashcard");
-    const front = card?.querySelector(".flashcard__front");
-    const back = card?.querySelector(".flashcard__back");
-
-    if (front && back) {
-      front.addEventListener("click", () => {
-        front.classList.add("hidden");
-        back.classList.remove("hidden");
-      });
-    }
-
-    container.querySelectorAll(".conf-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const value = btn.dataset.conf;
-        safeLocalStorageSet(getConfidenceKey(job.id, currentIndex), value);
-        setTimeout(() => {
-          if (currentIndex < stories.length - 1) {
-            currentIndex += 1;
-            renderCard();
-          } else {
-            showToast("All stories rated.");
-            renderCard();
-          }
-        }, 400);
-      });
-    });
-
-    const prevBtn = container.querySelector(".flashcard-prev");
-    const nextBtn = container.querySelector(".flashcard-next");
-    if (prevBtn) {
-      prevBtn.addEventListener("click", () => {
-        if (currentIndex > 0) {
-          currentIndex -= 1;
-          renderCard();
-        }
-      });
-    }
-    if (nextBtn) {
-      nextBtn.addEventListener("click", () => {
-        if (currentIndex < stories.length - 1) {
-          currentIndex += 1;
-          renderCard();
-        }
-      });
-    }
-  };
-
-  renderCard();
+  return items.slice(0, 12);
 };
 
-const renderMockInterview = (container, job) => {
-  const questions = normaliseList(job.prep_questions || []);
-  if (!questions.length) {
-    container.innerHTML = `<div class="detail-box">No mock interview questions yet.</div>`;
+const getKeyPoints = (job) => {
+  const candidates = [
+    normaliseList(job.key_talking_points || []),
+    normaliseList(state.candidatePrep?.key_talking_points || []),
+    normaliseList(state.candidatePrep?.key_stats || []),
+    normaliseList(state.candidatePrep?.strengths || []),
+  ];
+  for (const list of candidates) {
+    if (list.length) return list.slice(0, 3);
+  }
+  return [];
+};
+
+const buildStarAnswerHtml = (story) => {
+  const parsed = parseStarStory(story);
+  if (!parsed.situation && !parsed.task && !parsed.action && !parsed.result) {
+    return formatInlineText(parsed.raw || "Not available yet.");
+  }
+  return `
+    <div class="deck-answer__block"><strong>Situation:</strong> ${formatInlineText(parsed.situation || "Not available yet.")}</div>
+    <div class="deck-answer__block"><strong>Task:</strong> ${formatInlineText(parsed.task || "Not available yet.")}</div>
+    <div class="deck-answer__block"><strong>Action:</strong> ${formatInlineText(parsed.action || "Not available yet.")}</div>
+    <div class="deck-answer__block"><strong>Result:</strong> ${formatInlineText(parsed.result || "Not available yet.")}</div>
+  `;
+};
+
+const renderStudyDeck = (container, job, prebuiltItems = null) => {
+  const items = prebuiltItems || buildStudyDeckItems(job);
+  if (!items.length) {
+    container.innerHTML = `<div class="detail-box">No prep data yet.</div>`;
     return;
   }
 
   let currentIndex = 0;
 
-  const renderQuestion = () => {
-    if (currentIndex >= questions.length) {
+  const render = () => {
+    if (currentIndex >= items.length) {
       container.innerHTML = `
-        <div class="mock-complete">
-          <h3>Session complete!</h3>
-          <p>You covered all ${questions.length} questions.</p>
-          <button class="btn btn-primary mock-restart">Restart</button>
+        <div class="deck-complete">
+          <h3>Session complete</h3>
+          <p>You covered ${items.length} items.</p>
+          ${buildConfidenceSummary(job.id, items.length)}
+          <button class="btn btn-primary deck-restart">Restart session</button>
         </div>
       `;
-      const restartBtn = container.querySelector(".mock-restart");
+      const restartBtn = container.querySelector(".deck-restart");
       if (restartBtn) {
         restartBtn.addEventListener("click", () => {
           currentIndex = 0;
-          renderQuestion();
+          render();
         });
       }
       return;
     }
 
-    const answers = resolveAnswerOptions(job, currentIndex);
-    const selectedScore = 9;
-    const answerText = getAnswerForScore(answers, selectedScore);
-    const progress = Math.round(((currentIndex + 1) / questions.length) * 100);
+    const item = items[currentIndex];
+    const progress = Math.round(((currentIndex + 1) / items.length) * 100);
+    const confidence = safeLocalStorageGet(getConfidenceKey(job.id, currentIndex)) || "";
+    const keyPoints = getKeyPoints(job);
+
+    let label = "Interview question";
+    let answerHtml = "Not available yet.";
+    if (item.type === "star") {
+      label = "STAR story";
+      answerHtml = buildStarAnswerHtml(item.story);
+    } else if (item.type === "question") {
+      label = "Interview question";
+      const answers = resolveAnswerOptions(job, item.qIndex);
+      const modelAnswer = getAnswerForScore(answers, 9);
+      answerHtml = formatInlineText(modelAnswer || "Not available yet.");
+    } else if (item.type === "talking") {
+      label = "Key talking point";
+      const extra = job.interview_focus || job.why_fit || job.quick_pitch || "";
+      answerHtml = `
+        <div>${formatInlineText(item.point || "Not available yet.")}</div>
+        ${extra ? `<div class="deck-answer__hint">${formatInlineText(extra)}</div>` : ""}
+      `;
+    }
 
     container.innerHTML = `
-      <div class="mock-interview">
-        <div class="mock-progress">Question <span id="mock-current">${currentIndex + 1}</span> of <span id="mock-total">${questions.length}</span></div>
-        <div class="mock-progress-bar"><div class="mock-progress-fill" style="width:${progress}%"></div></div>
-        <div class="mock-question">${formatInlineText(questions[currentIndex])}</div>
-        <div class="mock-score-select">
-          <label>Target score:</label>
-          <select class="mock-score">
-            <option value="8">8/10 · Solid</option>
-            <option value="9" selected>9/10 · Strong</option>
-            <option value="10">10/10 · Elite</option>
-          </select>
+      <div class="study-deck">
+        ${buildConfidenceSummary(job.id, items.length)}
+        <div class="deck-progress">
+          <div>Item ${currentIndex + 1} of ${items.length}</div>
+          <div>10–15 min session</div>
         </div>
-        <button class="btn btn-primary mock-reveal-btn">Reveal answer</button>
-        <div class="mock-answer hidden">${formatInlineText(answerText)}</div>
-        <div class="mock-nav hidden">
-          <button class="btn btn-secondary mock-prev" ${currentIndex === 0 ? "disabled" : ""}>Previous</button>
-          <button class="btn btn-primary mock-next">Next question</button>
+        <div class="deck-progress-bar"><div class="deck-progress-fill" style="width:${progress}%"></div></div>
+        <div class="deck-card">
+          <div class="deck-card__label">${label}</div>
+          <div class="deck-card__prompt">${formatInlineText(item.prompt || "Key focus")}</div>
+          <button class="deck-reveal">Reveal model answer</button>
+          <div class="deck-answer hidden">${answerHtml}</div>
+          ${
+            keyPoints.length
+              ? `
+            <div class="deck-keypoints hidden">
+              <h4>Key points to hit</h4>
+              ${formatList(keyPoints)}
+            </div>`
+              : ""
+          }
+          <div class="flashcard__confidence" style="margin-top:16px;">
+            <span>How confident?</span>
+            <button class="conf-btn conf-btn--red ${confidence === "red" ? "active" : ""}" data-conf="red">Needs work</button>
+            <button class="conf-btn conf-btn--amber ${confidence === "amber" ? "active" : ""}" data-conf="amber">Getting there</button>
+            <button class="conf-btn conf-btn--green ${confidence === "green" ? "active" : ""}" data-conf="green">Nailed it</button>
+          </div>
+        </div>
+        <div class="deck-footer">
+          <div class="deck-nav">
+            <button class="btn btn-secondary deck-prev" ${currentIndex === 0 ? "disabled" : ""}>Previous</button>
+            <button class="btn btn-primary deck-next" ${currentIndex === items.length - 1 ? "disabled" : ""}>Next</button>
+          </div>
+          <div class="flashcard-progress">${currentIndex + 1} / ${items.length}</div>
         </div>
       </div>
     `;
 
-    const revealBtn = container.querySelector(".mock-reveal-btn");
-    const answerEl = container.querySelector(".mock-answer");
-    const navEl = container.querySelector(".mock-nav");
-    const scoreSelect = container.querySelector(".mock-score");
-
-    const updateAnswer = () => {
-      const score = scoreSelect?.value || "9";
-      const nextAnswer = getAnswerForScore(answers, score);
-      if (answerEl) answerEl.innerHTML = formatInlineText(nextAnswer);
-    };
-
-    if (scoreSelect) {
-      scoreSelect.addEventListener("change", () => {
-        if (answerEl && !answerEl.classList.contains("hidden")) {
-          updateAnswer();
-        }
-      });
-    }
-
+    const revealBtn = container.querySelector(".deck-reveal");
+    const answerEl = container.querySelector(".deck-answer");
+    const keyPointsEl = container.querySelector(".deck-keypoints");
     if (revealBtn) {
       revealBtn.addEventListener("click", () => {
-        updateAnswer();
         revealBtn.classList.add("hidden");
         if (answerEl) answerEl.classList.remove("hidden");
-        if (navEl) navEl.classList.remove("hidden");
+        if (keyPointsEl) keyPointsEl.classList.remove("hidden");
       });
     }
 
-    const prevBtn = container.querySelector(".mock-prev");
-    const nextBtn = container.querySelector(".mock-next");
+    container.querySelectorAll(".conf-btn").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const value = btn.dataset.conf;
+        safeLocalStorageSet(getConfidenceKey(job.id, currentIndex), value);
+        setTimeout(() => {
+          if (currentIndex < items.length - 1) {
+            currentIndex += 1;
+            render();
+          } else {
+            currentIndex += 1;
+            render();
+          }
+        }, 400);
+      });
+    });
+
+    const prevBtn = container.querySelector(".deck-prev");
+    const nextBtn = container.querySelector(".deck-next");
     if (prevBtn) {
       prevBtn.addEventListener("click", () => {
         if (currentIndex > 0) {
           currentIndex -= 1;
-          renderQuestion();
+          render();
         }
       });
     }
     if (nextBtn) {
       nextBtn.addEventListener("click", () => {
-        currentIndex += 1;
-        renderQuestion();
+        if (currentIndex < items.length - 1) {
+          currentIndex += 1;
+          render();
+        }
       });
     }
   };
 
-  renderQuestion();
-};
-
-const listToText = (items) => {
-  const list = normaliseList(items);
-  if (!list.length) return "Not available yet.";
-  return list.map((item) => `- ${String(item).replace(/^\s*[•*-]\s+/, "")}`).join("\n");
-};
-
-const buildCheatSheetText = (job, prep) => {
-  const parts = [];
-  parts.push(`Quick Pitch:\n${job.quick_pitch || prep.quick_pitch || "Not available yet."}`);
-  parts.push(`\nWhy You Fit This Role:\n${job.why_fit || "Not available yet."}`);
-  parts.push(`\nKey Talking Points:\n${listToText(job.key_talking_points || prep.key_talking_points || [])}`);
-  parts.push(`\nYour Strengths:\n${listToText(prep.strengths || [])}`);
-  parts.push(`\nRisk Mitigations:\n${listToText(prep.risk_mitigations || [])}`);
-  parts.push(`\nInterview Focus:\n${job.interview_focus || "Not available yet."}`);
-  parts.push(`\nCompany Insights:\n${job.company_insights || "Not available yet."}`);
-  return parts.join("\n");
-};
-
-const renderCheatSheet = (container, job) => {
-  const prep = state.candidatePrep || {};
-  container.innerHTML = `
-    <div class="cheatsheet">
-      <div class="cheatsheet__section">
-        <h3>Quick Pitch</h3>
-        <div>${formatInlineText(job.quick_pitch || prep.quick_pitch || "Not available yet.")}</div>
-      </div>
-      <div class="cheatsheet__section">
-        <h3>Why You Fit This Role</h3>
-        <div>${formatInlineText(job.why_fit || "Not available yet.")}</div>
-      </div>
-      <div class="cheatsheet__section">
-        <h3>Key Talking Points</h3>
-        ${formatList(job.key_talking_points || prep.key_talking_points || [])}
-      </div>
-      <div class="cheatsheet__section">
-        <h3>Your Strengths</h3>
-        ${formatList(prep.strengths || [])}
-      </div>
-      <div class="cheatsheet__section">
-        <h3>Risk Mitigations (gaps/weaknesses)</h3>
-        ${formatList(prep.risk_mitigations || [])}
-      </div>
-      <div class="cheatsheet__section">
-        <h3>Interview Focus</h3>
-        <div>${formatInlineText(job.interview_focus || "Not available yet.")}</div>
-      </div>
-      <div class="cheatsheet__section">
-        <h3>Company Insights</h3>
-        <div>${formatInlineText(job.company_insights || "Not available yet.")}</div>
-      </div>
-      <div class="cheatsheet__actions">
-        <button class="btn btn-primary copy-cheatsheet-btn">Copy all</button>
-        <button class="btn btn-secondary print-cheatsheet-btn">Print</button>
-      </div>
-    </div>
-  `;
-
-  const copyBtn = container.querySelector(".copy-cheatsheet-btn");
-  if (copyBtn) {
-    copyBtn.addEventListener("click", () => {
-      copyToClipboard(buildCheatSheetText(job, prep));
-      showToast("Cheat sheet copied.");
-    });
-  }
-
-  const printBtn = container.querySelector(".print-cheatsheet-btn");
-  if (printBtn) {
-    printBtn.addEventListener("click", () => {
-      window.print();
-    });
-  }
-};
-
-const hasPrepContent = (job) => {
-  if (!job) return false;
-  return Boolean(
-    (job.prep_questions && job.prep_questions.length) ||
-      (job.star_stories && job.star_stories.length) ||
-      (job.key_talking_points && job.key_talking_points.length) ||
-      job.quick_pitch ||
-      job.interview_focus ||
-      job.company_insights ||
-      job.why_fit ||
-      job.cv_gap
-  );
+  render();
 };
 
 const openPrepMode = (jobId) => {
   if (!prepOverlay) return;
   const job = state.jobs.find((j) => j.id === jobId);
-  if (!job || !hasPrepContent(job)) {
+  if (!job) {
+    showToast("No prep data yet.");
+    return;
+  }
+  const items = buildStudyDeckItems(job);
+  if (!items.length) {
     showToast("No prep data yet.");
     return;
   }
@@ -935,37 +834,19 @@ const openPrepMode = (jobId) => {
   if (prepOverlayMeta) prepOverlayMeta.textContent = job.company || "";
   prepOverlay.classList.remove("hidden");
   document.body.style.overflow = "hidden";
-  window.__prepJob = job;
-  switchPrepTab("flashcards");
+  state.activePrepJob = job;
+  if (prepOverlayContent) {
+    renderStudyDeck(prepOverlayContent, job, items);
+  }
 };
 
 const closePrepMode = () => {
   if (!prepOverlay) return;
   prepOverlay.classList.add("hidden");
   document.body.style.overflow = "";
-  window.__prepJob = null;
-};
-
-const switchPrepTab = (tabName) => {
-  if (!prepOverlayContent) return;
-  document.querySelectorAll(".prep-tab").forEach((btn) => {
-    btn.classList.toggle("prep-tab--active", btn.dataset.prepTab === tabName);
-  });
-  const job = window.__prepJob;
-  if (!job) {
-    prepOverlayContent.innerHTML = "<div class=\"detail-box\">Select a role to start prep.</div>";
-    return;
-  }
-  if (tabName === "flashcards") {
-    renderFlashcards(prepOverlayContent, job);
-    return;
-  }
-  if (tabName === "mock") {
-    renderMockInterview(prepOverlayContent, job);
-    return;
-  }
-  if (tabName === "cheatsheet") {
-    renderCheatSheet(prepOverlayContent, job);
+  state.activePrepJob = null;
+  if (prepOverlayContent) {
+    prepOverlayContent.innerHTML = "";
   }
 };
 
@@ -1974,12 +1855,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closePrepMode();
   }
-});
-
-document.querySelectorAll(".prep-tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    switchPrepTab(btn.dataset.prepTab);
-  });
 });
 
 setActiveTab("dashboard");
