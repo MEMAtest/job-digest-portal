@@ -479,10 +479,11 @@ const buildPrepQa = (job) => {
         answers = [fallbackAnswers[idx]];
       }
 
+      const labels = ["8/10 · Solid", "9/10 · Strong", "10/10 · Elite"];
       const options = [8, 9, 10]
         .map((score, optIdx) => {
           const answerText = answers[optIdx] || answers[0] || "";
-          return `<option value="${score}" data-answer="${escapeHtml(answerText)}">${score}/10</option>`;
+          return `<option value="${score}" data-answer="${escapeHtml(answerText)}">${labels[optIdx]}</option>`;
         })
         .join("");
 
