@@ -72,6 +72,11 @@ except Exception:  # noqa: BLE001
     credentials = None
     firestore = None
 
+try:
+    import google.generativeai as genai
+except Exception:  # noqa: BLE001
+    genai = None
+
 
 @dataclass
 class JobRecord:
@@ -140,6 +145,8 @@ TO_EMAIL = os.getenv("TO_EMAIL", "ademolaomosanya@gmail.com")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "") or os.getenv("JOB_DIGEST_OPENAI_KEY", "")
 OPENAI_MODEL = os.getenv("JOB_DIGEST_OPENAI_MODEL", "gpt-4o-mini")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("JOB_DIGEST_GEMINI_KEY", "")
+GEMINI_MODEL = os.getenv("JOB_DIGEST_GEMINI_MODEL", "gemini-1.5-flash")
 AI_MAX_JOBS = int(os.getenv("JOB_DIGEST_AI_MAX_JOBS", "20"))
 JOB_DIGEST_CV_PATH = os.getenv(
     "JOB_DIGEST_CV_PATH",
@@ -1638,16 +1645,32 @@ def write_source_stats(records: List[JobRecord]) -> None:
         return
 
 
+def _ai_generate(prompt: str) -> str:
+    """Call Gemini if available, otherwise fall back to OpenAI. Returns raw text."""
+    if GEMINI_API_KEY and genai is not None:
+        try:
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel(GEMINI_MODEL)
+            response = model.generate_content(prompt)
+            return getattr(response, "text", "") or ""
+        except Exception:
+            pass
+    if OPENAI_API_KEY and OpenAI is not None:
+        try:
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            response = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return response.choices[0].message.content or ""
+        except Exception:
+            pass
+    return ""
+
+
 def write_role_suggestions() -> None:
     client_db = init_firestore_client()
     if client_db is None:
-        return
-    if not GEMINI_API_KEY or genai is None:
-        return
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(GEMINI_MODEL)
-    except Exception:
         return
 
     prompt = (
@@ -1656,11 +1679,10 @@ def write_role_suggestions() -> None:
         "roles (array of strings) and rationale (string). Keep roles UK market relevant.\n\n"
         f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
     )
-    try:
-        response = model.generate_content(prompt)
-    except Exception:
+    text = _ai_generate(prompt)
+    if not text:
         return
-    data = parse_gemini_payload(getattr(response, "text", "") or "") or {}
+    data = parse_gemini_payload(text) or {}
     roles = data.get("roles", [])
     if isinstance(roles, str):
         roles = [roles]
@@ -1683,13 +1705,6 @@ def write_candidate_prep() -> None:
     client_db = init_firestore_client()
     if client_db is None:
         return
-    if not GEMINI_API_KEY or genai is None:
-        return
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(GEMINI_MODEL)
-    except Exception:
-        return
 
     prompt = (
         "You are a UK executive interview coach. Create a concise interview prep sheet for Ade. "
@@ -1698,11 +1713,10 @@ def write_candidate_prep() -> None:
         "Keep it clear, confident, and memorable.\n\n"
         f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
     )
-    try:
-        response = model.generate_content(prompt)
-    except Exception:
+    text = _ai_generate(prompt)
+    if not text:
         return
-    data = parse_gemini_payload(getattr(response, "text", "") or "") or {}
+    data = parse_gemini_payload(text) or {}
     key_stats = data.get("key_stats", [])
     if isinstance(key_stats, str):
         key_stats = [key_stats]

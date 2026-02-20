@@ -430,64 +430,87 @@ const renderJobs = () => {
     const dotsContainer = card.querySelector(".carousel-dots");
 
     const detailCards = carousel ? Array.from(carousel.querySelectorAll(".detail-box")) : [];
-    const snapToIndex = (index) => {
-      if (!carousel || !detailCards[index]) return;
-      const target = detailCards[index];
-      const left = target.offsetLeft - carousel.offsetLeft;
-      carousel.scrollTo({ left, behavior: "smooth" });
-    };
 
-    const renderDots = () => {
-      if (!dotsContainer) return;
-      dotsContainer.innerHTML = "";
-      detailCards.forEach((_, idx) => {
-        const dot = document.createElement("button");
-        dot.className = "carousel-dot";
-        dot.setAttribute("aria-label", `Go to card ${idx + 1}`);
-        dot.addEventListener("click", () => snapToIndex(idx));
-        dotsContainer.appendChild(dot);
-      });
-    };
+    const isMobile = window.matchMedia("(max-width: 900px)").matches;
 
-    const updateActiveDot = () => {
-      if (!carousel || !dotsContainer) return;
-      const scrollLeft = carousel.scrollLeft;
-      let activeIdx = 0;
-      let bestDistance = Number.POSITIVE_INFINITY;
-      detailCards.forEach((cardEl, idx) => {
-        const distance = Math.abs(cardEl.offsetLeft - carousel.offsetLeft - scrollLeft);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          activeIdx = idx;
+    if (isMobile) {
+      // Convert detail boxes into accordion items
+      detailCards.forEach((box) => {
+        const title = box.querySelector(".section-title");
+        if (!title) return;
+        // Wrap everything after the title in an accordion-body div
+        const body = document.createElement("div");
+        body.className = "accordion-body";
+        while (title.nextSibling) {
+          body.appendChild(title.nextSibling);
         }
+        box.appendChild(body);
+        // Tap title to toggle
+        title.addEventListener("click", () => {
+          box.classList.toggle("accordion-open");
+        });
       });
-      dotsContainer.querySelectorAll(".carousel-dot").forEach((dot, idx) => {
-        dot.classList.toggle("active", idx === activeIdx);
-      });
-    };
+    } else {
+      // Desktop: carousel behavior
+      const snapToIndex = (index) => {
+        if (!carousel || !detailCards[index]) return;
+        const target = detailCards[index];
+        const left = target.offsetLeft - carousel.offsetLeft;
+        carousel.scrollTo({ left, behavior: "smooth" });
+      };
 
-    if (carousel) {
-      renderDots();
-      updateActiveDot();
-      carousel.addEventListener("scroll", () => {
-        window.requestAnimationFrame(updateActiveDot);
-      });
-    }
+      const renderDots = () => {
+        if (!dotsContainer) return;
+        dotsContainer.innerHTML = "";
+        detailCards.forEach((_, idx) => {
+          const dot = document.createElement("button");
+          dot.className = "carousel-dot";
+          dot.setAttribute("aria-label", `Go to card ${idx + 1}`);
+          dot.addEventListener("click", () => snapToIndex(idx));
+          dotsContainer.appendChild(dot);
+        });
+      };
 
-    if (prevBtn) {
-      prevBtn.addEventListener("click", () => {
-        const active = dotsContainer?.querySelector(".carousel-dot.active");
-        const idx = active ? Array.from(dotsContainer.children).indexOf(active) : 0;
-        snapToIndex(Math.max(0, idx - 1));
-      });
-    }
+      const updateActiveDot = () => {
+        if (!carousel || !dotsContainer) return;
+        const scrollLeft = carousel.scrollLeft;
+        let activeIdx = 0;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        detailCards.forEach((cardEl, idx) => {
+          const distance = Math.abs(cardEl.offsetLeft - carousel.offsetLeft - scrollLeft);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            activeIdx = idx;
+          }
+        });
+        dotsContainer.querySelectorAll(".carousel-dot").forEach((dot, idx) => {
+          dot.classList.toggle("active", idx === activeIdx);
+        });
+      };
 
-    if (nextBtn) {
-      nextBtn.addEventListener("click", () => {
-        const active = dotsContainer?.querySelector(".carousel-dot.active");
-        const idx = active ? Array.from(dotsContainer.children).indexOf(active) : 0;
-        snapToIndex(Math.min(detailCards.length - 1, idx + 1));
-      });
+      if (carousel) {
+        renderDots();
+        updateActiveDot();
+        carousel.addEventListener("scroll", () => {
+          window.requestAnimationFrame(updateActiveDot);
+        });
+      }
+
+      if (prevBtn) {
+        prevBtn.addEventListener("click", () => {
+          const active = dotsContainer?.querySelector(".carousel-dot.active");
+          const idx = active ? Array.from(dotsContainer.children).indexOf(active) : 0;
+          snapToIndex(Math.max(0, idx - 1));
+        });
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener("click", () => {
+          const active = dotsContainer?.querySelector(".carousel-dot.active");
+          const idx = active ? Array.from(dotsContainer.children).indexOf(active) : 0;
+          snapToIndex(Math.min(detailCards.length - 1, idx + 1));
+        });
+      }
     }
 
     card.querySelectorAll(".copy-btn").forEach((btn) => {

@@ -4,6 +4,11 @@
   padding: 0;
 }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   background: #f4f6fb;
@@ -40,6 +45,7 @@ body {
   place-items: center;
   color: #fff;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 .brand-title {
@@ -95,6 +101,7 @@ body {
 
 .content {
   padding: 28px 36px 40px;
+  min-width: 0;
 }
 
 .topbar {
@@ -197,6 +204,7 @@ body {
   outline: none;
   color: #0f172a;
   background: transparent;
+  width: 100%;
 }
 
 .top-pick {
@@ -575,69 +583,233 @@ body {
   font-weight: 700;
 }
 
+/* ───────────────────────────────────────
+   MOBILE — full redesign
+   ─────────────────────────────────────── */
 @media (max-width: 900px) {
+  /* Layout */
   .app {
     grid-template-columns: 1fr;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
+
+  /* Sidebar → compact nav bar */
   .sidebar {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    padding: 12px 14px 8px;
+    gap: 8px;
   }
+  .brand {
+    gap: 8px;
+  }
+  .brand-badge {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+  .brand-title { font-size: 14px; }
+  .brand-subtitle { font-size: 10px; }
+  .sidebar-footer { display: none; }
   .nav {
     flex-direction: row;
-    gap: 8px;
+    gap: 4px;
   }
   .nav-item {
     flex: 1;
     text-align: center;
-    padding: 10px 8px;
-    font-size: 12px;
+    padding: 8px 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    border-radius: 8px;
   }
+
+  /* Content */
   .content {
-    padding: 16px;
+    padding: 12px;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
+
+  /* Topbar */
+  .topbar {
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .topbar h1 { font-size: 18px; }
+  .topbar p { font-size: 12px; }
+  .topbar-actions {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+  }
+  .topbar-actions .btn {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  /* Filters — 2-col */
+  .filters {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  /* Stats — 2-col */
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-card { padding: 10px; }
+  .stat-card__value { font-size: 18px; }
+
+  /* Job list */
   .job-grid {
-    display: block;
-    max-height: calc(100vh - 340px);
-    overflow-y: auto;
-    scroll-snap-type: y mandatory;
-    padding-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
+
+  /* Job card */
   .job-card {
-    display: flex;
-    flex-direction: column;
-    scroll-snap-align: start;
-    min-height: calc(100vh - 320px);
-  }
-  .detail-carousel-wrap {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  .detail-carousel {
-    flex: 1;
-    align-items: stretch;
-  }
-  .detail-box {
-    height: 100%;
-    overflow: auto;
-  }
-  .job-card__actions {
-    margin-top: 8px;
+    padding: 12px;
+    gap: 10px;
+    overflow: hidden;
   }
   .job-card__header {
     flex-direction: column;
-    align-items: flex-start;
+    gap: 6px;
+  }
+  .job-card__title { font-size: 15px; }
+  .job-card__meta { font-size: 12px; }
+  .job-card__badges {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge--location {
+    max-width: none;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  /* HIDE desktop carousel chrome */
+  .detail-carousel-header { display: none; }
+  .carousel-dots { display: none; }
+
+  /* Convert carousel → vertical accordion */
+  .detail-carousel-wrap {
+    margin-top: 8px;
+  }
+  .job-card__details.detail-carousel {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow-x: visible;
+    overflow-y: visible;
+    scroll-snap-type: none;
+    padding-bottom: 0;
+  }
+
+  /* Each detail-box becomes an accordion item */
+  .detail-box {
+    flex: none;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+  }
+  .detail-box:first-child {
+    border-top: none;
+  }
+  .detail-box:last-child {
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  /* Section title = accordion trigger */
+  .detail-box .section-title {
+    padding: 10px 12px;
+    margin-bottom: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .detail-box .section-title::after {
+    content: "\25B8";
+    font-size: 12px;
+    color: #94a3b8;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 8px;
+  }
+  .detail-box.accordion-open .section-title::after {
+    transform: rotate(90deg);
+  }
+
+  /* Accordion content (everything after section-title) */
+  .detail-box .accordion-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+    padding: 0 12px;
+  }
+  .detail-box.accordion-open .accordion-body {
+    max-height: 2000px;
+    padding: 8px 12px 12px;
+  }
+
+  /* Actions */
+  .job-card__actions {
+    margin-top: 4px;
+  }
+  .job-card__actions a {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    padding: 10px;
+  }
+
+  /* Tracking grid */
+  .tracking-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  /* Top pick */
+  .top-pick {
+    padding: 12px;
+  }
+  .top-pick .job-card__details {
+    flex-direction: column;
+    overflow: visible;
     gap: 8px;
   }
-  .detail-box {
-    flex: 0 0 88%;
-    max-width: 88%;
-    height: auto;
-    overflow: visible;
+  .top-pick .detail-box {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px;
+    background: #f8fafc;
   }
-  .detail-carousel {
-    align-items: flex-start;
+
+  /* Alert */
+  .alert {
+    font-size: 12px;
+    padding: 10px 12px;
   }
 }
