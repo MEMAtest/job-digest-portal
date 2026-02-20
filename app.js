@@ -834,24 +834,6 @@ const loadJobs = async () => {
     renderTopPick(jobs[0]);
     renderJobs();
 
-    const statsRef = collection(db, statsCollection);
-    const statsQuery = query(statsRef, orderBy("date", "desc"), limit(7));
-    const statsSnap = await getDocs(statsQuery);
-    const statsDocs = statsSnap.docs.map((doc) => doc.data());
-    renderSourceStats(statsDocs);
-
-    const suggestionsRef = collection(db, suggestionsCollection);
-    const suggestionsQuery = query(suggestionsRef, orderBy("date", "desc"), limit(1));
-    const suggestionsSnap = await getDocs(suggestionsQuery);
-    const suggestionDoc = suggestionsSnap.docs[0]?.data();
-    renderRoleSuggestions(suggestionDoc);
-
-    const prepRef = collection(db, candidatePrepCollection);
-    const prepQuery = query(prepRef, orderBy("date", "desc"), limit(1));
-    const prepSnap = await getDocs(prepQuery);
-    const prepDoc = prepSnap.docs[0]?.data();
-    renderCandidatePrep(prepDoc);
-
     summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
   } catch (error) {
     console.error(error);
@@ -861,11 +843,54 @@ const loadJobs = async () => {
       alertBanner.classList.remove("hidden");
       if (String(message).toLowerCase().includes("permissions")) {
         alertBanner.innerHTML =
-          "<strong>Permission error:</strong> Update your Firestore rules to allow read access to the jobs collections. See README for the exact rules snippet.";
+          "<strong>Permission error:</strong> Update your Firestore rules to allow read access to the jobs collection.";
       } else {
         alertBanner.innerHTML = `<strong>Load error:</strong> ${escapeHtml(message)}`;
       }
     }
+    return;
+  }
+
+  const warnParts = [];
+  try {
+    const statsRef = collection(db, statsCollection);
+    const statsQuery = query(statsRef, orderBy("date", "desc"), limit(7));
+    const statsSnap = await getDocs(statsQuery);
+    const statsDocs = statsSnap.docs.map((doc) => doc.data());
+    renderSourceStats(statsDocs);
+  } catch (error) {
+    console.error(error);
+    warnParts.push("source stats");
+  }
+
+  try {
+    const suggestionsRef = collection(db, suggestionsCollection);
+    const suggestionsQuery = query(suggestionsRef, orderBy("date", "desc"), limit(1));
+    const suggestionsSnap = await getDocs(suggestionsQuery);
+    const suggestionDoc = suggestionsSnap.docs[0]?.data();
+    renderRoleSuggestions(suggestionDoc);
+  } catch (error) {
+    console.error(error);
+    warnParts.push("role suggestions");
+  }
+
+  try {
+    const prepRef = collection(db, candidatePrepCollection);
+    const prepQuery = query(prepRef, orderBy("date", "desc"), limit(1));
+    const prepSnap = await getDocs(prepQuery);
+    const prepDoc = prepSnap.docs[0]?.data();
+    renderCandidatePrep(prepDoc);
+  } catch (error) {
+    console.error(error);
+    warnParts.push("candidate prep");
+  }
+
+  if (warnParts.length && alertBanner) {
+    alertBanner.classList.remove("hidden");
+    alertBanner.classList.add("alert--warning");
+    alertBanner.innerHTML = `<strong>Limited data:</strong> ${warnParts.join(
+      ", "
+    )} unavailable. Check Firestore rules for job_stats, role_suggestions, and candidate_prep.`;
   }
 };
 
