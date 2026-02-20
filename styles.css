@@ -156,6 +156,24 @@ body {
   margin-bottom: 24px;
 }
 
+.quick-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #1e1b4b;
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  font-size: 13px;
+}
+
+.quick-filter__label {
+  font-weight: 600;
+}
+
 .filter {
   background: #fff;
   padding: 12px 14px;

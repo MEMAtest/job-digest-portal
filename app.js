@@ -43,6 +43,10 @@ const state = {
   locations: new Set(),
 };
 
+let quickFilterPredicate = null;
+let quickFilterLabel = "";
+let uniqueCompanyOnly = false;
+
 const formatFitBadge = (score) => {
   if (score >= 80) return "badge badge--green";
   if (score >= 72) return "badge badge--blue";
@@ -79,6 +83,54 @@ const isUkOrRemote = (location) => {
     loc.includes("scotland") ||
     loc.includes("wales")
   );
+};
+
+const parseDateValue = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) return date;
+  return null;
+};
+
+const quickFilterBar = document.getElementById("quick-filter");
+
+const clearQuickFilter = () => {
+  quickFilterPredicate = null;
+  quickFilterLabel = "";
+  uniqueCompanyOnly = false;
+  if (quickFilterBar) {
+    quickFilterBar.classList.add("hidden");
+    quickFilterBar.innerHTML = "";
+  }
+  renderJobs();
+};
+
+const applyQuickFilter = ({ label, predicate, status, uniqueCompanies } = {}) => {
+  quickFilterPredicate = predicate || null;
+  quickFilterLabel = label || "";
+  uniqueCompanyOnly = Boolean(uniqueCompanies);
+  if (status !== undefined) {
+    statusSelect.value = status;
+  }
+  if (quickFilterBar) {
+    if (!quickFilterLabel && !uniqueCompanyOnly) {
+      quickFilterBar.classList.add("hidden");
+      quickFilterBar.innerHTML = "";
+    } else {
+      const labelText = quickFilterLabel || (uniqueCompanyOnly ? "Unique companies only" : "Quick filter");
+      quickFilterBar.classList.remove("hidden");
+      quickFilterBar.innerHTML = `
+        <div class="quick-filter__label">${escapeHtml(labelText)}</div>
+        <button class="btn btn-tertiary quick-filter__clear">Clear</button>
+      `;
+      const clearBtn = quickFilterBar.querySelector(".quick-filter__clear");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", clearQuickFilter);
+      }
+    }
+  }
+  renderJobs();
+  setActiveTab("live");
 };
 
 const escapeHtml = (value) => {
@@ -161,7 +213,7 @@ const renderJobs = () => {
   const statusFilter = statusSelect.value;
   const ukOnly = ukOnlyCheckbox.checked;
 
-  const filtered = state.jobs.filter((job) => {
+  let filtered = state.jobs.filter((job) => {
     const jobStatus = (job.application_status || "saved").toLowerCase();
     const matchesSearch =
       !searchTerm ||
@@ -176,9 +228,28 @@ const renderJobs = () => {
     const matchesLocation = !locationFilter || job.location === locationFilter;
     const matchesStatus = !statusFilter || jobStatus === statusFilter;
     const matchesUkOnly = !ukOnly || isUkOrRemote(job.location);
+    const matchesQuick = !quickFilterPredicate || quickFilterPredicate(job);
 
-    return matchesSearch && matchesFit && matchesSource && matchesLocation && matchesStatus && matchesUkOnly;
+    return (
+      matchesSearch &&
+      matchesFit &&
+      matchesSource &&
+      matchesLocation &&
+      matchesStatus &&
+      matchesUkOnly &&
+      matchesQuick
+    );
   });
+
+  if (uniqueCompanyOnly) {
+    const seen = new Set();
+    filtered = filtered.filter((job) => {
+      const key = (job.company || "").trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
 
   jobsContainer.innerHTML = "";
   filtered.forEach((job) => {
@@ -534,28 +605,21 @@ const renderDashboardStats = (jobs) => {
   const last24 = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const last72 = new Date(now.getTime() - 72 * 60 * 60 * 1000);
 
-  const parseDate = (value) => {
-    if (!value) return null;
-    const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) return date;
-    return null;
-  };
-
   const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
-  const updatedDates = jobs.map((job) => parseDate(job.updated_at)).filter(Boolean);
+  const updatedDates = jobs.map((job) => parseDateValue(job.updated_at)).filter(Boolean);
 
   const newLast24 = updatedDates.filter((dt) => dt >= last24).length;
   const newLast72 = updatedDates.filter((dt) => dt >= last72).length;
 
   const appliedToday = jobs.filter((job) => {
     if (safeStatus(job) !== "applied") return false;
-    const dt = parseDate(job.application_date);
+    const dt = parseDateValue(job.application_date);
     return dt && dt >= startToday;
   }).length;
 
   const appliedYesterday = jobs.filter((job) => {
     if (safeStatus(job) !== "applied") return false;
-    const dt = parseDate(job.application_date);
+    const dt = parseDateValue(job.application_date);
     return dt && dt >= startYesterday && dt < startToday;
   }).length;
 
@@ -565,52 +629,120 @@ const renderDashboardStats = (jobs) => {
   const uniqueCompanies = new Set(jobs.map((job) => job.company).filter(Boolean)).size;
 
   dashboardStatsContainer.innerHTML = `
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="links">
       <div class="stat-card__label">Links sent</div>
       <div class="stat-card__value">${jobs.length}</div>
       <div class="stat-card__trend">Live roles in feed</div>
     </div>
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="new24">
       <div class="stat-card__label">New (24h)</div>
       <div class="stat-card__value">${newLast24}</div>
       <div class="stat-card__trend">Updated in last day</div>
     </div>
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="new72">
       <div class="stat-card__label">New (72h)</div>
       <div class="stat-card__value">${newLast72}</div>
       <div class="stat-card__trend">Updated in last 3 days</div>
     </div>
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="appliedToday">
       <div class="stat-card__label">Applied today</div>
       <div class="stat-card__value">${appliedToday}</div>
       <div class="stat-card__trend">Since midnight</div>
     </div>
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="appliedYesterday">
       <div class="stat-card__label">Applied yesterday</div>
       <div class="stat-card__value">${appliedYesterday}</div>
       <div class="stat-card__trend">Previous day</div>
     </div>
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="saved">
       <div class="stat-card__label">Saved</div>
       <div class="stat-card__value">${savedCount}</div>
       <div class="stat-card__trend">Not yet applied</div>
     </div>
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="interview">
       <div class="stat-card__label">Interviews</div>
       <div class="stat-card__value">${interviewCount}</div>
       <div class="stat-card__trend">Active</div>
     </div>
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="offer">
       <div class="stat-card__label">Offers</div>
       <div class="stat-card__value">${offerCount}</div>
       <div class="stat-card__trend">Win rate tracker</div>
     </div>
-    <div class="stat-card stat-card--clickable">
+    <div class="stat-card stat-card--clickable" data-stat="uniqueCompanies">
       <div class="stat-card__label">Unique companies</div>
       <div class="stat-card__value">${uniqueCompanies}</div>
       <div class="stat-card__trend">Company spread</div>
     </div>
   `;
+
+  dashboardStatsContainer.querySelectorAll(".stat-card--clickable").forEach((card) => {
+    const stat = card.dataset.stat;
+    card.addEventListener("click", () => {
+      if (stat === "links") {
+        applyQuickFilter({ label: "All roles", predicate: null, status: "" });
+        return;
+      }
+      if (stat === "new24") {
+        applyQuickFilter({
+          label: "Updated in last 24 hours",
+          predicate: (job) => {
+            const dt = parseDateValue(job.updated_at);
+            return dt && dt >= last24;
+          },
+        });
+        return;
+      }
+      if (stat === "new72") {
+        applyQuickFilter({
+          label: "Updated in last 72 hours",
+          predicate: (job) => {
+            const dt = parseDateValue(job.updated_at);
+            return dt && dt >= last72;
+          },
+        });
+        return;
+      }
+      if (stat === "appliedToday") {
+        applyQuickFilter({
+          label: "Applied today",
+          status: "applied",
+          predicate: (job) => {
+            const dt = parseDateValue(job.application_date);
+            return dt && dt >= startToday;
+          },
+        });
+        return;
+      }
+      if (stat === "appliedYesterday") {
+        applyQuickFilter({
+          label: "Applied yesterday",
+          status: "applied",
+          predicate: (job) => {
+            const dt = parseDateValue(job.application_date);
+            return dt && dt >= startYesterday && dt < startToday;
+          },
+        });
+        return;
+      }
+      if (stat === "saved") {
+        applyQuickFilter({ label: "Saved roles", status: "saved" });
+        return;
+      }
+      if (stat === "interview") {
+        applyQuickFilter({ label: "Interview stage", status: "interview" });
+        return;
+      }
+      if (stat === "offer") {
+        applyQuickFilter({ label: "Offers", status: "offer" });
+        return;
+      }
+      if (stat === "uniqueCompanies") {
+        applyQuickFilter({ label: "Unique companies", uniqueCompanies: true });
+        return;
+      }
+    });
+  });
 };
 
 const setActiveTab = (tabId) => {
