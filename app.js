@@ -453,7 +453,12 @@ const quickApply = async (job, card) => {
 
 const formatList = (items) => {
   if (!items || !items.length) return "Not available yet.";
-  return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+  return `<ul>${items
+    .map((item) => {
+      const safe = escapeHtml(item).replaceAll("\\n", "<br>");
+      return `<li>${safe}</li>`;
+    })
+    .join("")}</ul>`;
 };
 
 const buildPrepQa = (job) => {
