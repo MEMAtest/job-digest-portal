@@ -473,21 +473,23 @@ const buildPrepQa = (job) => {
   return questions
     .map((question, idx) => {
       let answers = [];
-      if (Array.isArray(answerSets[idx])) {
-        answers = answerSets[idx];
+      if (answerSets[idx] && Array.isArray(answerSets[idx].answers)) {
+        answers = answerSets[idx].answers;
+      } else if (Array.isArray(answerSets[idx])) {
+        answers = answerSets[idx].map((text, i) => ({ score: 8 + i, text }));
       } else if (fallbackAnswers[idx]) {
-        answers = [fallbackAnswers[idx]];
+        answers = [{ score: 9, text: fallbackAnswers[idx] }];
       }
 
-      const labels = ["8/10 · Solid", "9/10 · Strong", "10/10 · Elite"];
+      const labels = { 8: "8/10 · Solid", 9: "9/10 · Strong", 10: "10/10 · Elite" };
       const options = [8, 9, 10]
-        .map((score, optIdx) => {
-          const answerText = answers[optIdx] || answers[0] || "";
-          return `<option value="${score}" data-answer="${escapeHtml(answerText)}">${labels[optIdx]}</option>`;
+        .map((score) => {
+          const match = answers.find((ans) => Number(ans.score) === score) || answers[0] || { text: "" };
+          return `<option value="${score}" data-answer="${escapeHtml(match.text || "")}">${labels[score]}</option>`;
         })
         .join("");
 
-      const initialAnswer = answers[0] || "";
+      const initialAnswer = answers[0]?.text || "";
       return `
         <div class="prep-qa">
           <div class="prep-qa__question">${escapeHtml(question)}</div>
