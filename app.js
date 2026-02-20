@@ -211,7 +211,15 @@ const renderJobs = () => {
           ${job.apply_method ? `<span class="badge badge--method">${escapeHtml(job.apply_method)}</span>` : ""}
         </div>
       </div>
-      <div class="job-card__details detail-carousel">
+      <div class="detail-carousel-wrap">
+        <div class="detail-carousel-header">
+          <div class="detail-carousel-hint">Swipe for more</div>
+          <div class="detail-carousel-controls">
+            <button class="carousel-btn carousel-btn--prev" aria-label="Previous card">&#x2039;</button>
+            <button class="carousel-btn carousel-btn--next" aria-label="Next card">&#x203A;</button>
+          </div>
+        </div>
+        <div class="job-card__details detail-carousel" id="carousel-${escapeHtml(job.id)}">
         <div class="detail-box">
           <div class="section-title">Role summary</div>
           <div>${escapeHtml(job.role_summary || "Not available yet.")}</div>
@@ -313,12 +321,80 @@ const renderJobs = () => {
           <button class="btn btn-primary save-tracking">Save update</button>
           <div class="tracking-status-msg"></div>
         </div>
+        </div>
+        <div class="carousel-dots" data-carousel-dots="${escapeHtml(job.id)}"></div>
       </div>
       <div class="job-card__actions">
         <a href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View & Apply</a>
       </div>
     `;
     jobsContainer.appendChild(card);
+
+    const carousel = card.querySelector(".detail-carousel");
+    const prevBtn = card.querySelector(".carousel-btn--prev");
+    const nextBtn = card.querySelector(".carousel-btn--next");
+    const dotsContainer = card.querySelector(".carousel-dots");
+
+    const detailCards = carousel ? Array.from(carousel.querySelectorAll(".detail-box")) : [];
+    const snapToIndex = (index) => {
+      if (!carousel || !detailCards[index]) return;
+      const target = detailCards[index];
+      const left = target.offsetLeft - carousel.offsetLeft;
+      carousel.scrollTo({ left, behavior: "smooth" });
+    };
+
+    const renderDots = () => {
+      if (!dotsContainer) return;
+      dotsContainer.innerHTML = "";
+      detailCards.forEach((_, idx) => {
+        const dot = document.createElement("button");
+        dot.className = "carousel-dot";
+        dot.setAttribute("aria-label", `Go to card ${idx + 1}`);
+        dot.addEventListener("click", () => snapToIndex(idx));
+        dotsContainer.appendChild(dot);
+      });
+    };
+
+    const updateActiveDot = () => {
+      if (!carousel || !dotsContainer) return;
+      const scrollLeft = carousel.scrollLeft;
+      let activeIdx = 0;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      detailCards.forEach((cardEl, idx) => {
+        const distance = Math.abs(cardEl.offsetLeft - carousel.offsetLeft - scrollLeft);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          activeIdx = idx;
+        }
+      });
+      dotsContainer.querySelectorAll(".carousel-dot").forEach((dot, idx) => {
+        dot.classList.toggle("active", idx === activeIdx);
+      });
+    };
+
+    if (carousel) {
+      renderDots();
+      updateActiveDot();
+      carousel.addEventListener("scroll", () => {
+        window.requestAnimationFrame(updateActiveDot);
+      });
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        const active = dotsContainer?.querySelector(".carousel-dot.active");
+        const idx = active ? Array.from(dotsContainer.children).indexOf(active) : 0;
+        snapToIndex(Math.max(0, idx - 1));
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        const active = dotsContainer?.querySelector(".carousel-dot.active");
+        const idx = active ? Array.from(dotsContainer.children).indexOf(active) : 0;
+        snapToIndex(Math.min(detailCards.length - 1, idx + 1));
+      });
+    }
 
     card.querySelectorAll(".copy-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
