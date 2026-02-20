@@ -179,6 +179,22 @@ const formatInlineText = (value) => {
     .replace(/\r?\n/g, "<br>");
 };
 
+const safeLocalStorageGet = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch (error) {
+    return null;
+  }
+};
+
+const safeLocalStorageSet = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (error) {
+    // ignore storage failures (private mode, blocked storage)
+  }
+};
+
 const showToast = (message, duration = 2500) => {
   const existing = document.querySelector(".toast");
   if (existing) existing.remove();
@@ -513,7 +529,8 @@ const buildPrepQa = (job) => {
       const options = [8, 9, 10]
         .map((score) => {
           const match = answers.find((ans) => Number(ans.score) === score) || answers[0] || { text: "" };
-          return `<option value="${score}" data-answer="${escapeHtml(match.text || "")}">${labels[score]}</option>`;
+          const encoded = encodeURIComponent(match.text || "");
+          return `<option value="${score}" data-answer="${encoded}">${labels[score]}</option>`;
         })
         .join("");
 
@@ -558,7 +575,7 @@ const getConfidenceStats = (jobId, count) => {
   if (!jobId) return stats;
   for (let i = 0; i < count; i += 1) {
     const key = getConfidenceKey(jobId, i);
-    const value = localStorage.getItem(key);
+    const value = safeLocalStorageGet(key);
     if (value === "green") stats.green += 1;
     if (value === "amber") stats.amber += 1;
     if (value === "red") stats.red += 1;
@@ -621,7 +638,7 @@ const renderFlashcards = (container, job) => {
     const story = parseStarStory(stories[currentIndex]);
     const topicSource = story.situation || story.raw || "";
     const topic = topicSource.split(/\r?\n/)[0].slice(0, 120);
-    const confidence = localStorage.getItem(getConfidenceKey(job.id, currentIndex)) || "";
+    const confidence = safeLocalStorageGet(getConfidenceKey(job.id, currentIndex)) || "";
 
     container.innerHTML = `
       ${buildConfidenceSummary(job.id, stories.length)}
@@ -680,7 +697,7 @@ const renderFlashcards = (container, job) => {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         const value = btn.dataset.conf;
-        localStorage.setItem(getConfidenceKey(job.id, currentIndex), value);
+        safeLocalStorageSet(getConfidenceKey(job.id, currentIndex), value);
         setTimeout(() => {
           if (currentIndex < stories.length - 1) {
             currentIndex += 1;
@@ -893,10 +910,24 @@ const renderCheatSheet = (container, job) => {
   }
 };
 
+const hasPrepContent = (job) => {
+  if (!job) return false;
+  return Boolean(
+    (job.prep_questions && job.prep_questions.length) ||
+      (job.star_stories && job.star_stories.length) ||
+      (job.key_talking_points && job.key_talking_points.length) ||
+      job.quick_pitch ||
+      job.interview_focus ||
+      job.company_insights ||
+      job.why_fit ||
+      job.cv_gap
+  );
+};
+
 const openPrepMode = (jobId) => {
   if (!prepOverlay) return;
   const job = state.jobs.find((j) => j.id === jobId);
-  if (!job || !job.prep_questions || !job.prep_questions.length) {
+  if (!job || !hasPrepContent(job)) {
     showToast("No prep data yet.");
     return;
   }
@@ -1393,7 +1424,14 @@ const renderJobs = () => {
       select.addEventListener("change", () => {
         const selected = select.selectedOptions[0];
         if (!answerEl) return;
-        answerEl.innerHTML = formatInlineText(selected?.dataset?.answer || "Not available yet.");
+        const raw = selected?.dataset?.answer || "";
+        let decoded = raw;
+        try {
+          decoded = decodeURIComponent(raw);
+        } catch (error) {
+          decoded = raw;
+        }
+        answerEl.innerHTML = formatInlineText(decoded || "Not available yet.");
       });
     });
 
