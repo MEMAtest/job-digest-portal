@@ -164,15 +164,291 @@ const escapeHtml = (value) => {
     .replaceAll("'", "&#39;");
 };
 
+const showToast = (message, duration = 2500) => {
+  const existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = message;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("toast--visible"));
+  setTimeout(() => {
+    el.classList.remove("toast--visible");
+    setTimeout(() => el.remove(), 300);
+  }, duration);
+};
+
 const copyToClipboard = async (text) => {
   if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
-    alert("Copied to clipboard.");
+    showToast("Copied to clipboard.");
   } catch (error) {
     console.error(error);
-    alert("Copy failed. Please select and copy manually.");
+    showToast("Copy failed. Please select and copy manually.");
   }
+};
+
+const getTailoredCvPlainText = (job) => {
+  const sections = job.tailored_cv_sections || {};
+  const lines = [];
+  lines.push("ADE OMOSANYA");
+  lines.push("London, UK | ade@omosanya.com | linkedin.com/in/adeomosanya | omosanya.com\n");
+  lines.push("PROFESSIONAL SUMMARY");
+  lines.push(sections.summary || "Senior Product Manager with 8+ years across financial services, regtech and fintech. Specialist in onboarding, KYC/AML, and platform product strategy.\n");
+  lines.push("KEY ACHIEVEMENTS");
+  (sections.key_achievements || [
+    "- Led digital onboarding transformation serving 3M+ customers, reducing drop-off by 35%",
+    "- Delivered KYC remediation platform processing 500K+ cases across 6 jurisdictions",
+    "- Drove API-first integration strategy connecting 15+ downstream systems",
+    "- Shipped sanctions screening product reducing false positives by 40%",
+    "- Built product analytics framework improving feature adoption by 25%",
+  ]).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
+  lines.push("\nPROFESSIONAL EXPERIENCE");
+  lines.push("\nVistra Corporate Services | Senior Product Manager | 2022 - Present");
+  (sections.vistra_bullets || [
+    "- Own end-to-end onboarding and KYC product suite across 6 EMEA jurisdictions",
+    "- Led platform migration reducing onboarding time from 21 to 7 days",
+    "- Managed cross-functional team of 12 engineers and 3 designers",
+    "- Delivered API integration layer connecting to 15+ compliance data providers",
+    "- Shipped automated risk scoring reducing manual review by 60%",
+    "- Drove product discovery and roadmap prioritisation using RICE framework",
+    "- Established product analytics with Mixpanel tracking 50+ key events",
+    "- Led regulatory change programme for EU AML 6th Directive compliance",
+  ]).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
+  lines.push("\nEbury Partners | Product Manager | 2020 - 2022");
+  (sections.ebury_bullets || [
+    "- Owned client onboarding and KYB product for FX/payments platform",
+    "- Reduced onboarding cycle time by 45% through workflow automation",
+    "- Shipped API-first partner integration used by 200+ intermediaries",
+    "- Led cross-border payments compliance product across 20+ currencies",
+  ]).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
+  lines.push("\nMEMA Consulting | Product Lead | 2018 - 2020");
+  lines.push("- Led delivery of regtech SaaS platform for AML compliance");
+  lines.push("- Managed product backlog and sprint planning for team of 8");
+  lines.push("- Drove client onboarding reducing implementation time by 30%");
+  lines.push("\nElucidate | Product Manager | 2017 - 2018");
+  lines.push("- Owned financial crime risk rating product for banking clients");
+  lines.push("- Shipped ML-powered risk scoring achieving 85% prediction accuracy");
+  lines.push("\nN26 | Associate Product Manager | 2016 - 2017");
+  lines.push("- Contributed to mobile banking onboarding flow serving 2M+ users");
+  lines.push("- Ran A/B tests improving KYC completion rate by 18%");
+  lines.push("\nPrevious Experience | Various Roles | 2014 - 2016");
+  lines.push("- Business analyst and operations roles in financial services");
+  lines.push("\nTECHNICAL & PRODUCT CAPABILITIES");
+  lines.push("Product: Roadmapping, OKRs, RICE, Discovery, A/B Testing, Analytics");
+  lines.push("Technical: SQL, Python, REST APIs, Jira, Confluence, Figma, Mixpanel, Amplitude");
+  lines.push("Domain: KYC, AML, Onboarding, Sanctions Screening, Payments, Open Banking");
+  lines.push("\nEDUCATION & CERTIFICATIONS");
+  lines.push("BSc Economics | University of Nottingham");
+  lines.push("ICA Certificate in Compliance | International Compliance Association");
+  return lines.join("\n");
+};
+
+const buildTailoredCvHtml = (job) => {
+  const s = job.tailored_cv_sections || {};
+  const summary = s.summary || "Senior Product Manager with 8+ years across financial services, regtech and fintech. Specialist in onboarding, KYC/AML, and platform product strategy. Proven track record of delivering complex regulatory products at scale.";
+  const achievements = s.key_achievements || [
+    "Led digital onboarding transformation serving 3M+ customers, reducing drop-off by 35%",
+    "Delivered KYC remediation platform processing 500K+ cases across 6 jurisdictions",
+    "Drove API-first integration strategy connecting 15+ downstream systems",
+    "Shipped sanctions screening product reducing false positives by 40%",
+    "Built product analytics framework improving feature adoption by 25%",
+  ];
+  const vistraBullets = s.vistra_bullets || [
+    "Own end-to-end onboarding and KYC product suite across 6 EMEA jurisdictions",
+    "Led platform migration reducing onboarding time from 21 to 7 days",
+    "Managed cross-functional team of 12 engineers and 3 designers",
+    "Delivered API integration layer connecting to 15+ compliance data providers",
+    "Shipped automated risk scoring reducing manual review by 60%",
+    "Drove product discovery and roadmap prioritisation using RICE framework",
+    "Established product analytics with Mixpanel tracking 50+ key events",
+    "Led regulatory change programme for EU AML 6th Directive compliance",
+  ];
+  const eburyBullets = s.ebury_bullets || [
+    "Owned client onboarding and KYB product for FX/payments platform",
+    "Reduced onboarding cycle time by 45% through workflow automation",
+    "Shipped API-first partner integration used by 200+ intermediaries",
+    "Led cross-border payments compliance product across 20+ currencies",
+  ];
+
+  const esc = (t) => escapeHtml(String(t));
+  const bulletHtml = (items) => items.map(b => `<div style="margin:0 0 3px 0;padding-left:14px;text-indent:-14px;line-height:1.35;">- ${esc(b.replace(/^-\s*/, ""))}</div>`).join("");
+
+  const container = document.createElement("div");
+  container.innerHTML = `
+    <div style="font-family:'Inter',Helvetica,Arial,sans-serif;color:#1f2937;padding:0;margin:0;width:180mm;font-size:9.5pt;line-height:1.4;">
+      <!-- Header -->
+      <div style="text-align:center;margin-bottom:10px;">
+        <div style="font-size:20pt;font-weight:700;letter-spacing:0.5px;color:#0f172a;margin-bottom:4px;">ADE OMOSANYA</div>
+        <div style="font-size:8.5pt;color:#475569;">London, UK &nbsp;|&nbsp; ade@omosanya.com &nbsp;|&nbsp; linkedin.com/in/adeomosanya &nbsp;|&nbsp; omosanya.com</div>
+      </div>
+
+      <!-- Professional Summary -->
+      <div style="margin-bottom:8px;">
+        <div style="font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1.5px solid #0f172a;padding-bottom:2px;margin-bottom:5px;color:#0f172a;">Professional Summary</div>
+        <div style="font-size:9.5pt;line-height:1.45;">${esc(summary)}</div>
+      </div>
+
+      <!-- Key Achievements -->
+      <div style="margin-bottom:8px;">
+        <div style="font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1.5px solid #0f172a;padding-bottom:2px;margin-bottom:5px;color:#0f172a;">Key Achievements</div>
+        ${bulletHtml(achievements)}
+      </div>
+
+      <!-- Professional Experience -->
+      <div style="margin-bottom:8px;">
+        <div style="font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1.5px solid #0f172a;padding-bottom:2px;margin-bottom:5px;color:#0f172a;">Professional Experience</div>
+
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+            <span style="font-weight:700;font-size:9.5pt;">Vistra Corporate Services</span>
+            <span style="font-size:8.5pt;color:#475569;">2022 - Present</span>
+          </div>
+          <div style="font-style:italic;font-size:9pt;color:#475569;margin-bottom:3px;">Senior Product Manager</div>
+          ${bulletHtml(vistraBullets)}
+        </div>
+
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+            <span style="font-weight:700;font-size:9.5pt;">Ebury Partners</span>
+            <span style="font-size:8.5pt;color:#475569;">2020 - 2022</span>
+          </div>
+          <div style="font-style:italic;font-size:9pt;color:#475569;margin-bottom:3px;">Product Manager</div>
+          ${bulletHtml(eburyBullets)}
+        </div>
+
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+            <span style="font-weight:700;font-size:9.5pt;">MEMA Consulting</span>
+            <span style="font-size:8.5pt;color:#475569;">2018 - 2020</span>
+          </div>
+          <div style="font-style:italic;font-size:9pt;color:#475569;margin-bottom:3px;">Product Lead</div>
+          ${bulletHtml([
+            "Led delivery of regtech SaaS platform for AML compliance",
+            "Managed product backlog and sprint planning for team of 8",
+            "Drove client onboarding reducing implementation time by 30%",
+          ])}
+        </div>
+
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+            <span style="font-weight:700;font-size:9.5pt;">Elucidate</span>
+            <span style="font-size:8.5pt;color:#475569;">2017 - 2018</span>
+          </div>
+          <div style="font-style:italic;font-size:9pt;color:#475569;margin-bottom:3px;">Product Manager</div>
+          ${bulletHtml([
+            "Owned financial crime risk rating product for banking clients",
+            "Shipped ML-powered risk scoring achieving 85% prediction accuracy",
+          ])}
+        </div>
+
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+            <span style="font-weight:700;font-size:9.5pt;">N26</span>
+            <span style="font-size:8.5pt;color:#475569;">2016 - 2017</span>
+          </div>
+          <div style="font-style:italic;font-size:9pt;color:#475569;margin-bottom:3px;">Associate Product Manager</div>
+          ${bulletHtml([
+            "Contributed to mobile banking onboarding flow serving 2M+ users",
+            "Ran A/B tests improving KYC completion rate by 18%",
+          ])}
+        </div>
+
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;">
+            <span style="font-weight:700;font-size:9.5pt;">Previous Experience</span>
+            <span style="font-size:8.5pt;color:#475569;">2014 - 2016</span>
+          </div>
+          <div style="font-style:italic;font-size:9pt;color:#475569;margin-bottom:3px;">Various Roles</div>
+          ${bulletHtml(["Business analyst and operations roles in financial services"])}
+        </div>
+      </div>
+
+      <!-- Technical & Product Capabilities -->
+      <div style="margin-bottom:8px;">
+        <div style="font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1.5px solid #0f172a;padding-bottom:2px;margin-bottom:5px;color:#0f172a;">Technical & Product Capabilities</div>
+        <div style="margin-bottom:2px;"><strong>Product:</strong> Roadmapping, OKRs, RICE, Discovery, A/B Testing, Analytics</div>
+        <div style="margin-bottom:2px;"><strong>Technical:</strong> SQL, Python, REST APIs, Jira, Confluence, Figma, Mixpanel, Amplitude</div>
+        <div><strong>Domain:</strong> KYC, AML, Onboarding, Sanctions Screening, Payments, Open Banking</div>
+      </div>
+
+      <!-- Education & Certifications -->
+      <div>
+        <div style="font-size:10pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1.5px solid #0f172a;padding-bottom:2px;margin-bottom:5px;color:#0f172a;">Education & Certifications</div>
+        <div style="margin-bottom:2px;"><strong>BSc Economics</strong> — University of Nottingham</div>
+        <div><strong>ICA Certificate in Compliance</strong> — International Compliance Association</div>
+      </div>
+    </div>
+  `;
+  if (!container.firstElementChild) {
+    const fallback = document.createElement("div");
+    fallback.textContent = "CV template could not be generated.";
+    return fallback;
+  }
+  return container.firstElementChild;
+};
+
+const quickApply = async (job, card) => {
+  const status = (job.application_status || "saved").toLowerCase();
+  const shouldMarkApplied = status === "saved";
+
+  // 1. Clipboard — must happen first within user gesture
+  const cvText = getTailoredCvPlainText(job);
+  const coverLetter = job.cover_letter || "";
+  const clipboardPayload = `=== TAILORED CV ===\n${cvText}\n\n=== COVER LETTER ===\n${coverLetter}`;
+  try {
+    await navigator.clipboard.writeText(clipboardPayload);
+  } catch (err) {
+    console.error("Clipboard write failed:", err);
+  }
+
+  // 2. Open link (validate scheme)
+  if (job.link && /^https?:\/\//.test(job.link)) {
+    window.open(job.link, "_blank", "noopener");
+  }
+
+  // 3. Mark applied (only if currently "saved")
+  if (shouldMarkApplied && db) {
+    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date().toISOString();
+    const payload = {
+      application_status: "applied",
+      application_date: `${today}T00:00:00.000Z`,
+      last_touch_date: now,
+      updated_at: now,
+    };
+    try {
+      await updateDoc(doc(db, collectionName, job.id), payload);
+      job.application_status = "applied";
+      job.application_date = payload.application_date;
+      job.last_touch_date = payload.last_touch_date;
+
+      // Update card DOM
+      const metaDivs = card.querySelectorAll(".job-card__meta");
+      metaDivs.forEach((m) => {
+        if (m.textContent.startsWith("Status:")) m.textContent = "Status: applied";
+      });
+      const trackingSelect = card.querySelector(".tracking-status");
+      if (trackingSelect) trackingSelect.value = "applied";
+      const appliedInput = card.querySelector(".tracking-applied");
+      if (appliedInput) appliedInput.value = today;
+      const lastTouchInput = card.querySelector(".tracking-last-touch");
+      if (lastTouchInput) lastTouchInput.value = now.slice(0, 10);
+
+      // Update Quick Apply button state
+      const qaBtn = card.querySelector(".btn-quick-apply");
+      if (qaBtn) {
+        qaBtn.textContent = "Re-copy & Open";
+        qaBtn.classList.add("btn-quick-apply--done");
+      }
+    } catch (err) {
+      console.error("quickApply Firestore update failed:", err);
+    }
+  }
+
+  // 4. Toast
+  showToast(shouldMarkApplied && db ? "Copied + marked applied" : "Copied + opened link");
 };
 
 const formatList = (items) => {
@@ -406,6 +682,16 @@ const renderJobs = () => {
             job.id
           )}">Copy cover letter</button>
         </div>
+        <div class="detail-box">
+          <div class="section-title">Tailored CV</div>
+          <div class="cv-preview" style="font-size:11px;color:#475569;margin-bottom:8px;">${
+            job.tailored_cv_sections?.summary
+              ? escapeHtml(job.tailored_cv_sections.summary).slice(0, 150) + "…"
+              : "CV will be tailored with your profile. Download to preview."
+          }</div>
+          <button class="btn btn-primary download-cv-btn" data-job-id="${escapeHtml(job.id)}">Download PDF</button>
+          <button class="btn btn-tertiary copy-cv-text-btn" data-job-id="${escapeHtml(job.id)}">Copy as text</button>
+        </div>
         <div class="detail-box tracking">
           <div class="section-title">Application tracking</div>
           <div class="tracking-grid">
@@ -425,11 +711,41 @@ const renderJobs = () => {
             <input type="text" class="tracking-next-action" value="${escapeHtml(
               job.next_action || ""
             )}" placeholder="e.g. Follow up email" />
+            <label>Salary range</label>
+            <input type="text" class="tracking-salary" value="${escapeHtml(
+              job.salary_range || ""
+            )}" placeholder="e.g. 65-80k" />
+            <label>Applied via</label>
+            <select class="tracking-applied-via">
+              <option value="" ${!job.applied_via ? "selected" : ""}>—</option>
+              <option value="LinkedIn" ${job.applied_via === "LinkedIn" ? "selected" : ""}>LinkedIn</option>
+              <option value="Company site" ${job.applied_via === "Company site" ? "selected" : ""}>Company site</option>
+              <option value="Recruiter" ${job.applied_via === "Recruiter" ? "selected" : ""}>Recruiter</option>
+              <option value="Referral" ${job.applied_via === "Referral" ? "selected" : ""}>Referral</option>
+              <option value="Other" ${job.applied_via === "Other" ? "selected" : ""}>Other</option>
+            </select>
+            <label>Follow-up date</label>
+            <input type="date" class="tracking-follow-up" value="${
+              job.follow_up_date ? job.follow_up_date.slice(0, 10) : ""
+            }" />
+            <label>Interviewer</label>
+            <input type="text" class="tracking-interviewer-name" value="${escapeHtml(
+              job.interviewer_name || ""
+            )}" placeholder="Name" />
+            <label>Interviewer email</label>
+            <input type="email" class="tracking-interviewer-email" value="${escapeHtml(
+              job.interviewer_email || ""
+            )}" placeholder="email@example.com" />
+            <label>Interview date</label>
+            <input type="date" class="tracking-interview-date" value="${
+              job.interview_date ? job.interview_date.slice(0, 10) : ""
+            }" />
             <label>Notes</label>
             <textarea class="tracking-notes" rows="3" placeholder="Notes...">${escapeHtml(
               job.application_notes || ""
             )}</textarea>
           </div>
+          <div class="tracking-validation-msg" style="color:#dc2626;font-size:12px;margin-bottom:6px;"></div>
           <button class="btn btn-primary save-tracking">Save update</button>
           <div class="tracking-status-msg"></div>
         </div>
@@ -437,10 +753,17 @@ const renderJobs = () => {
         <div class="carousel-dots" data-carousel-dots="${escapeHtml(job.id)}"></div>
       </div>
       <div class="job-card__actions">
+        <button class="btn btn-quick-apply${statusValue !== "saved" ? " btn-quick-apply--done" : ""}">${statusValue === "saved" ? "Quick Apply" : "Re-copy & Open"}</button>
         <a href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View & Apply</a>
       </div>
     `;
     jobsContainer.appendChild(card);
+
+    // Wire up Quick Apply button
+    const qaBtn = card.querySelector(".btn-quick-apply");
+    if (qaBtn) {
+      qaBtn.addEventListener("click", () => quickApply(job, card));
+    }
 
     const carousel = card.querySelector(".detail-carousel");
     const prevBtn = card.querySelector(".carousel-btn--prev");
@@ -587,29 +910,90 @@ const renderJobs = () => {
       });
     });
 
+    // Tailored CV: Download PDF
+    const downloadCvBtn = card.querySelector(".download-cv-btn");
+    if (downloadCvBtn) {
+      downloadCvBtn.addEventListener("click", () => {
+        if (typeof html2pdf === "undefined") {
+          showToast("PDF library failed to load. Check your connection.");
+          return;
+        }
+        const target = state.jobs.find((item) => item.id === downloadCvBtn.dataset.jobId);
+        if (!target) return;
+        const htmlEl = buildTailoredCvHtml(target);
+        const companySlug = (target.company || "Company").replace(/[^a-zA-Z0-9]/g, "");
+        html2pdf().set({
+          margin: [10, 15],
+          filename: `AdeOmosanya_CV_${companySlug}.pdf`,
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: "mm", format: "a4" },
+        }).from(htmlEl).save();
+        showToast("Generating PDF…");
+      });
+    }
+
+    // Tailored CV: Copy as text
+    const copyCvTextBtn = card.querySelector(".copy-cv-text-btn");
+    if (copyCvTextBtn) {
+      copyCvTextBtn.addEventListener("click", () => {
+        const target = state.jobs.find((item) => item.id === copyCvTextBtn.dataset.jobId);
+        if (!target) return;
+        copyToClipboard(getTailoredCvPlainText(target));
+      });
+    }
+
     const saveBtn = card.querySelector(".save-tracking");
     const statusEl = card.querySelector(".tracking-status");
     const appliedEl = card.querySelector(".tracking-applied");
     const lastTouchEl = card.querySelector(".tracking-last-touch");
     const nextActionEl = card.querySelector(".tracking-next-action");
     const notesEl = card.querySelector(".tracking-notes");
+    const salaryEl = card.querySelector(".tracking-salary");
+    const appliedViaEl = card.querySelector(".tracking-applied-via");
+    const followUpEl = card.querySelector(".tracking-follow-up");
+    const interviewerNameEl = card.querySelector(".tracking-interviewer-name");
+    const interviewerEmailEl = card.querySelector(".tracking-interviewer-email");
+    const interviewDateEl = card.querySelector(".tracking-interview-date");
     const statusMsg = card.querySelector(".tracking-status-msg");
+    const validationMsg = card.querySelector(".tracking-validation-msg");
 
     saveBtn.addEventListener("click", async () => {
       if (!db) {
         statusMsg.textContent = "Missing Firebase config.";
         return;
       }
+
+      // Interview date validation
+      if (validationMsg) validationMsg.textContent = "";
+      if (statusEl.value === "interview" && interviewDateEl && !interviewDateEl.value) {
+        if (validationMsg) validationMsg.textContent = "Please set an interview date.";
+        interviewDateEl.focus();
+        interviewDateEl.style.borderColor = "#dc2626";
+        return;
+      }
+      if (interviewDateEl) interviewDateEl.style.borderColor = "";
+
+      // Auto-fill applied date when status is "applied" and date is empty
+      const todayStr = new Date().toISOString().slice(0, 10);
+      if (statusEl.value === "applied" && !appliedEl.value) {
+        appliedEl.value = todayStr;
+      }
+      // Every tracking save is a "touch"
+      lastTouchEl.value = todayStr;
+
+      const toIsoDate = (val) => val ? `${val}T00:00:00.000Z` : "";
       const payload = {
         application_status: statusEl.value,
-        application_date: appliedEl.value
-          ? new Date(appliedEl.value).toISOString()
-          : "",
-        last_touch_date: lastTouchEl.value
-          ? new Date(lastTouchEl.value).toISOString()
-          : "",
+        application_date: toIsoDate(appliedEl.value),
+        last_touch_date: toIsoDate(lastTouchEl.value),
         next_action: nextActionEl.value,
         application_notes: notesEl.value,
+        salary_range: salaryEl.value,
+        applied_via: appliedViaEl.value,
+        follow_up_date: toIsoDate(followUpEl.value),
+        interviewer_name: interviewerNameEl.value,
+        interviewer_email: interviewerEmailEl.value,
+        interview_date: toIsoDate(interviewDateEl.value),
         updated_at: new Date().toISOString(),
       };
       try {
@@ -619,6 +1003,12 @@ const renderJobs = () => {
         job.last_touch_date = payload.last_touch_date;
         job.next_action = payload.next_action;
         job.application_notes = payload.application_notes;
+        job.salary_range = payload.salary_range;
+        job.applied_via = payload.applied_via;
+        job.follow_up_date = payload.follow_up_date;
+        job.interviewer_name = payload.interviewer_name;
+        job.interviewer_email = payload.interviewer_email;
+        job.interview_date = payload.interview_date;
         statusMsg.textContent = "Saved.";
       } catch (error) {
         console.error(error);
@@ -926,6 +1316,111 @@ const renderDashboardStats = (jobs) => {
   });
 };
 
+const renderPipelineView = (jobs) => {
+  const container = document.getElementById("pipeline-view");
+  if (!container) return;
+
+  const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
+  const statuses = ["saved", "applied", "interview", "offer", "rejected"];
+  const labels = { saved: "Saved", applied: "Applied", interview: "Interview", offer: "Offer", rejected: "Rejected" };
+  const groups = {};
+  statuses.forEach((s) => (groups[s] = []));
+  jobs.forEach((job) => {
+    const s = safeStatus(job);
+    if (groups[s]) groups[s].push(job);
+  });
+
+  container.innerHTML = `
+    <div class="section-title" style="margin-bottom:12px;">Pipeline</div>
+    <div class="pipeline-columns">
+      ${statuses
+        .map(
+          (s) => `
+        <div class="pipeline-col" data-pipeline-status="${s}">
+          <div class="pipeline-col__header">${labels[s]} <span class="pipeline-col__count">(${groups[s].length})</span></div>
+          <div class="pipeline-col__jobs">
+            ${groups[s]
+              .slice(0, 8)
+              .map(
+                (job) =>
+                  `<div class="pipeline-job" data-job-id="${escapeHtml(job.id)}"><div class="pipeline-job__role">${escapeHtml(job.role)}</div><div class="pipeline-job__company">${escapeHtml(job.company)}</div></div>`
+              )
+              .join("")}
+            ${groups[s].length > 8 ? `<div class="pipeline-job__more">+${groups[s].length - 8} more</div>` : ""}
+          </div>
+        </div>`
+        )
+        .join("")}
+    </div>
+  `;
+
+  container.querySelectorAll(".pipeline-col").forEach((col) => {
+    col.addEventListener("click", () => {
+      const s = col.dataset.pipelineStatus;
+      applyQuickFilter({ label: `${labels[s]} roles`, status: s });
+    });
+  });
+};
+
+const renderFollowUps = (jobs) => {
+  const container = document.getElementById("follow-ups");
+  if (!container) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
+
+  const overdue = jobs.filter((job) => {
+    const s = safeStatus(job);
+    if (s === "rejected" || s === "offer") return false;
+    const dt = parseDateValue(job.follow_up_date);
+    return dt && dt <= today;
+  }).sort((a, b) => {
+    const da = parseDateValue(a.follow_up_date);
+    const db2 = parseDateValue(b.follow_up_date);
+    return (da || 0) - (db2 || 0);
+  });
+
+  if (!overdue.length) {
+    container.innerHTML = "";
+    return;
+  }
+
+  const daysDiff = (date) => {
+    const diff = today - date;
+    return Math.floor(diff / (1000 * 60 * 60 * 24));
+  };
+
+  container.innerHTML = `
+    <div class="section-title" style="margin-bottom:12px;">Follow-ups Due</div>
+    <div class="follow-ups-list">
+      ${overdue
+        .map((job) => {
+          const dt = parseDateValue(job.follow_up_date);
+          const days = daysDiff(dt);
+          const label = days === 0 ? "Due today" : `${days}d overdue`;
+          return `<div class="follow-up-card" data-job-id="${escapeHtml(job.id)}">
+            <div class="follow-up-card__role">${escapeHtml(job.role)}</div>
+            <div class="follow-up-card__company">${escapeHtml(job.company)}</div>
+            <div class="follow-up-card__overdue">${label}</div>
+          </div>`;
+        })
+        .join("")}
+    </div>
+  `;
+
+  container.querySelectorAll(".follow-up-card").forEach((el) => {
+    el.addEventListener("click", () => {
+      const jobId = el.dataset.jobId;
+      setActiveTab("live");
+      setTimeout(() => {
+        const target = document.querySelector(`#carousel-${jobId}`)?.closest(".job-card");
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    });
+  });
+};
+
 const setActiveTab = (tabId) => {
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.classList.toggle("nav-item--active", btn.dataset.tab === tabId);
@@ -989,6 +1484,8 @@ const loadJobs = async () => {
     state.locations = new Set(jobs.map((job) => job.location).filter(Boolean));
 
     renderDashboardStats(jobs);
+    renderPipelineView(jobs);
+    renderFollowUps(jobs);
     renderFilters();
     renderTopPick(jobs[0]);
     renderJobs();
@@ -1086,31 +1583,91 @@ runNowBtn.addEventListener("click", async () => {
   runStatusLine.textContent = "Run triggered — waiting for Mac watcher (~2 min)…";
   const start = Date.now();
   const poll = setInterval(async () => {
-    const snap = await getDoc(ref);
-    const data = snap.data();
-    const status = data?.status;
-    if (status === "running") {
-      runStatusLine.textContent = "Running — fetching jobs…";
-    } else if (status === "done") {
+    try {
+      const snap = await getDoc(ref);
+      const data = snap.data();
+      const status = data?.status;
+      if (status === "running") {
+        runStatusLine.textContent = "Running — fetching jobs…";
+      } else if (status === "done") {
+        clearInterval(poll);
+        runStatusLine.textContent = "Done — refreshing results…";
+        runNowBtn.disabled = false;
+        runNowBtn.textContent = "Run now";
+        await loadJobs();
+        runStatusLine.textContent = "Complete.";
+      } else if (status === "error") {
+        clearInterval(poll);
+        const tail = data?.error_tail ? `\n${data.error_tail}` : "";
+        runStatusLine.textContent = `Run failed — check watcher log on Mac.${tail}`;
+        runNowBtn.disabled = false;
+        runNowBtn.textContent = "Run now";
+      } else if (Date.now() - start > 300_000) {
+        clearInterval(poll);
+        runStatusLine.textContent = "Timed out — run may still complete in background.";
+        runNowBtn.disabled = false;
+        runNowBtn.textContent = "Run now";
+      }
+    } catch (err) {
       clearInterval(poll);
-      runStatusLine.textContent = "Done — refreshing results…";
-      runNowBtn.disabled = false;
-      runNowBtn.textContent = "Run now";
-      await loadJobs();
-      runStatusLine.textContent = "Complete.";
-    } else if (status === "error") {
-      clearInterval(poll);
-      const tail = data?.error_tail ? `\n${data.error_tail}` : "";
-      runStatusLine.textContent = `Run failed — check watcher log on Mac.${tail}`;
-      runNowBtn.disabled = false;
-      runNowBtn.textContent = "Run now";
-    } else if (Date.now() - start > 300_000) {
-      clearInterval(poll);
-      runStatusLine.textContent = "Timed out — run may still complete in background.";
+      console.error("Poll error:", err);
+      runStatusLine.textContent = "Connection error during polling.";
       runNowBtn.disabled = false;
       runNowBtn.textContent = "Run now";
     }
   }, 10_000);
 });
 
-loadJobs();
+// ── Notification permission toggle ──
+const notifyToggle = document.getElementById("notify-toggle");
+const updateNotifyButton = () => {
+  if (!notifyToggle || !("Notification" in window)) return;
+  const perm = Notification.permission;
+  notifyToggle.classList.remove("btn-notify--granted", "btn-notify--denied");
+  if (perm === "granted") {
+    notifyToggle.textContent = "Notifications on";
+    notifyToggle.classList.add("btn-notify--granted");
+  } else if (perm === "denied") {
+    notifyToggle.textContent = "Notifications blocked";
+    notifyToggle.classList.add("btn-notify--denied");
+  } else {
+    notifyToggle.textContent = "Enable notifications";
+  }
+};
+updateNotifyButton();
+if (notifyToggle) {
+  notifyToggle.addEventListener("click", async () => {
+    if (!("Notification" in window)) return;
+    if (Notification.permission === "denied") return;
+    await Notification.requestPermission();
+    updateNotifyButton();
+  });
+}
+
+// ── Browser notifications for new high-fit jobs ──
+const checkNewJobNotifications = (jobs) => {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const knownRaw = localStorage.getItem("known_job_ids");
+    const knownIds = knownRaw ? new Set(JSON.parse(knownRaw)) : new Set();
+    const currentIds = jobs.map((j) => j.id);
+    const newHighFit = jobs.filter((j) => !knownIds.has(j.id) && j.fit_score >= 80);
+    if (newHighFit.length > 0) {
+      const top = newHighFit[0];
+      new Notification(`${newHighFit.length} new high-fit role${newHighFit.length > 1 ? "s" : ""}`, {
+        body: `${top.role} at ${top.company} (${top.fit_score}% fit)${newHighFit.length > 1 ? ` and ${newHighFit.length - 1} more` : ""}`,
+      });
+    }
+    localStorage.setItem("known_job_ids", JSON.stringify(currentIds));
+  } catch (e) {
+    console.error("Notification check failed:", e);
+  }
+};
+
+// Wrap loadJobs to add notification check after load
+const loadJobsAndNotify = async () => {
+  await loadJobs();
+  if (state.jobs.length) checkNewJobNotifications(state.jobs);
+};
+
+loadJobsAndNotify();

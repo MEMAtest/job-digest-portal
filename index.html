@@ -11,6 +11,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="config.js"></script>
   </head>
   <body>
@@ -33,6 +34,7 @@
           <div class="status-dot"></div>
           <span>Updated daily at 08:40</span>
         </div>
+        <button id="notify-toggle" class="btn-notify">Enable notifications</button>
       </aside>
 
       <main class="content">
@@ -52,6 +54,8 @@
 
         <section class="tab-section" data-tab="dashboard">
           <section id="dashboard-stats" class="stats-grid"></section>
+          <section id="pipeline-view"></section>
+          <section id="follow-ups"></section>
           <section id="source-stats" class="stats-grid"></section>
         </section>
 

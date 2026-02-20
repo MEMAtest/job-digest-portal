@@ -526,6 +526,31 @@ body {
   gap: 12px;
 }
 
+.btn-quick-apply {
+  background: #4f46e5;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn-quick-apply:hover {
+  background: #4338ca;
+}
+
+.btn-quick-apply--done {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.btn-quick-apply--done:hover {
+  background: #cbd5e1;
+}
+
 .job-card__actions a {
   text-decoration: none;
   color: #fff;
@@ -534,6 +559,172 @@ body {
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
+}
+
+/* Notification toggle */
+.btn-notify {
+  background: #1e293b;
+  color: #cbd5f5;
+  border: 1px solid #334155;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  transition: background 0.2s ease;
+}
+
+.btn-notify:hover {
+  background: #334155;
+}
+
+.btn-notify--granted {
+  background: #166534;
+  border-color: #22c55e;
+  color: #dcfce7;
+}
+
+.btn-notify--denied {
+  background: #7f1d1d;
+  border-color: #dc2626;
+  color: #fecaca;
+  cursor: not-allowed;
+}
+
+/* Pipeline view */
+.pipeline-columns {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 24px;
+}
+
+.pipeline-col {
+  flex: 1;
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pipeline-col:hover {
+  border-color: #c7d2fe;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+.pipeline-col__header {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.pipeline-col__count {
+  font-weight: 400;
+  color: #64748b;
+}
+
+.pipeline-col__jobs {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.pipeline-job {
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.pipeline-job:last-child {
+  border-bottom: none;
+}
+
+.pipeline-job__role {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pipeline-job__company {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.pipeline-job__more {
+  font-size: 11px;
+  color: #4f46e5;
+  padding-top: 6px;
+  font-weight: 500;
+}
+
+/* Follow-ups */
+.follow-ups-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.follow-up-card {
+  background: #fff7e6;
+  border: 1px solid #f5c87a;
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.follow-up-card:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.follow-up-card__role {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.follow-up-card__company {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.follow-up-card__overdue {
+  font-size: 11px;
+  font-weight: 600;
+  color: #dc2626;
+  margin-top: 4px;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #0f172a;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 9999;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+}
+
+.toast--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .hidden {
@@ -796,13 +987,22 @@ body {
     padding: 0 12px;
   }
   .detail-box.accordion-open .accordion-body {
-    max-height: 2000px;
+    max-height: 8000px;
     padding: 8px 12px 12px;
   }
 
   /* Actions */
   .job-card__actions {
     margin-top: 4px;
+    display: flex;
+    gap: 8px;
+  }
+  .job-card__actions .btn-quick-apply {
+    flex: 1;
+    order: -1;
+    text-align: center;
+    font-size: 12px;
+    padding: 10px;
   }
   .job-card__actions a {
     flex: 1;
