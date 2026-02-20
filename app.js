@@ -860,7 +860,7 @@ const loadJobs = async () => {
     renderSourceStats(statsDocs);
   } catch (error) {
     console.error(error);
-    warnParts.push("source stats");
+    warnParts.push({ name: "source stats", error });
   }
 
   try {
@@ -871,7 +871,7 @@ const loadJobs = async () => {
     renderRoleSuggestions(suggestionDoc);
   } catch (error) {
     console.error(error);
-    warnParts.push("role suggestions");
+    warnParts.push({ name: "role suggestions", error });
   }
 
   try {
@@ -882,15 +882,23 @@ const loadJobs = async () => {
     renderCandidatePrep(prepDoc);
   } catch (error) {
     console.error(error);
-    warnParts.push("candidate prep");
+    warnParts.push({ name: "candidate prep", error });
   }
 
   if (warnParts.length && alertBanner) {
+    const detailList = warnParts
+      .map((item) => {
+        const message = item.error?.message || "Unknown error";
+        return `<li>${escapeHtml(item.name)} — ${escapeHtml(message)}</li>`;
+      })
+      .join("");
     alertBanner.classList.remove("hidden");
     alertBanner.classList.add("alert--warning");
-    alertBanner.innerHTML = `<strong>Limited data:</strong> ${warnParts.join(
-      ", "
-    )} unavailable. Check Firestore rules for job_stats, role_suggestions, and candidate_prep.`;
+    alertBanner.innerHTML = `
+      <strong>Limited data:</strong> Some collections could not load.
+      <ul>${detailList}</ul>
+      <div style="margin-top:6px;">Check Firestore rules for <code>job_stats</code>, <code>role_suggestions</code>, and <code>candidate_prep</code>.</div>
+    `;
   }
 };
 

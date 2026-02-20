@@ -560,6 +560,17 @@ body {
   color: #854d0e;
 }
 
+.alert ul {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
+.alert code {
+  background: rgba(15, 23, 42, 0.08);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
 .alert strong {
   font-weight: 700;
 }
