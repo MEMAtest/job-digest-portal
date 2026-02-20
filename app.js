@@ -522,6 +522,23 @@ const renderCandidatePrep = (doc) => {
   `;
 };
 
+const setActiveTab = (tabId) => {
+  document.querySelectorAll(".nav-item").forEach((btn) => {
+    btn.classList.toggle("nav-item--active", btn.dataset.tab === tabId);
+  });
+  document.querySelectorAll(".tab-section").forEach((section) => {
+    section.classList.toggle("hidden", section.dataset.tab !== tabId);
+  });
+};
+
+document.querySelectorAll(".nav-item").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    setActiveTab(btn.dataset.tab);
+  });
+});
+
+setActiveTab("live");
+
 const loadJobs = async () => {
   summaryLine.textContent = "Fetching latest roles…";
 
@@ -530,51 +547,56 @@ const loadJobs = async () => {
     return;
   }
 
-  const app = initializeApp(window.FIREBASE_CONFIG);
-  db = getFirestore(app);
-  collectionName = window.FIREBASE_COLLECTION || "jobs";
-  statsCollection = window.FIREBASE_STATS_COLLECTION || "job_stats";
-  suggestionsCollection = window.FIREBASE_SUGGESTIONS_COLLECTION || "role_suggestions";
-  candidatePrepCollection = window.FIREBASE_CANDIDATE_PREP_COLLECTION || "candidate_prep";
-  runRequestsCollection = window.FIREBASE_RUN_REQUESTS_COLLECTION || "run_requests";
+  try {
+    const app = initializeApp(window.FIREBASE_CONFIG);
+    db = getFirestore(app);
+    collectionName = window.FIREBASE_COLLECTION || "jobs";
+    statsCollection = window.FIREBASE_STATS_COLLECTION || "job_stats";
+    suggestionsCollection = window.FIREBASE_SUGGESTIONS_COLLECTION || "role_suggestions";
+    candidatePrepCollection = window.FIREBASE_CANDIDATE_PREP_COLLECTION || "candidate_prep";
+    runRequestsCollection = window.FIREBASE_RUN_REQUESTS_COLLECTION || "run_requests";
 
-  const jobsRef = collection(db, collectionName);
-  const jobsQuery = query(jobsRef, orderBy("fit_score", "desc"), limit(200));
-  const snapshot = await getDocs(jobsQuery);
+    const jobsRef = collection(db, collectionName);
+    const jobsQuery = query(jobsRef, orderBy("fit_score", "desc"), limit(200));
+    const snapshot = await getDocs(jobsQuery);
 
-  const jobs = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-    prep_questions: doc.data().prep_questions || [],
-  }));
+    const jobs = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+      prep_questions: doc.data().prep_questions || [],
+    }));
 
-  state.jobs = jobs;
-  state.sources = new Set(jobs.map((job) => job.source).filter(Boolean));
-  state.locations = new Set(jobs.map((job) => job.location).filter(Boolean));
+    state.jobs = jobs;
+    state.sources = new Set(jobs.map((job) => job.source).filter(Boolean));
+    state.locations = new Set(jobs.map((job) => job.location).filter(Boolean));
 
-  renderFilters();
-  renderTopPick(jobs[0]);
-  renderJobs();
+    renderFilters();
+    renderTopPick(jobs[0]);
+    renderJobs();
 
-  const statsRef = collection(db, statsCollection);
-  const statsQuery = query(statsRef, orderBy("date", "desc"), limit(7));
-  const statsSnap = await getDocs(statsQuery);
-  const statsDocs = statsSnap.docs.map((doc) => doc.data());
-  renderSourceStats(statsDocs);
+    const statsRef = collection(db, statsCollection);
+    const statsQuery = query(statsRef, orderBy("date", "desc"), limit(7));
+    const statsSnap = await getDocs(statsQuery);
+    const statsDocs = statsSnap.docs.map((doc) => doc.data());
+    renderSourceStats(statsDocs);
 
-  const suggestionsRef = collection(db, suggestionsCollection);
-  const suggestionsQuery = query(suggestionsRef, orderBy("date", "desc"), limit(1));
-  const suggestionsSnap = await getDocs(suggestionsQuery);
-  const suggestionDoc = suggestionsSnap.docs[0]?.data();
-  renderRoleSuggestions(suggestionDoc);
+    const suggestionsRef = collection(db, suggestionsCollection);
+    const suggestionsQuery = query(suggestionsRef, orderBy("date", "desc"), limit(1));
+    const suggestionsSnap = await getDocs(suggestionsQuery);
+    const suggestionDoc = suggestionsSnap.docs[0]?.data();
+    renderRoleSuggestions(suggestionDoc);
 
-  const prepRef = collection(db, candidatePrepCollection);
-  const prepQuery = query(prepRef, orderBy("date", "desc"), limit(1));
-  const prepSnap = await getDocs(prepQuery);
-  const prepDoc = prepSnap.docs[0]?.data();
-  renderCandidatePrep(prepDoc);
+    const prepRef = collection(db, candidatePrepCollection);
+    const prepQuery = query(prepRef, orderBy("date", "desc"), limit(1));
+    const prepSnap = await getDocs(prepQuery);
+    const prepDoc = prepSnap.docs[0]?.data();
+    renderCandidatePrep(prepDoc);
 
-  summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
+    summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
+  } catch (error) {
+    console.error(error);
+    summaryLine.textContent = `Failed to load roles: ${error.message || "Unknown error"}`;
+  }
 };
 
 refreshBtn.addEventListener("click", loadJobs);

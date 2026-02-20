@@ -24,9 +24,9 @@
           </div>
         </div>
         <nav class="nav">
-          <button class="nav-item nav-item--active">Live Roles</button>
-          <button class="nav-item">Top Picks</button>
-          <button class="nav-item">Preparation</button>
+          <button class="nav-item nav-item--active" data-tab="live">Live Roles</button>
+          <button class="nav-item" data-tab="top">Top Picks</button>
+          <button class="nav-item" data-tab="prep">Preparation</button>
         </nav>
         <div class="sidebar-footer">
           <div class="status-dot"></div>
@@ -41,60 +41,67 @@
             <p id="summary-line">Loading sources…</p>
           </div>
           <div class="topbar-actions">
+            <button id="run-now-btn" class="btn btn-primary">Run now</button>
             <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
           </div>
         </header>
+        <p id="run-status-line" class="run-status hidden"></p>
 
-        <section class="filters">
-          <div class="filter">
-            <label for="search">Search</label>
-            <input id="search" type="text" placeholder="Product manager, onboarding, KYC…" />
-          </div>
-          <div class="filter">
-            <label for="minFit">Min Fit</label>
-            <select id="minFit">
-              <option value="60">60%</option>
-              <option value="65">65%</option>
-              <option value="70" selected>70%</option>
-              <option value="75">75%</option>
-              <option value="80">80%</option>
-            </select>
-          </div>
-          <div class="filter">
-            <label for="source">Source</label>
-            <select id="source"></select>
-          </div>
-          <div class="filter">
-            <label for="location">Location</label>
-            <select id="location"></select>
-          </div>
-          <div class="filter">
-            <label for="status">Status</label>
-            <select id="status">
-              <option value="">All statuses</option>
-              <option value="saved">Saved</option>
-              <option value="applied">Applied</option>
-              <option value="interview">Interview</option>
-              <option value="offer">Offer</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-          <div class="filter filter--toggle">
-            <label class="toggle-label">
-              <input id="ukOnly" type="checkbox" />
-              UK &amp; Remote only
-            </label>
-          </div>
+        <section class="tab-section" data-tab="live">
+          <section class="filters">
+            <div class="filter">
+              <label for="search">Search</label>
+              <input id="search" type="text" placeholder="Product manager, onboarding, KYC…" />
+            </div>
+            <div class="filter">
+              <label for="minFit">Min Fit</label>
+              <select id="minFit">
+                <option value="60">60%</option>
+                <option value="65">65%</option>
+                <option value="70" selected>70%</option>
+                <option value="75">75%</option>
+                <option value="80">80%</option>
+              </select>
+            </div>
+            <div class="filter">
+              <label for="source">Source</label>
+              <select id="source"></select>
+            </div>
+            <div class="filter">
+              <label for="location">Location</label>
+              <select id="location"></select>
+            </div>
+            <div class="filter">
+              <label for="status">Status</label>
+              <select id="status">
+                <option value="">All statuses</option>
+                <option value="saved">Saved</option>
+                <option value="applied">Applied</option>
+                <option value="interview">Interview</option>
+                <option value="offer">Offer</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            <div class="filter filter--toggle">
+              <label class="toggle-label">
+                <input id="ukOnly" type="checkbox" />
+                UK &amp; Remote only
+              </label>
+            </div>
+          </section>
+
+          <section id="jobs" class="job-grid"></section>
         </section>
 
-        <section id="top-pick" class="top-pick hidden"></section>
+        <section class="tab-section hidden" data-tab="top">
+          <section id="top-pick" class="top-pick hidden"></section>
+          <section id="source-stats" class="stats-grid"></section>
+        </section>
 
-        <section id="source-stats" class="stats-grid"></section>
-
-        <section id="role-suggestions" class="detail-box hidden"></section>
-        <section id="candidate-prep" class="detail-box hidden"></section>
-
-        <section id="jobs" class="job-grid"></section>
+        <section class="tab-section hidden" data-tab="prep">
+          <section id="role-suggestions" class="detail-box hidden"></section>
+          <section id="candidate-prep" class="detail-box hidden"></section>
+        </section>
       </main>
     </div>
 
