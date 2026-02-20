@@ -293,6 +293,8 @@ const renderJobs = () => {
     const requirementsList = formatList(job.key_requirements || []);
     const talkingPoints = formatList(job.key_talking_points || []);
     const starStories = formatList(job.star_stories || []);
+    const prepAnswers = formatList(job.prep_answers || []);
+    const scorecardList = formatList(job.scorecard || []);
     const statusValue = (job.application_status || "saved").toLowerCase();
     const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
     const lastTouchDate = job.last_touch_date ? job.last_touch_date.slice(0, 10) : "";
@@ -380,6 +382,14 @@ const renderJobs = () => {
         <div class="detail-box">
           <div class="section-title">Prep questions</div>
           ${prepList}
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Answer outlines</div>
+          ${prepAnswers}
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Hiring scorecard</div>
+          ${scorecardList}
         </div>
         <div class="detail-box">
           <div class="section-title">How to apply</div>
@@ -754,8 +764,14 @@ const renderCandidatePrep = (doc) => {
     ${formatList(doc.key_stats || [])}
     <div style="margin-top:8px;"><strong>Key talking points</strong></div>
     ${formatList(doc.key_talking_points || [])}
+    <div style="margin-top:8px;"><strong>Strengths to emphasise</strong></div>
+    ${formatList(doc.strengths || [])}
+    <div style="margin-top:8px;"><strong>Risk mitigations</strong></div>
+    ${formatList(doc.risk_mitigations || [])}
     <div style="margin-top:8px;"><strong>STAR stories (10/10)</strong></div>
     ${formatList(doc.star_stories || [])}
+    <div style="margin-top:8px;"><strong>Interview questions to rehearse</strong></div>
+    ${formatList(doc.interview_questions || [])}
   `;
 };
 
