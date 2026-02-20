@@ -48,6 +48,7 @@ const state = {
 let quickFilterPredicate = null;
 let quickFilterLabel = "";
 let uniqueCompanyOnly = false;
+let mobileNavObserver = null;
 
 const formatFitBadge = (score) => {
   if (score >= 80) return "badge badge--green";
@@ -273,7 +274,14 @@ const renderJobs = () => {
     });
   }
 
+  if (mobileNavObserver) {
+    mobileNavObserver.disconnect();
+    mobileNavObserver = null;
+  }
+
   jobsContainer.innerHTML = "";
+  const isMobile = window.matchMedia("(max-width: 900px)").matches;
+
   filtered.forEach((job) => {
     const prepList = job.prep_questions?.length
       ? `<ul>${job.prep_questions
@@ -431,8 +439,6 @@ const renderJobs = () => {
 
     const detailCards = carousel ? Array.from(carousel.querySelectorAll(".detail-box")) : [];
 
-    const isMobile = window.matchMedia("(max-width: 900px)").matches;
-
     if (isMobile) {
       // Convert detail boxes into accordion items
       detailCards.forEach((box) => {
@@ -449,6 +455,50 @@ const renderJobs = () => {
         title.addEventListener("click", () => {
           box.classList.toggle("accordion-open");
         });
+      });
+
+      // Quick-save bookmark button
+      const quickSaveBtn = document.createElement("button");
+      quickSaveBtn.className = "quick-save-btn";
+      const statusVal = (job.application_status || "saved").toLowerCase();
+      if (statusVal === "saved") quickSaveBtn.classList.add("is-saved");
+      quickSaveBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-3.5L5 21V5z"/></svg>`;
+      card.appendChild(quickSaveBtn);
+
+      quickSaveBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (!db) return;
+        // Don't let quick-save overwrite advanced statuses
+        const currentStatus = (job.application_status || "saved").toLowerCase();
+        if (!["saved", "applied"].includes(currentStatus)) return;
+        const wasSaved = quickSaveBtn.classList.contains("is-saved");
+        const newStatus = wasSaved ? "applied" : "saved";
+
+        // Optimistic UI
+        quickSaveBtn.classList.toggle("is-saved");
+        quickSaveBtn.classList.add("is-saving");
+
+        try {
+          await updateDoc(doc(db, collectionName, job.id), {
+            application_status: newStatus,
+            updated_at: new Date().toISOString(),
+          });
+          job.application_status = newStatus;
+          // Sync the tracking select if it exists on this card
+          const trackingSelect = card.querySelector(".tracking-status");
+          if (trackingSelect) trackingSelect.value = newStatus;
+          // Update status text in header
+          const metaDivs = card.querySelectorAll(".job-card__meta");
+          metaDivs.forEach((m) => {
+            if (m.textContent.startsWith("Status:")) m.textContent = `Status: ${newStatus}`;
+          });
+        } catch (err) {
+          console.error("Quick-save failed:", err);
+          // Roll back
+          quickSaveBtn.classList.toggle("is-saved");
+        } finally {
+          quickSaveBtn.classList.remove("is-saving");
+        }
       });
     } else {
       // Desktop: carousel behavior
@@ -566,6 +616,76 @@ const renderJobs = () => {
       }
     });
   });
+
+  // ── Mobile job nav bar (prev / counter / next) ──
+  const existingNav = document.querySelector(".mobile-job-nav");
+  if (existingNav) existingNav.remove();
+
+  if (isMobile && filtered.length > 0) {
+    const nav = document.createElement("div");
+    nav.className = "mobile-job-nav";
+
+    const prevBtn = document.createElement("button");
+    prevBtn.className = "mobile-job-nav__btn";
+    prevBtn.textContent = "\u2039";
+    prevBtn.setAttribute("aria-label", "Previous job");
+
+    const counter = document.createElement("span");
+    counter.className = "mobile-job-nav__counter";
+    counter.textContent = `1 of ${filtered.length}`;
+
+    const nextBtn = document.createElement("button");
+    nextBtn.className = "mobile-job-nav__btn";
+    nextBtn.textContent = "\u203A";
+    nextBtn.setAttribute("aria-label", "Next job");
+
+    nav.appendChild(prevBtn);
+    nav.appendChild(counter);
+    nav.appendChild(nextBtn);
+
+    jobsContainer.parentNode.insertBefore(nav, jobsContainer);
+
+    const cards = Array.from(jobsContainer.querySelectorAll(".job-card"));
+    let currentIndex = 0;
+
+    const scrollToCard = (index) => {
+      if (cards[index]) {
+        cards[index].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
+      }
+    };
+
+    prevBtn.addEventListener("click", () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        scrollToCard(currentIndex);
+      }
+    });
+
+    nextBtn.addEventListener("click", () => {
+      if (currentIndex < cards.length - 1) {
+        currentIndex++;
+        scrollToCard(currentIndex);
+      }
+    });
+
+    // IntersectionObserver to update counter on swipe
+    mobileNavObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const idx = cards.indexOf(entry.target);
+            if (idx !== -1) {
+              currentIndex = idx;
+              counter.textContent = `${idx + 1} of ${filtered.length}`;
+            }
+          }
+        });
+      },
+      { root: jobsContainer, threshold: 0.6 }
+    );
+
+    cards.forEach((c) => mobileNavObserver.observe(c));
+  }
 
   if (!filtered.length) {
     jobsContainer.innerHTML = `<div class="detail-box">No roles match these filters yet. Try lowering the fit threshold or clearing filters.</div>`;

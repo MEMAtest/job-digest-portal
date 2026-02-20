@@ -584,6 +584,17 @@ body {
 }
 
 /* ───────────────────────────────────────
+   Mobile nav bar + quick-save (hidden on desktop)
+   ─────────────────────────────────────── */
+.mobile-job-nav {
+  display: none;
+}
+
+.quick-save-btn {
+  display: none;
+}
+
+/* ───────────────────────────────────────
    MOBILE — full redesign
    ─────────────────────────────────────── */
 @media (max-width: 900px) {
@@ -667,18 +678,32 @@ body {
   .stat-card { padding: 10px; }
   .stat-card__value { font-size: 18px; }
 
-  /* Job list */
+  /* Job list → horizontal scroll-snap */
   .job-grid {
     display: flex;
-    flex-direction: column;
-    gap: 12px;
+    flex-direction: row;
+    gap: 0;
+    overflow-x: scroll;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .job-grid::-webkit-scrollbar {
+    display: none;
   }
 
-  /* Job card */
+  /* Job card → full-screen swipable card */
   .job-card {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    height: calc(100vh - 220px);
+    height: calc(100dvh - 220px);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
     padding: 12px;
     gap: 10px;
     overflow: hidden;
+    position: relative;
   }
   .job-card__header {
     flex-direction: column;
@@ -703,9 +728,10 @@ body {
   .detail-carousel-header { display: none; }
   .carousel-dots { display: none; }
 
-  /* Convert carousel → vertical accordion */
+  /* Convert carousel → vertical accordion (scrollable within card) */
   .detail-carousel-wrap {
     margin-top: 8px;
+    overflow-y: auto;
   }
   .job-card__details.detail-carousel {
     display: flex;
@@ -811,5 +837,72 @@ body {
   .alert {
     font-size: 12px;
     padding: 10px 12px;
+  }
+
+  /* ── Mobile job nav bar ── */
+  .mobile-job-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+  }
+  .mobile-job-nav__btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #0f172a;
+    font-size: 18px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .mobile-job-nav__btn:active {
+    background: #f1f5f9;
+  }
+  .mobile-job-nav__counter {
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
+    min-width: 70px;
+    text-align: center;
+  }
+
+  /* ── Quick-save bookmark ── */
+  .quick-save-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    cursor: pointer;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  }
+  .quick-save-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: #64748b;
+    stroke-width: 2;
+    transition: fill 0.15s ease, stroke 0.15s ease;
+  }
+  .quick-save-btn.is-saved svg {
+    fill: #4f46e5;
+    stroke: #4f46e5;
+  }
+  .quick-save-btn.is-saving svg {
+    opacity: 0.5;
   }
 }

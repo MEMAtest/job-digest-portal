@@ -11,3 +11,4 @@ window.FIREBASE_COLLECTION = "jobs";
 window.FIREBASE_STATS_COLLECTION = "job_stats";
 window.FIREBASE_SUGGESTIONS_COLLECTION = "role_suggestions";
 window.FIREBASE_CANDIDATE_PREP_COLLECTION = "candidate_prep";
+window.FIREBASE_RUN_REQUESTS_COLLECTION = "run_requests";

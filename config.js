@@ -9,3 +9,4 @@ window.FIREBASE_CONFIG = {
 };
 
 window.FIREBASE_COLLECTION = "jobs";
+window.FIREBASE_RUN_REQUESTS_COLLECTION = "run_requests";
