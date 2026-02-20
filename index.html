@@ -115,6 +115,20 @@
           <section id="candidate-prep" class="detail-box hidden"></section>
         </section>
       </main>
+
+      <div id="prep-overlay" class="prep-overlay hidden">
+        <div class="prep-overlay__header">
+          <button id="prep-close" class="prep-overlay__close" aria-label="Close prep overlay">&times;</button>
+          <h2 id="prep-overlay-title"></h2>
+          <p id="prep-overlay-meta"></p>
+        </div>
+        <nav class="prep-tabs">
+          <button class="prep-tab prep-tab--active" data-prep-tab="flashcards">STAR Stories</button>
+          <button class="prep-tab" data-prep-tab="mock">Mock Interview</button>
+          <button class="prep-tab" data-prep-tab="cheatsheet">Cheat Sheet</button>
+        </nav>
+        <div id="prep-content" class="prep-content"></div>
+      </div>
     </div>
 
     <script type="module" src="app.js"></script>

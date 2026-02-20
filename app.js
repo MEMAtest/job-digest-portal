@@ -24,6 +24,11 @@ const runStatusLine = document.getElementById("run-status-line");
 const dashboardStatsContainer = document.getElementById("dashboard-stats");
 const breadcrumbLine = document.getElementById("breadcrumb");
 const alertBanner = document.getElementById("alert-banner");
+const prepOverlay = document.getElementById("prep-overlay");
+const prepOverlayTitle = document.getElementById("prep-overlay-title");
+const prepOverlayMeta = document.getElementById("prep-overlay-meta");
+const prepOverlayContent = document.getElementById("prep-content");
+const prepCloseBtn = document.getElementById("prep-close");
 
 const searchInput = document.getElementById("search");
 const minFitSelect = document.getElementById("minFit");
@@ -43,6 +48,7 @@ const state = {
   jobs: [],
   sources: new Set(),
   locations: new Set(),
+  candidatePrep: {},
 };
 
 let quickFilterPredicate = null;
@@ -514,13 +520,422 @@ const buildPrepQa = (job) => {
       const initialAnswer = answers[0]?.text || "";
       return `
         <div class="prep-qa">
-          <div class="prep-qa__question">${escapeHtml(question)}</div>
+          <div class="prep-qa__question">${formatInlineText(question)}</div>
           <select class="prep-qa__select">${options}</select>
-          <div class="prep-qa__answer">${escapeHtml(initialAnswer || "Not available yet.")}</div>
+          <div class="prep-qa__answer">${formatInlineText(initialAnswer || "Not available yet.")}</div>
         </div>
       `;
     })
     .join("");
+};
+
+const parseStarStory = (text) => {
+  const raw = String(text || "").trim();
+  if (!raw) return { raw: "" };
+
+  const extract = (label) => {
+    const regex = new RegExp(`${label}:\\s*([\\s\\S]*?)(?=Situation:|Task:|Action:|Result:|$)`, "i");
+    const match = raw.match(regex);
+    return match ? match[1].trim() : "";
+  };
+
+  const situation = extract("Situation");
+  const task = extract("Task");
+  const action = extract("Action");
+  const result = extract("Result");
+
+  if (!situation && !task && !action && !result) {
+    return { raw };
+  }
+
+  return { situation, task, action, result, raw };
+};
+
+const getConfidenceKey = (jobId, index) => `prep_confidence_${jobId}_${index}`;
+
+const getConfidenceStats = (jobId, count) => {
+  const stats = { green: 0, amber: 0, red: 0 };
+  if (!jobId) return stats;
+  for (let i = 0; i < count; i += 1) {
+    const key = getConfidenceKey(jobId, i);
+    const value = localStorage.getItem(key);
+    if (value === "green") stats.green += 1;
+    if (value === "amber") stats.amber += 1;
+    if (value === "red") stats.red += 1;
+  }
+  return stats;
+};
+
+const buildConfidenceSummary = (jobId, count) => {
+  const stats = getConfidenceStats(jobId, count);
+  const total = Math.max(count, 1);
+  const greenPct = Math.round((stats.green / total) * 100);
+  const amberPct = Math.round((stats.amber / total) * 100);
+  const redPct = Math.max(0, 100 - greenPct - amberPct);
+
+  return `
+    <div class="confidence-summary">
+      <div>Nailed it: <strong>${stats.green}</strong></div>
+      <div>Getting there: <strong>${stats.amber}</strong></div>
+      <div>Needs work: <strong>${stats.red}</strong></div>
+      <div class="confidence-bar">
+        <span class="confidence-bar__green" style="width:${greenPct}%;"></span>
+        <span class="confidence-bar__amber" style="width:${amberPct}%;"></span>
+        <span class="confidence-bar__red" style="width:${redPct}%;"></span>
+      </div>
+    </div>
+  `;
+};
+
+const resolveAnswerOptions = (job, idx) => {
+  const answerSets = Array.isArray(job.prep_answer_sets) ? job.prep_answer_sets : [];
+  const fallbackAnswers = Array.isArray(job.prep_answers) ? job.prep_answers : [];
+
+  if (answerSets[idx] && Array.isArray(answerSets[idx].answers)) {
+    return answerSets[idx].answers;
+  }
+  if (Array.isArray(answerSets[idx])) {
+    return answerSets[idx].map((text, i) => ({ score: 8 + i, text }));
+  }
+  if (fallbackAnswers[idx]) {
+    return [{ score: 9, text: fallbackAnswers[idx] }];
+  }
+  return [];
+};
+
+const getAnswerForScore = (answers, score) => {
+  const target = answers.find((ans) => Number(ans.score) === Number(score));
+  return (target || answers[0] || { text: "Not available yet." }).text;
+};
+
+const renderFlashcards = (container, job) => {
+  const stories = normaliseList(job.star_stories || []);
+  if (!stories.length) {
+    container.innerHTML = `<div class="detail-box">No STAR stories yet.</div>`;
+    return;
+  }
+
+  let currentIndex = 0;
+
+  const renderCard = () => {
+    const story = parseStarStory(stories[currentIndex]);
+    const topicSource = story.situation || story.raw || "";
+    const topic = topicSource.split(/\r?\n/)[0].slice(0, 120);
+    const confidence = localStorage.getItem(getConfidenceKey(job.id, currentIndex)) || "";
+
+    container.innerHTML = `
+      ${buildConfidenceSummary(job.id, stories.length)}
+      <div class="flashcard" data-index="${currentIndex}">
+        <div class="flashcard__front">
+          <div class="flashcard__prompt">What's your STAR story for:</div>
+          <div class="flashcard__topic">${formatInlineText(topic || "Key achievement")}</div>
+          <div class="flashcard__hint">Click to reveal answer</div>
+        </div>
+        <div class="flashcard__back hidden">
+          ${
+            story.situation || story.task || story.action || story.result
+              ? `
+                <div class="flashcard__section"><strong>Situation:</strong> ${formatInlineText(
+                  story.situation || "Not available yet."
+                )}</div>
+                <div class="flashcard__section"><strong>Task:</strong> ${formatInlineText(
+                  story.task || "Not available yet."
+                )}</div>
+                <div class="flashcard__section"><strong>Action:</strong> ${formatInlineText(
+                  story.action || "Not available yet."
+                )}</div>
+                <div class="flashcard__section"><strong>Result:</strong> ${formatInlineText(
+                  story.result || "Not available yet."
+                )}</div>
+              `
+              : `<div class="flashcard__section">${formatInlineText(story.raw)}</div>`
+          }
+        </div>
+        <div class="flashcard__confidence">
+          <span>How confident?</span>
+          <button class="conf-btn conf-btn--red ${confidence === "red" ? "active" : ""}" data-conf="red">Needs work</button>
+          <button class="conf-btn conf-btn--amber ${confidence === "amber" ? "active" : ""}" data-conf="amber">Getting there</button>
+          <button class="conf-btn conf-btn--green ${confidence === "green" ? "active" : ""}" data-conf="green">Nailed it</button>
+        </div>
+      </div>
+      <div class="flashcard-nav">
+        <button class="btn btn-secondary flashcard-prev" ${currentIndex === 0 ? "disabled" : ""}>Previous</button>
+        <div class="flashcard-progress">${currentIndex + 1} / ${stories.length} stories</div>
+        <button class="btn btn-primary flashcard-next" ${currentIndex === stories.length - 1 ? "disabled" : ""}>Next</button>
+      </div>
+    `;
+
+    const card = container.querySelector(".flashcard");
+    const front = card?.querySelector(".flashcard__front");
+    const back = card?.querySelector(".flashcard__back");
+
+    if (front && back) {
+      front.addEventListener("click", () => {
+        front.classList.add("hidden");
+        back.classList.remove("hidden");
+      });
+    }
+
+    container.querySelectorAll(".conf-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const value = btn.dataset.conf;
+        localStorage.setItem(getConfidenceKey(job.id, currentIndex), value);
+        setTimeout(() => {
+          if (currentIndex < stories.length - 1) {
+            currentIndex += 1;
+            renderCard();
+          } else {
+            showToast("All stories rated.");
+            renderCard();
+          }
+        }, 400);
+      });
+    });
+
+    const prevBtn = container.querySelector(".flashcard-prev");
+    const nextBtn = container.querySelector(".flashcard-next");
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        if (currentIndex > 0) {
+          currentIndex -= 1;
+          renderCard();
+        }
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        if (currentIndex < stories.length - 1) {
+          currentIndex += 1;
+          renderCard();
+        }
+      });
+    }
+  };
+
+  renderCard();
+};
+
+const renderMockInterview = (container, job) => {
+  const questions = normaliseList(job.prep_questions || []);
+  if (!questions.length) {
+    container.innerHTML = `<div class="detail-box">No mock interview questions yet.</div>`;
+    return;
+  }
+
+  let currentIndex = 0;
+
+  const renderQuestion = () => {
+    if (currentIndex >= questions.length) {
+      container.innerHTML = `
+        <div class="mock-complete">
+          <h3>Session complete!</h3>
+          <p>You covered all ${questions.length} questions.</p>
+          <button class="btn btn-primary mock-restart">Restart</button>
+        </div>
+      `;
+      const restartBtn = container.querySelector(".mock-restart");
+      if (restartBtn) {
+        restartBtn.addEventListener("click", () => {
+          currentIndex = 0;
+          renderQuestion();
+        });
+      }
+      return;
+    }
+
+    const answers = resolveAnswerOptions(job, currentIndex);
+    const selectedScore = 9;
+    const answerText = getAnswerForScore(answers, selectedScore);
+    const progress = Math.round(((currentIndex + 1) / questions.length) * 100);
+
+    container.innerHTML = `
+      <div class="mock-interview">
+        <div class="mock-progress">Question <span id="mock-current">${currentIndex + 1}</span> of <span id="mock-total">${questions.length}</span></div>
+        <div class="mock-progress-bar"><div class="mock-progress-fill" style="width:${progress}%"></div></div>
+        <div class="mock-question">${formatInlineText(questions[currentIndex])}</div>
+        <div class="mock-score-select">
+          <label>Target score:</label>
+          <select class="mock-score">
+            <option value="8">8/10 · Solid</option>
+            <option value="9" selected>9/10 · Strong</option>
+            <option value="10">10/10 · Elite</option>
+          </select>
+        </div>
+        <button class="btn btn-primary mock-reveal-btn">Reveal answer</button>
+        <div class="mock-answer hidden">${formatInlineText(answerText)}</div>
+        <div class="mock-nav hidden">
+          <button class="btn btn-secondary mock-prev" ${currentIndex === 0 ? "disabled" : ""}>Previous</button>
+          <button class="btn btn-primary mock-next">Next question</button>
+        </div>
+      </div>
+    `;
+
+    const revealBtn = container.querySelector(".mock-reveal-btn");
+    const answerEl = container.querySelector(".mock-answer");
+    const navEl = container.querySelector(".mock-nav");
+    const scoreSelect = container.querySelector(".mock-score");
+
+    const updateAnswer = () => {
+      const score = scoreSelect?.value || "9";
+      const nextAnswer = getAnswerForScore(answers, score);
+      if (answerEl) answerEl.innerHTML = formatInlineText(nextAnswer);
+    };
+
+    if (scoreSelect) {
+      scoreSelect.addEventListener("change", () => {
+        if (answerEl && !answerEl.classList.contains("hidden")) {
+          updateAnswer();
+        }
+      });
+    }
+
+    if (revealBtn) {
+      revealBtn.addEventListener("click", () => {
+        updateAnswer();
+        revealBtn.classList.add("hidden");
+        if (answerEl) answerEl.classList.remove("hidden");
+        if (navEl) navEl.classList.remove("hidden");
+      });
+    }
+
+    const prevBtn = container.querySelector(".mock-prev");
+    const nextBtn = container.querySelector(".mock-next");
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        if (currentIndex > 0) {
+          currentIndex -= 1;
+          renderQuestion();
+        }
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        currentIndex += 1;
+        renderQuestion();
+      });
+    }
+  };
+
+  renderQuestion();
+};
+
+const listToText = (items) => {
+  const list = normaliseList(items);
+  if (!list.length) return "Not available yet.";
+  return list.map((item) => `- ${String(item).replace(/^\s*[•*-]\s+/, "")}`).join("\n");
+};
+
+const buildCheatSheetText = (job, prep) => {
+  const parts = [];
+  parts.push(`Quick Pitch:\n${job.quick_pitch || prep.quick_pitch || "Not available yet."}`);
+  parts.push(`\nWhy You Fit This Role:\n${job.why_fit || "Not available yet."}`);
+  parts.push(`\nKey Talking Points:\n${listToText(job.key_talking_points || prep.key_talking_points || [])}`);
+  parts.push(`\nYour Strengths:\n${listToText(prep.strengths || [])}`);
+  parts.push(`\nRisk Mitigations:\n${listToText(prep.risk_mitigations || [])}`);
+  parts.push(`\nInterview Focus:\n${job.interview_focus || "Not available yet."}`);
+  parts.push(`\nCompany Insights:\n${job.company_insights || "Not available yet."}`);
+  return parts.join("\n");
+};
+
+const renderCheatSheet = (container, job) => {
+  const prep = state.candidatePrep || {};
+  container.innerHTML = `
+    <div class="cheatsheet">
+      <div class="cheatsheet__section">
+        <h3>Quick Pitch</h3>
+        <div>${formatInlineText(job.quick_pitch || prep.quick_pitch || "Not available yet.")}</div>
+      </div>
+      <div class="cheatsheet__section">
+        <h3>Why You Fit This Role</h3>
+        <div>${formatInlineText(job.why_fit || "Not available yet.")}</div>
+      </div>
+      <div class="cheatsheet__section">
+        <h3>Key Talking Points</h3>
+        ${formatList(job.key_talking_points || prep.key_talking_points || [])}
+      </div>
+      <div class="cheatsheet__section">
+        <h3>Your Strengths</h3>
+        ${formatList(prep.strengths || [])}
+      </div>
+      <div class="cheatsheet__section">
+        <h3>Risk Mitigations (gaps/weaknesses)</h3>
+        ${formatList(prep.risk_mitigations || [])}
+      </div>
+      <div class="cheatsheet__section">
+        <h3>Interview Focus</h3>
+        <div>${formatInlineText(job.interview_focus || "Not available yet.")}</div>
+      </div>
+      <div class="cheatsheet__section">
+        <h3>Company Insights</h3>
+        <div>${formatInlineText(job.company_insights || "Not available yet.")}</div>
+      </div>
+      <div class="cheatsheet__actions">
+        <button class="btn btn-primary copy-cheatsheet-btn">Copy all</button>
+        <button class="btn btn-secondary print-cheatsheet-btn">Print</button>
+      </div>
+    </div>
+  `;
+
+  const copyBtn = container.querySelector(".copy-cheatsheet-btn");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      copyToClipboard(buildCheatSheetText(job, prep));
+      showToast("Cheat sheet copied.");
+    });
+  }
+
+  const printBtn = container.querySelector(".print-cheatsheet-btn");
+  if (printBtn) {
+    printBtn.addEventListener("click", () => {
+      window.print();
+    });
+  }
+};
+
+const openPrepMode = (jobId) => {
+  if (!prepOverlay) return;
+  const job = state.jobs.find((j) => j.id === jobId);
+  if (!job || !job.prep_questions || !job.prep_questions.length) {
+    showToast("No prep data yet.");
+    return;
+  }
+  if (prepOverlayTitle) prepOverlayTitle.textContent = job.role || "Prep Mode";
+  if (prepOverlayMeta) prepOverlayMeta.textContent = job.company || "";
+  prepOverlay.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  window.__prepJob = job;
+  switchPrepTab("flashcards");
+};
+
+const closePrepMode = () => {
+  if (!prepOverlay) return;
+  prepOverlay.classList.add("hidden");
+  document.body.style.overflow = "";
+  window.__prepJob = null;
+};
+
+const switchPrepTab = (tabName) => {
+  if (!prepOverlayContent) return;
+  document.querySelectorAll(".prep-tab").forEach((btn) => {
+    btn.classList.toggle("prep-tab--active", btn.dataset.prepTab === tabName);
+  });
+  const job = window.__prepJob;
+  if (!job) {
+    prepOverlayContent.innerHTML = "<div class=\"detail-box\">Select a role to start prep.</div>";
+    return;
+  }
+  if (tabName === "flashcards") {
+    renderFlashcards(prepOverlayContent, job);
+    return;
+  }
+  if (tabName === "mock") {
+    renderMockInterview(prepOverlayContent, job);
+    return;
+  }
+  if (tabName === "cheatsheet") {
+    renderCheatSheet(prepOverlayContent, job);
+  }
 };
 
 const renderFilters = () => {
@@ -811,6 +1226,7 @@ const renderJobs = () => {
       </div>
       <div class="job-card__actions">
         <button class="btn btn-quick-apply${statusValue !== "saved" ? " btn-quick-apply--done" : ""}">${statusValue === "saved" ? "Quick Apply" : "Re-copy & Open"}</button>
+        <button class="btn btn-prep" data-job-id="${escapeHtml(job.id)}">Prep</button>
         <a href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View & Apply</a>
       </div>
     `;
@@ -820,6 +1236,11 @@ const renderJobs = () => {
     const qaBtn = card.querySelector(".btn-quick-apply");
     if (qaBtn) {
       qaBtn.addEventListener("click", () => quickApply(job, card));
+    }
+
+    const prepBtn = card.querySelector(".btn-prep");
+    if (prepBtn) {
+      prepBtn.addEventListener("click", () => openPrepMode(prepBtn.dataset.jobId));
     }
 
     const carousel = card.querySelector(".detail-carousel");
@@ -972,7 +1393,7 @@ const renderJobs = () => {
       select.addEventListener("change", () => {
         const selected = select.selectedOptions[0];
         if (!answerEl) return;
-        answerEl.textContent = selected?.dataset?.answer || "Not available yet.";
+        answerEl.innerHTML = formatInlineText(selected?.dataset?.answer || "Not available yet.");
       });
     });
 
@@ -1507,6 +1928,22 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
   });
 });
 
+if (prepCloseBtn) {
+  prepCloseBtn.addEventListener("click", closePrepMode);
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closePrepMode();
+  }
+});
+
+document.querySelectorAll(".prep-tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    switchPrepTab(btn.dataset.prepTab);
+  });
+});
+
 setActiveTab("dashboard");
 
 const loadJobs = async () => {
@@ -1601,6 +2038,7 @@ const loadJobs = async () => {
     const prepQuery = query(prepRef, orderBy("date", "desc"), limit(1));
     const prepSnap = await getDocs(prepQuery);
     const prepDoc = prepSnap.docs[0]?.data();
+    state.candidatePrep = prepDoc || {};
     renderCandidatePrep(prepDoc);
   } catch (error) {
     console.error(error);
