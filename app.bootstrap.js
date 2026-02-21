@@ -36,6 +36,7 @@ import {
 } from "./app.core.js";
 import { renderFilters, renderJobs } from "./app.jobs.js";
 import { renderApplyHub } from "./app.applyhub.js";
+import { renderCvHub } from "./app.cvhub.js";
 import { loadBaseCvFromFirestore } from "./app.cv.js";
 import {
   renderDashboardStats,
@@ -187,6 +188,7 @@ const loadJobs = async () => {
     }
     renderJobs();
     renderApplyHub();
+    renderCvHub();
     renderTriagePrompt(jobs);
 
     summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
