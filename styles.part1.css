@@ -436,30 +436,11 @@ body {
 }
 
 .job-card__details {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 14px;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-}
-
-.job-card__details.detail-carousel {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5f5 transparent;
-}
-
-.job-card__details.detail-carousel::-webkit-scrollbar {
-  height: 8px;
-}
-
-.job-card__details.detail-carousel::-webkit-scrollbar-thumb {
-  background: #cbd5f5;
-  border-radius: 999px;
-}
-
-.job-card__details.detail-carousel::-webkit-scrollbar-track {
-  background: transparent;
+  overflow: visible;
+  padding-bottom: 0;
 }
 
 .detail-box {
@@ -469,10 +450,9 @@ body {
   border: 1px solid #e2e8f0;
   font-size: 13px;
   color: #334155;
-  min-width: 260px;
-  max-width: 360px;
-  flex: 0 0 300px;
-  scroll-snap-align: start;
+  min-width: 0;
+  max-width: none;
+  width: 100%;
 }
 
 .detail-carousel-wrap {
@@ -480,10 +460,7 @@ body {
 }
 
 .detail-carousel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
+  display: none;
 }
 
 .detail-carousel-hint {
