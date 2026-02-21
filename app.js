@@ -51,6 +51,7 @@ const state = {
   candidatePrep: {},
   activePrepJob: null,
   hubSort: null,
+  hubNotesTimers: {},
   triageQueue: [],
   triageIndex: 0,
   triageStats: { dismissed: 0, shortlisted: 0, apply: 0 },
@@ -1509,6 +1510,16 @@ const renderApplyHub = () => {
   const hubContainer = document.getElementById("apply-hub");
   if (!hubContainer) return;
 
+  // Preserve draft notes before re-render
+  const existingNotes = hubContainer.querySelectorAll?.(".hub-notes") || [];
+  existingNotes.forEach((textarea) => {
+    const jobId = textarea.dataset.jobId;
+    if (!jobId) return;
+    const job = state.jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    job.application_notes = textarea.value.slice(0, 500);
+  });
+
   const readyJobs = state.jobs.filter((j) => (j.application_status || "saved").toLowerCase() === "ready_to_apply");
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -1558,7 +1569,9 @@ const renderApplyHub = () => {
     const cvDiffPreview = buildPreviewText(cvDiffHtml);
     const summaryPreview = buildPreviewText(formatInlineText(job.tailored_summary || ""));
     const coverPreview = buildPreviewText(formatInlineText(job.cover_letter || ""));
-    const requirementsPreview = buildPreviewText(formatList(job.key_requirements || []));
+    const requirementsPreview = buildPreviewText(
+      (job.key_requirements || []).map((req) => String(req)).join(" · ")
+    );
     const noteText = job.application_notes || "";
     const noteCount = Math.min(noteText.length, 500);
     const actionLabel =
@@ -1743,6 +1756,14 @@ const renderApplyHub = () => {
     });
   });
 
+  if (hubToggleBtn) {
+    const sections = Array.from(hubContainer.querySelectorAll(".hub-card__section"));
+    const openCount = sections.filter((d) => d.open).length;
+    const allOpen = sections.length > 0 && openCount === sections.length;
+    hubToggleBtn.dataset.toggle = allOpen ? "collapse" : "expand";
+    hubToggleBtn.textContent = allOpen ? "Collapse all" : "Expand all";
+  }
+
   // Wire up hub card buttons
   hubContainer.querySelectorAll(".btn-quick-apply").forEach((btn) => {
     const jobId = btn.dataset.jobId;
@@ -1787,7 +1808,8 @@ const renderApplyHub = () => {
   });
 
   // Notes autosave
-  const notesTimers = {};
+  const notesTimers = state.hubNotesTimers || {};
+  state.hubNotesTimers = notesTimers;
   hubContainer.querySelectorAll(".hub-notes").forEach((textarea) => {
     const jobId = textarea.dataset.jobId;
     const counter = textarea.parentElement?.querySelector(".hub-notes__count");
@@ -1796,19 +1818,20 @@ const renderApplyHub = () => {
       const len = Math.min(textarea.value.length, 500);
       if (counter) counter.textContent = `${len}/500`;
     };
-    textarea.addEventListener("input", updateCounter);
-    textarea.addEventListener("blur", () => {
+    const scheduleSave = (immediate = false) => {
       if (!jobId) return;
       if (notesTimers[jobId]) clearTimeout(notesTimers[jobId]);
+      const delay = immediate ? 0 : 500;
       notesTimers[jobId] = setTimeout(async () => {
         const job = state.jobs.find((j) => j.id === jobId);
-        if (!job || !db) return;
+        if (!job) return;
+        job.application_notes = textarea.value.slice(0, 500);
+        if (!db) return;
         try {
           await updateDoc(doc(db, collectionName, jobId), {
             application_notes: textarea.value.slice(0, 500),
             updated_at: new Date().toISOString(),
           });
-          job.application_notes = textarea.value.slice(0, 500);
           if (saved) {
             saved.classList.remove("hidden");
             setTimeout(() => saved.classList.add("hidden"), 1000);
@@ -1816,8 +1839,13 @@ const renderApplyHub = () => {
         } catch (error) {
           console.error("Notes save failed:", error);
         }
-      }, 500);
+      }, delay);
+    };
+    textarea.addEventListener("input", () => {
+      updateCounter();
+      scheduleSave(false);
     });
+    textarea.addEventListener("blur", () => scheduleSave(true));
     updateCounter();
   });
 };
