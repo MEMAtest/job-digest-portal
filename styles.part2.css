@@ -165,6 +165,7 @@
   max-height: 70vh;
   overflow-y: auto;
   padding-right: 4px;
+  scrollbar-width: thin;
 }
 
 .prep-card {
@@ -232,7 +233,7 @@
 .prep-detail-tabs {
   display: flex;
   gap: 8px;
-  margin: 16px 0;
+  margin: 12px 0 16px;
   flex-wrap: wrap;
 }
 
@@ -279,10 +280,24 @@
   cursor: pointer;
   font-weight: 600;
   color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .prep-detail-card summary::-webkit-details-marker {
   display: none;
+}
+
+.prep-detail-card summary::after {
+  content: "Expand";
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.prep-detail-card[open] summary::after {
+  content: "Collapse";
 }
 
 .prep-detail-card__body {
@@ -290,6 +305,13 @@
   font-size: 13px;
   line-height: 1.6;
   color: #475569;
+}
+
+.prep-detail-card:not([open]) .prep-detail-card__body {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .prep-detail-list {
@@ -300,7 +322,7 @@
   color: #475569;
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 1100px) {
   .prep-board {
     grid-template-columns: 1fr;
   }
@@ -316,10 +338,12 @@
     overflow-y: hidden;
     max-height: none;
     padding-bottom: 6px;
+    scroll-snap-type: x mandatory;
   }
 
   .prep-card {
     min-width: 220px;
+    scroll-snap-align: start;
   }
 }
 
