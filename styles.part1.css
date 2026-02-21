@@ -470,6 +470,7 @@ body {
 
 .detail-carousel-wrap {
   margin-top: 12px;
+  overflow-x: hidden;
 }
 
 .detail-carousel-header {

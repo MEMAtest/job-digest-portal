@@ -251,7 +251,7 @@ export const renderJobs = () => {
     } /></label>
         <div>
           <div class="job-card__title">${escapeHtml(job.role)}</div>
-          <div class="job-card__company">${escapeHtml(job.company)}</div>
+          <div class="job-card__company">${escapeHtml(job.company || "Company not listed")}</div>
           <div class="job-card__meta">${escapeHtml(formatPosted(job.posted))} · ${escapeHtml(job.source)}</div>
           <div class="job-card__meta">Status: ${escapeHtml(statusValue)}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
         </div>
