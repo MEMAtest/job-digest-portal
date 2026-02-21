@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import base64
 import csv
+import difflib
 import hashlib
 import json
 import os
@@ -96,6 +97,7 @@ class JobRecord:
     apply_tips: str = ""
     tailored_cv_sections: dict = field(default_factory=dict)
     applicant_count: str = ""
+    alternate_links: List[Dict[str, str]] = field(default_factory=list)
 
 
 DEFAULT_BASE_DIR = Path("/Users/adeomosanya/Documents/job apps/roles")
@@ -108,6 +110,7 @@ WINDOW_HOURS = int(os.getenv("JOB_DIGEST_WINDOW_HOURS", "24"))
 MIN_SCORE = int(os.getenv("JOB_DIGEST_MIN_SCORE", "70"))
 MAX_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MAX_EMAIL_ROLES", "12"))
 COMPANY_SEARCH_LIMIT = int(os.getenv("JOB_DIGEST_COMPANY_SEARCH_LIMIT", "60"))
+STALE_DAYS = int(os.getenv("JOB_DIGEST_STALE_DAYS", "14"))
 PREFERENCES = os.getenv(
     "JOB_DIGEST_PREFERENCES",
     "London or remote UK · Product/Platform roles · KYC/AML/Onboarding/Sanctions/Screening · Min fit 70%",
@@ -147,6 +150,10 @@ GEMINI_FALLBACK_MODELS = [
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("JOB_DIGEST_GROQ_MODEL", "llama-3.3-70b-versatile")
 GROQ_MAX_JOBS = int(os.getenv("JOB_DIGEST_GROQ_MAX_JOBS", "20"))
+GROQ_RATE_LIMIT_RPM = int(os.getenv("JOB_DIGEST_GROQ_RPM", "30"))
+GROQ_DAILY_TOKEN_LIMIT = int(os.getenv("JOB_DIGEST_GROQ_DAILY_TOKEN_LIMIT", "14400"))
+GROQ_TOKEN_WARN_RATIO = float(os.getenv("JOB_DIGEST_GROQ_TOKEN_WARN_RATIO", "0.8"))
+GROQ_USAGE = {"tokens": 0, "calls": 0, "retries": 0}
 
 try:
     from groq import Groq as GroqClient
@@ -821,6 +828,93 @@ def dedupe_keep_order(items: List[str]) -> List[str]:
     return deduped
 
 
+TITLE_STRIP_TOKENS = {
+    "senior",
+    "sr",
+    "lead",
+    "principal",
+    "head",
+    "junior",
+    "jr",
+}
+
+
+def normalise_company(name: str) -> str:
+    cleaned = re.sub(r"[^\w\s]", " ", (name or "").lower())
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def normalise_title(title: str) -> str:
+    cleaned = re.sub(r"[^\w\s]", " ", (title or "").lower())
+    tokens = [tok for tok in cleaned.split() if tok and tok not in TITLE_STRIP_TOKENS]
+    return " ".join(tokens)
+
+
+def record_richness(record: JobRecord) -> float:
+    score = 0.0
+    score += 1.0 if record.notes else 0.0
+    score += 1.0 if record.posted else 0.0
+    score += 1.0 if record.location else 0.0
+    score += 1.0 if record.link else 0.0
+    score += 1.0 if record.applicant_count else 0.0
+    score += min(len(record.notes or ""), 200) / 200.0
+    return score
+
+
+def merge_records(primary: JobRecord, secondary: JobRecord) -> JobRecord:
+    if secondary.link and secondary.link != primary.link:
+        primary.alternate_links.append({"source": secondary.source, "link": secondary.link})
+    if secondary.notes and not primary.notes:
+        primary.notes = secondary.notes
+    if secondary.posted and not primary.posted:
+        primary.posted = secondary.posted
+    if secondary.location and not primary.location:
+        primary.location = secondary.location
+    if secondary.applicant_count and not primary.applicant_count:
+        primary.applicant_count = secondary.applicant_count
+    return primary
+
+
+def dedupe_records(records: List[JobRecord]) -> List[JobRecord]:
+    deduped: List[JobRecord] = []
+    for record in records:
+        matched_index = None
+        record_company = normalise_company(record.company)
+        record_title = normalise_title(record.role)
+        for idx, existing in enumerate(deduped):
+            if record.link and existing.link and record.link == existing.link:
+                matched_index = idx
+                break
+            if record_company and record_company == normalise_company(existing.company):
+                similarity = difflib.SequenceMatcher(None, record_title, normalise_title(existing.role)).ratio()
+                if similarity >= 0.85:
+                    matched_index = idx
+                    break
+        if matched_index is None:
+            deduped.append(record)
+            continue
+
+        existing = deduped[matched_index]
+        primary = existing
+        secondary = record
+        if record_richness(record) > record_richness(existing):
+            primary, secondary = record, existing
+        elif record_richness(record) == record_richness(existing) and record.fit_score > existing.fit_score:
+            primary, secondary = record, existing
+
+        merged = merge_records(primary, secondary)
+        if existing is not merged:
+            merged.alternate_links.extend(existing.alternate_links)
+        merged.alternate_links = dedupe_keep_order(
+            [json.dumps(link, sort_keys=True) for link in merged.alternate_links]
+        )
+        merged.alternate_links = [json.loads(item) for item in merged.alternate_links]
+
+        deduped[matched_index] = merged
+
+    return deduped
+
+
 def load_uk_feed_targets(path: Path) -> Dict[str, List[str]]:
     targets: Dict[str, List[str]] = {
         "greenhouse": [],
@@ -1101,6 +1195,18 @@ def clean_link(url: str) -> str:
     return url.split("?")[0] if url else url
 
 
+def parse_applicant_count(value: str) -> Optional[int]:
+    if not value:
+        return None
+    match = re.search(r"(\d[\d,]*)", str(value))
+    if not match:
+        return None
+    try:
+        return int(match.group(1).replace(",", ""))
+    except ValueError:
+        return None
+
+
 def load_seen_cache(path: Path) -> Dict[str, str]:
     if not path.exists():
         return {}
@@ -1140,10 +1246,11 @@ def save_seen_cache(path: Path, seen: Dict[str, str]) -> None:
 def filter_new_records(records: List[JobRecord], seen: Dict[str, str]) -> List[JobRecord]:
     new_records = []
     for record in records:
-        if not record.link:
-            new_records.append(record)
-            continue
-        if record.link in seen:
+        links_to_check = [record.link] if record.link else []
+        links_to_check.extend(
+            [alt.get("link", "") for alt in record.alternate_links if isinstance(alt, dict)]
+        )
+        if links_to_check and any(link for link in links_to_check if link in seen):
             continue
         new_records.append(record)
     return new_records
@@ -1408,6 +1515,26 @@ def parse_gemini_payload(text: str) -> Optional[Dict[str, object]]:
         return None
 
 
+def _sleep_for_rpm() -> None:
+    if GROQ_RATE_LIMIT_RPM <= 0:
+        return
+    delay = 60 / max(1, GROQ_RATE_LIMIT_RPM)
+    time.sleep(delay)
+
+
+def _extract_retry_after(error: Exception) -> Optional[int]:
+    response = getattr(error, "response", None)
+    headers = getattr(response, "headers", None) if response else None
+    if headers:
+        retry_after = headers.get("retry-after") or headers.get("Retry-After")
+        if retry_after:
+            try:
+                return int(float(retry_after))
+            except ValueError:
+                return None
+    return None
+
+
 def generate_gemini_text(prompt: str) -> Optional[str]:
     if not GEMINI_API_KEY or genai is None:
         return None
@@ -1427,21 +1554,38 @@ def generate_gemini_text(prompt: str) -> Optional[str]:
     return None
 
 
-def generate_groq_text(prompt: str) -> Optional[str]:
+def generate_groq_text(prompt: str, usage: Optional[Dict[str, int]] = None) -> Optional[str]:
     if not GROQ_API_KEY or GroqClient is None:
         return None
-    try:
-        client = GroqClient(api_key=GROQ_API_KEY)
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-            max_tokens=4000,
-        )
-        return response.choices[0].message.content or ""
-    except Exception as e:
-        print(f"Groq error: {e}")
-        return None
+    client = GroqClient(api_key=GROQ_API_KEY)
+    backoffs = [2, 4, 8]
+    attempts = len(backoffs) + 1
+    for attempt in range(attempts):
+        try:
+            _sleep_for_rpm()
+            response = client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.4,
+                max_tokens=4000,
+            )
+            if usage is not None:
+                usage["calls"] = usage.get("calls", 0) + 1
+                tokens = getattr(response, "usage", None)
+                total_tokens = getattr(tokens, "total_tokens", None) if tokens else None
+                if isinstance(total_tokens, int):
+                    usage["tokens"] = usage.get("tokens", 0) + total_tokens
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            status = getattr(e, "status_code", None) or getattr(getattr(e, "response", None), "status_code", None)
+            if usage is not None:
+                usage["retries"] = usage.get("retries", 0) + 1
+            if attempt < attempts - 1:
+                retry_after = _extract_retry_after(e) if status == 429 else None
+                time.sleep(retry_after or backoffs[attempt])
+                continue
+            print(f"Groq error: {e}")
+            return None
 
 
 def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
@@ -1449,7 +1593,13 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
         return records
 
     limit = min(GROQ_MAX_JOBS, len(records))
+    usage = GROQ_USAGE
+    warn_threshold = int(GROQ_DAILY_TOKEN_LIMIT * GROQ_TOKEN_WARN_RATIO)
+    allow_groq = True
     for record in records[:limit]:
+        if allow_groq and warn_threshold and usage.get("tokens", 0) >= warn_threshold:
+            print("Groq token usage nearing daily limit; falling back to Gemini for remaining jobs.")
+            allow_groq = False
         prompt = (
             "You are a senior UK fintech product recruiter and ATS optimisation specialist. "
             "Given the candidate profile and job summary, score fit 0-100 and produce ATS-ready outputs. "
@@ -1475,7 +1625,9 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
             f"Posted: {record.posted}\n"
             f"Summary: {record.notes}\n"
         )
-        text = generate_groq_text(prompt)
+        text = generate_groq_text(prompt, usage=usage) if allow_groq else None
+        if not text and GEMINI_API_KEY and genai is not None:
+            text = generate_gemini_text(prompt)
         data = parse_gemini_payload(text or "")
         if not data:
             continue
@@ -1501,6 +1653,12 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
             val = data.get(list_key)
             if isinstance(val, list) and val:
                 setattr(record, list_key, val)
+
+    if usage.get("calls", 0) or usage.get("retries", 0):
+        print(
+            "Groq summary:",
+            f"{usage.get('calls', 0)} calls, {usage.get('retries', 0)} retries, {usage.get('tokens', 0)} tokens",
+        )
 
     return records
 
@@ -1685,6 +1843,16 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
 
     for record in records:
         doc_id = record_document_id(record)
+        doc_ref = client.collection(FIREBASE_COLLECTION).document(doc_id)
+        existing_data: Dict[str, object] = {}
+        try:
+            snapshot = doc_ref.get()
+            if snapshot.exists:
+                existing_data = snapshot.to_dict() or {}
+        except Exception:
+            existing_data = {}
+        now_iso = datetime.now(timezone.utc).isoformat()
+        created_at = existing_data.get("created_at") or now_iso
         data = {
             "role": record.role,
             "company": record.company,
@@ -1699,8 +1867,12 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "notes": record.notes,
             "prep_questions": record.prep_questions,
             "apply_tips": record.apply_tips,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": now_iso,
+            "created_at": created_at,
+            "last_seen_at": now_iso,
         }
+        if not existing_data.get("application_status"):
+            data["application_status"] = "saved"
         optional_fields = {
             "role_summary": record.role_summary,
             "tailored_summary": record.tailored_summary,
@@ -1717,6 +1889,7 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "scorecard": record.scorecard,
             "tailored_cv_sections": record.tailored_cv_sections,
             "applicant_count": record.applicant_count,
+            "alternate_links": record.alternate_links,
         }
         for key, value in optional_fields.items():
             if isinstance(value, list):
@@ -1724,8 +1897,32 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
                     data[key] = value
             elif value:
                 data[key] = value
+        current_applicant_count = parse_applicant_count(record.applicant_count)
+        if current_applicant_count is not None:
+            data["applicant_count_numeric"] = current_applicant_count
+            previous_count = existing_data.get("applicant_count_numeric")
+            if previous_count is None:
+                previous_count = parse_applicant_count(str(existing_data.get("applicant_count", "")))
+            if isinstance(previous_count, int) and previous_count != current_applicant_count:
+                data["applicant_count_prev"] = previous_count
+                data["applicant_count_prev_date"] = now_iso
+                try:
+                    history_doc = doc_ref.collection("applicant_history").document(
+                        f"{now_iso[:10]}_{current_applicant_count}"
+                    )
+                    history_doc.set(
+                        {
+                            "date": now_iso[:10],
+                            "count": current_applicant_count,
+                            "raw_text": record.applicant_count,
+                            "updated_at": now_iso,
+                        },
+                        merge=True,
+                    )
+                except Exception:
+                    pass
         try:
-            client.collection(FIREBASE_COLLECTION).document(doc_id).set(data, merge=True)
+            doc_ref.set(data, merge=True)
         except Exception:
             continue
 
@@ -1750,6 +1947,41 @@ def write_source_stats(records: List[JobRecord]) -> None:
         client.collection("job_stats").document(today).set(payload, merge=True)
     except Exception:
         return
+
+
+def cleanup_stale_jobs() -> None:
+    client = init_firestore_client()
+    if client is None:
+        return
+    cutoff = now_utc() - timedelta(days=STALE_DAYS)
+    cutoff_iso = cutoff.isoformat()
+    updated = 0
+    try:
+        query = (
+            client.collection(FIREBASE_COLLECTION)
+            .where("application_status", "==", "saved")
+            .where("created_at", "<", cutoff_iso)
+        )
+        for doc in query.stream():
+            data = doc.to_dict() or {}
+            if (data.get("fit_score") or 0) >= 85:
+                continue
+            try:
+                doc.reference.update(
+                    {
+                        "application_status": "dismissed",
+                        "dismiss_reason": "auto_stale",
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                )
+                updated += 1
+            except Exception:
+                continue
+    except Exception:
+        return
+
+    if updated:
+        print(f"Auto-dismissed {updated} stale jobs (> {STALE_DAYS} days).")
 
 
 def write_role_suggestions() -> None:
@@ -4105,13 +4337,8 @@ def main() -> None:
             )
         )
 
-    # Sort and dedupe by link
-    unique: Dict[str, JobRecord] = {}
-    for job in sorted(all_jobs, key=lambda x: x.fit_score, reverse=True):
-        if job.link not in unique:
-            unique[job.link] = job
-
-    records = list(unique.values())
+    # Deduplicate across sources (title + company similarity + link)
+    records = dedupe_records(sorted(all_jobs, key=lambda x: x.fit_score, reverse=True))
 
     # Keep records ordered by fit score (highest first)
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
@@ -4133,6 +4360,7 @@ def main() -> None:
     write_source_stats(records)
     write_role_suggestions()
     write_candidate_prep()
+    cleanup_stale_jobs()
 
     # Write outputs
     today = datetime.now().strftime("%Y-%m-%d")
@@ -4263,6 +4491,10 @@ def main() -> None:
         for record in records:
             if record.link:
                 seen_cache[record.link] = now_utc().isoformat()
+            for alt in record.alternate_links:
+                link = alt.get("link") if isinstance(alt, dict) else ""
+                if link:
+                    seen_cache[link] = now_utc().isoformat()
         save_seen_cache(SEEN_CACHE_PATH, seen_cache)
         if RUN_AT or RUN_ATS:
             state = load_run_state(RUN_STATE_PATH)
