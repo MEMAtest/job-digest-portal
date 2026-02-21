@@ -370,7 +370,7 @@ export const renderJobs = () => {
           <div class="tracking-grid">
             <label>Status</label>
             <select class="tracking-status">
-              <option value="saved" ${statusValue === "saved" ? "selected" : ""}>Saved</option>
+              <option value="saved" ${statusValue === "saved" ? "selected" : ""}>New</option>
               <option value="applied" ${statusValue === "applied" ? "selected" : ""}>Applied</option>
               <option value="interview" ${statusValue === "interview" ? "selected" : ""}>Interview</option>
               <option value="offer" ${statusValue === "offer" ? "selected" : ""}>Offer</option>
@@ -792,7 +792,7 @@ export const renderJobs = () => {
         job.interviewer_name = payload.interviewer_name;
         job.interviewer_email = payload.interviewer_email;
         job.interview_date = payload.interview_date;
-        statusMsg.textContent = "Saved.";
+        statusMsg.textContent = "Updated.";
       } catch (error) {
         console.error(error);
         statusMsg.textContent = "Save failed.";
