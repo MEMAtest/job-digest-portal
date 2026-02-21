@@ -244,16 +244,27 @@ export const renderJobs = () => {
 
     const card = document.createElement("div");
     card.className = "job-card";
+    const postedDisplay = job.posted_raw || job.posted || "";
+    const applicantDisplay = job.applicant_count ? ` · ${job.applicant_count} applicants` : "";
+    const openStatus =
+      job.job_status ||
+      (job.is_open === true ? "Open" : "") ||
+      (job.is_open === false ? "Closed" : "") ||
+      (job.is_closed ? "Closed" : "");
+    const statusSuffix = openStatus ? ` · ${openStatus}` : "";
+
     card.innerHTML = `
       <div class="job-card__header">
-        <label class="bulk-check-label"><input type="checkbox" class="bulk-check" data-job-id="${escapeHtml(job.id)}" ${
+        <div class="job-card__info">
+          <label class="bulk-check-label"><input type="checkbox" class="bulk-check" data-job-id="${escapeHtml(job.id)}" ${
       state.selectedJobs.has(job.id) ? "checked" : ""
     } /></label>
-        <div>
-          <div class="job-card__title">${escapeHtml(job.role)}</div>
-          <div class="job-card__company">${escapeHtml(job.company || "Company not listed")}</div>
-          <div class="job-card__meta">${escapeHtml(formatPosted(job.posted))} · ${escapeHtml(job.source)}</div>
-          <div class="job-card__meta">Status: ${escapeHtml(statusValue)}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
+          <div class="job-card__text">
+            <div class="job-card__title">${escapeHtml(job.role)}</div>
+            <div class="job-card__company">${escapeHtml(job.company || "Company not listed")}</div>
+            <div class="job-card__meta">${escapeHtml(formatPosted(postedDisplay))} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
+            <div class="job-card__meta">Status: ${escapeHtml(statusValue)}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
+          </div>
         </div>
         <div class="job-card__badges">
           <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
@@ -410,6 +421,7 @@ export const renderJobs = () => {
         <button class="btn btn-secondary btn-shortlist"${statusValue === "shortlisted" ? " disabled" : ""}>${
           statusValue === "shortlisted" ? "Shortlisted" : "Shortlist"
         }</button>
+        <button class="btn btn-secondary btn-dismiss">Dismiss</button>
         <button class="btn btn-prep" data-job-id="${escapeHtml(job.id)}">Prep</button>
         <a href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View link</a>
       </div>
@@ -460,6 +472,34 @@ export const renderJobs = () => {
         } catch (err) {
           console.error(err);
           showToast("Shortlist failed.");
+        }
+      });
+    }
+
+    const dismissBtn = card.querySelector(".btn-dismiss");
+    if (dismissBtn) {
+      dismissBtn.addEventListener("click", async () => {
+        if (!db) {
+          showToast("Missing Firebase config.");
+          return;
+        }
+        const now = new Date().toISOString();
+        try {
+          await updateDoc(doc(db, collectionName, job.id), {
+            application_status: "dismissed",
+            dismiss_reason: "manual",
+            updated_at: now,
+          });
+          job.application_status = "dismissed";
+          job.dismiss_reason = "manual";
+          const metaDivs = card.querySelectorAll(".job-card__meta");
+          metaDivs.forEach((m) => {
+            if (m.textContent.startsWith("Status:")) m.textContent = "Status: dismissed · manual";
+          });
+          showToast("Dismissed");
+        } catch (err) {
+          console.error(err);
+          showToast("Dismiss failed.");
         }
       });
     }

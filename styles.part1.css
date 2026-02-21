@@ -354,6 +354,18 @@ body {
   gap: 16px;
 }
 
+.job-card__info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.job-card__text {
+  min-width: 0;
+}
+
 .job-card__badges {
   display: flex;
   flex-direction: column;
