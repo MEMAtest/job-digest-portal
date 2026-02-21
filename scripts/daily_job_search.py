@@ -13,18 +13,6 @@ import json
 import os
 import re
 import time
-
-# Load .env file from script directory if present
-def _load_dotenv() -> None:
-    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-    if os.path.exists(env_path):
-        with open(env_path) as _f:
-            for _line in _f:
-                _line = _line.strip()
-                if _line and not _line.startswith("#") and "=" in _line:
-                    _k, _, _v = _line.partition("=")
-                    os.environ.setdefault(_k.strip(), _v.strip())
-_load_dotenv()
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -60,9 +48,14 @@ except Exception:  # noqa: BLE001
     PdfReader = None
 
 try:
-    from openai import OpenAI
+    import google.generativeai as genai
 except Exception:  # noqa: BLE001
-    OpenAI = None
+    genai = None
+
+try:
+    import openai as openai_lib
+except Exception:  # noqa: BLE001
+    openai_lib = None
 
 try:
     import firebase_admin
@@ -71,11 +64,6 @@ except Exception:  # noqa: BLE001
     firebase_admin = None
     credentials = None
     firestore = None
-
-try:
-    import google.generativeai as genai
-except Exception:  # noqa: BLE001
-    genai = None
 
 
 @dataclass
@@ -103,9 +91,11 @@ class JobRecord:
     quick_pitch: str = ""
     interview_focus: str = ""
     prep_questions: List[str] = field(default_factory=list)
+    prep_answers: List[str] = field(default_factory=list)
+    scorecard: List[str] = field(default_factory=list)
     apply_tips: str = ""
-    cv_edit_notes: str = ""
-    apply_method: str = ""
+    tailored_cv_sections: dict = field(default_factory=dict)
+    applicant_count: str = ""
 
 
 DEFAULT_BASE_DIR = Path("/Users/adeomosanya/Documents/job apps/roles")
@@ -120,7 +110,7 @@ MAX_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MAX_EMAIL_ROLES", "12"))
 COMPANY_SEARCH_LIMIT = int(os.getenv("JOB_DIGEST_COMPANY_SEARCH_LIMIT", "60"))
 PREFERENCES = os.getenv(
     "JOB_DIGEST_PREFERENCES",
-    "London or remote UK · Product/Platform & Delivery/Programme roles · KYC/AML/Onboarding/Sanctions/Screening · Director/VP/Head level · Min fit 70%",
+    "London or remote UK · Product/Platform roles · KYC/AML/Onboarding/Sanctions/Screening · Min fit 70%",
 )
 SOURCES_SUMMARY_OVERRIDE = os.getenv("JOB_DIGEST_SOURCES", "")
 SEEN_CACHE_PATH = Path(
@@ -143,27 +133,41 @@ SMTP_PASS = os.getenv("SMTP_PASS", "")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "")
 TO_EMAIL = os.getenv("TO_EMAIL", "ademolaomosanya@gmail.com")
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "") or os.getenv("JOB_DIGEST_OPENAI_KEY", "")
-OPENAI_MODEL = os.getenv("JOB_DIGEST_OPENAI_MODEL", "gpt-4o-mini")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("JOB_DIGEST_GEMINI_KEY", "")
 GEMINI_MODEL = os.getenv("JOB_DIGEST_GEMINI_MODEL", "gemini-1.5-flash")
-AI_MAX_JOBS = int(os.getenv("JOB_DIGEST_AI_MAX_JOBS", "20"))
+GEMINI_MAX_JOBS = int(os.getenv("JOB_DIGEST_GEMINI_MAX_JOBS", "20"))
+GEMINI_FALLBACK_MODELS = [
+    model.strip()
+    for model in os.getenv(
+        "JOB_DIGEST_GEMINI_FALLBACK",
+        "models/gemini-flash-latest,models/gemini-2.0-flash",
+    ).split(",")
+    if model.strip()
+]
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("JOB_DIGEST_GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MAX_JOBS = int(os.getenv("JOB_DIGEST_GROQ_MAX_JOBS", "20"))
+
+try:
+    from groq import Groq as GroqClient
+except ImportError:
+    GroqClient = None
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("JOB_DIGEST_OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_CV_MAX_JOBS = int(os.getenv("JOB_DIGEST_OPENAI_CV_MAX_JOBS", "20"))
+
 JOB_DIGEST_CV_PATH = os.getenv(
     "JOB_DIGEST_CV_PATH",
     "/Users/adeomosanya/Downloads/AdemolaOmosanya_2026.pdf",
 )
-JOB_DIGEST_DOCX_PATH = os.getenv(
-    "JOB_DIGEST_DOCX_PATH",
-    "/Users/adeomosanya/Downloads/Ademola_Enhanced_Full_Guide_v2.2_NoEvidence.docx",
-)
 JOB_DIGEST_PROFILE = os.getenv(
     "JOB_DIGEST_PROFILE",
     "Global product/process owner with KYC, onboarding, screening, financial crime, and"
-    " compliance transformation experience across banks and RegTech platforms."
-    " Key achievements: 55% reduction in client onboarding time (45 to 20 days) across EMEA/AMER/APAC;"
-    " designed VScreen SLA/KPI framework and QC operating model for 150+ analysts across 20 countries;"
-    " led Fenergo configuration gap analysis and bulk upload remediation;"
-    " signed off £400k business case; closed 12 BaFin audit points; delivered Dutch DNB validation.",
+    " compliance transformation experience across banks and RegTech platforms.",
+)
+JOB_DIGEST_DOCX_PATH = os.getenv(
+    "JOB_DIGEST_DOCX_PATH",
+    "/Users/adeomosanya/Downloads/Ademola_Enhanced_Full_Guide_v2.2_NoEvidence.docx",
 )
 
 ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID", "") or os.getenv("JOB_DIGEST_ADZUNA_APP_ID", "")
@@ -229,22 +233,6 @@ SEARCH_KEYWORDS = [
     "product manager risk platform",
     "product manager screening platform",
     "product manager financial crime platform",
-    # Delivery / Programme Management track
-    "senior manager project delivery",
-    "senior manager programme delivery",
-    "delivery director financial services",
-    "head of programme management",
-    "head of delivery",
-    "programme director kyc",
-    "programme director onboarding",
-    "head of operations kyc",
-    "head of operations onboarding",
-    "chief of staff fintech",
-    "director of operations financial crime",
-    "vp operations onboarding",
-    "director programme management",
-    "head of transformation kyc",
-    "operations director regtech",
 ]
 
 BOARD_KEYWORDS = [
@@ -473,7 +461,6 @@ ROLE_TITLE_REQUIREMENTS = {
     "operations",
     "management",
     "vp",
-    "chief",
 }
 
 VENDOR_COMPANIES = {
@@ -721,20 +708,17 @@ GREENHOUSE_BOARDS = [
     "finch",
     "snyk",
     "clearscore",
+    "starlingbank",
+    "tide",
+    "truelayer",
+    "mambu",
     "thoughtmachine",
     "rapyd",
-    "adyen",
-    "sumup",
-    "griffin",
-    "form3",
-    "featurespace",
-    "jumio",
-    "nice",
-    "behavox",
+    "plaid",
+    "marqeta",
 ]
 
 LEVER_BOARDS = [
-    "ion",
     "onfido",
     "trulioo",
     "sumsub",
@@ -799,7 +783,6 @@ SMARTRECRUITERS_COMPANIES = [
     "Lloyds",
     "NatWest",
     "Santander",
-    "LegalAndGeneral",
 ]
 
 ASHBY_BOARDS = [
@@ -818,9 +801,6 @@ ASHBY_BOARDS = [
     "truelayer",
     "mambu",
     "thoughtmachine",
-    "hawk",
-    "sardine",
-    "allica-bank",
 ]
 
 EXTRA_GREENHOUSE = [x.strip() for x in os.getenv("JOB_DIGEST_GREENHOUSE_BOARDS", "").split(",") if x.strip()]
@@ -957,7 +937,8 @@ JOB_BOARD_SOURCES = [
     {"name": "Jobicy", "type": "api", "url": "https://jobicy.com/api/v2/remote-jobs"},
     {"name": "MeetFrank", "type": "api", "url": "https://api.meetfrank.com/ai/jobs"},
     {"name": "Empllo", "type": "rss", "url": "https://empllo.com/rss/remote-product-jobs.rss"},
-{"name": "RealWorkFromAnywhere", "type": "rss", "url": "https://www.realworkfromanywhere.com/rss.xml"},
+    {"name": "JobsCollider", "type": "rss", "url": "https://jobscollider.com/remote-jobs.rss"},
+    {"name": "RealWorkFromAnywhere", "type": "rss", "url": "https://www.realworkfromanywhere.com/rss.xml"},
     {"name": "WorkAnywherePro", "type": "rss", "url": "https://workanywhere.pro/rss.xml"},
     {"name": "Adzuna", "type": "api", "url": "https://api.adzuna.com/v1/api/jobs/gb/search/1"},
     {"name": "Jooble", "type": "api", "url": "https://jooble.org/api"},
@@ -1323,8 +1304,6 @@ def score_fit(text: str, company: str) -> Tuple[int, List[str], List[str]]:
         score += 3
     if "api" in text_l:
         score += 3
-    if any(term in text_l for term in ("director", " vp ", "head of", "vice president")):
-        score += 5
 
     return min(score, 90), matched_domain, matched_extra
 
@@ -1390,8 +1369,6 @@ def is_relevant_title(title: str) -> bool:
         return True
     if "platform" in title_l:
         return True
-    if any(term in title_l for term in ("delivery", "programme", "program", "transformation")):
-        return True
     return False
 
 
@@ -1401,22 +1378,22 @@ def is_relevant_location(location: str, text: str = "") -> bool:
         return True
     if any(term in combined for term in EXCLUDE_LOCATION_TERMS):
         return False
-    return any(
-        term in combined
-        for term in [
-            "london",
-            "greater london",
-            "united kingdom",
-            "england",
-            "scotland",
-            "wales",
-            "uk",
-            "gb",
-            "great britain",
-            "remote",
-            "hybrid",
-        ]
-    )
+    uk_terms = [
+        "london",
+        "greater london",
+        "united kingdom",
+        "england",
+        "scotland",
+        "wales",
+        "uk",
+        "gb",
+        "great britain",
+    ]
+    if any(term in combined for term in uk_terms):
+        return True
+    if "remote" in combined or "hybrid" in combined:
+        return any(term in combined for term in uk_terms)
+    return False
 
 
 def parse_gemini_payload(text: str) -> Optional[Dict[str, object]]:
@@ -1431,46 +1408,60 @@ def parse_gemini_payload(text: str) -> Optional[Dict[str, object]]:
         return None
 
 
-def derive_apply_method(link: str) -> str:
-    l = (link or "").lower()
-    if "greenhouse.io" in l:
-        return "Greenhouse"
-    if "lever.co" in l:
-        return "Lever"
-    if "myworkdayjobs.com" in l:
-        return "Workday"
-    if "smartrecruiters.com" in l:
-        return "SmartRecruiters"
-    if "ashbyhq.com" in l or "ashby.com" in l:
-        return "Ashby"
-    if "linkedin.com/jobs" in l:
-        return "LinkedIn"
-    return "Direct website"
-
-
-def enhance_records_with_ai(records: List[JobRecord]) -> List[JobRecord]:
-    if not OPENAI_API_KEY or OpenAI is None:
-        return records
-
+def generate_gemini_text(prompt: str) -> Optional[str]:
+    if not GEMINI_API_KEY or genai is None:
+        return None
     try:
-        client = OpenAI(api_key=OPENAI_API_KEY)
+        genai.configure(api_key=GEMINI_API_KEY)
     except Exception:
+        return None
+
+    model_names = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
+    for name in model_names:
+        try:
+            model = genai.GenerativeModel(name)
+            response = model.generate_content(prompt)
+            return getattr(response, "text", "") or ""
+        except Exception:
+            continue
+    return None
+
+
+def generate_groq_text(prompt: str) -> Optional[str]:
+    if not GROQ_API_KEY or GroqClient is None:
+        return None
+    try:
+        client = GroqClient(api_key=GROQ_API_KEY)
+        response = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=4000,
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        print(f"Groq error: {e}")
+        return None
+
+
+def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
+    if not GROQ_API_KEY or GroqClient is None:
         return records
 
-    limit = min(AI_MAX_JOBS, len(records))
+    limit = min(GROQ_MAX_JOBS, len(records))
     for record in records[:limit]:
         prompt = (
             "You are a senior UK fintech product recruiter and ATS optimisation specialist. "
             "Given the candidate profile and job summary, score fit 0-100 and produce ATS-ready outputs. "
+            "Make interview prep deeper and role-specific, grounded in the candidate's actual work. "
             "Return JSON ONLY with keys: fit_score (int), why_fit (string), cv_gap (string), "
-            "cv_edit_notes (string — 2-4 sentence narrative describing exactly what to change in the CV "
-            "for this specific role: which section, what to move/add/emphasise, and why it matters for "
-            "this firm/JD), "
-            "prep_questions (array of 3-5 strings), apply_tips (string), role_summary (string), "
-            "tailored_summary (string), tailored_cv_bullets (array of 4-6 bullet strings), "
-            "key_requirements (array of strings), match_notes (string), company_insights (string), "
-            "cover_letter (string), key_talking_points (array of strings), star_stories (array of strings), "
-            "quick_pitch (string), interview_focus (string).\n\n"
+            "prep_questions (array of 8-12 strings), prep_answers (array of 8-12 concise answer outlines "
+            "matching prep_questions), scorecard (array of 5-7 criteria with what good looks like), "
+            "apply_tips (string), role_summary (string), tailored_summary (string), "
+            "tailored_cv_bullets (array of 4-6 bullet strings), key_requirements (array of strings), "
+            "match_notes (string), company_insights (string), cover_letter (string), "
+            "key_talking_points (array of 6-10 strings), star_stories (array of 6-8 STAR summaries with "
+            "Situation/Task/Action/Result + metrics), quick_pitch (string), interview_focus (string).\n\n"
             "ATS rules: plain text, no tables, no columns, no icons, no bullet symbols other than '- '. "
             "Bullets must be short, action-led, and include metrics if possible. "
             "If the job text includes Qualifications/Requirements, extract 3-6 key requirements into "
@@ -1484,16 +1475,69 @@ def enhance_records_with_ai(records: List[JobRecord]) -> List[JobRecord]:
             f"Posted: {record.posted}\n"
             f"Summary: {record.notes}\n"
         )
-        try:
-            response = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            text = response.choices[0].message.content or ""
-        except Exception:
+        text = generate_groq_text(prompt)
+        data = parse_gemini_payload(text or "")
+        if not data:
             continue
 
-        data = parse_gemini_payload(text)
+        try:
+            fit_score = int(data.get("fit_score", record.fit_score))
+        except (TypeError, ValueError):
+            fit_score = record.fit_score
+        record.fit_score = max(0, min(100, fit_score))
+        record.why_fit = data.get("why_fit", record.why_fit) or record.why_fit
+        record.cv_gap = data.get("cv_gap", record.cv_gap) or record.cv_gap
+        record.role_summary = data.get("role_summary", record.role_summary) or record.role_summary
+        record.tailored_summary = data.get("tailored_summary", record.tailored_summary) or record.tailored_summary
+        record.quick_pitch = data.get("quick_pitch", record.quick_pitch) or record.quick_pitch
+        record.interview_focus = data.get("interview_focus", record.interview_focus) or record.interview_focus
+        record.match_notes = data.get("match_notes", record.match_notes) or record.match_notes
+        record.company_insights = data.get("company_insights", record.company_insights) or record.company_insights
+        record.cover_letter = data.get("cover_letter", record.cover_letter) or record.cover_letter
+        record.apply_tips = data.get("apply_tips", record.apply_tips) or record.apply_tips
+
+        for list_key in ("tailored_cv_bullets", "key_requirements", "key_talking_points",
+                         "star_stories", "prep_questions", "prep_answers", "scorecard"):
+            val = data.get(list_key)
+            if isinstance(val, list) and val:
+                setattr(record, list_key, val)
+
+    return records
+
+
+def enhance_records_with_gemini(records: List[JobRecord]) -> List[JobRecord]:
+    if not GEMINI_API_KEY or genai is None:
+        return records
+
+    limit = min(GEMINI_MAX_JOBS, len(records))
+    for record in records[:limit]:
+        prompt = (
+            "You are a senior UK fintech product recruiter and ATS optimisation specialist. "
+            "Given the candidate profile and job summary, score fit 0-100 and produce ATS-ready outputs. "
+            "Make interview prep deeper and role-specific, grounded in the candidate's actual work. "
+            "Return JSON ONLY with keys: fit_score (int), why_fit (string), cv_gap (string), "
+            "prep_questions (array of 8-12 strings), prep_answers (array of 8-12 concise answer outlines "
+            "matching prep_questions), scorecard (array of 5-7 criteria with what good looks like), "
+            "apply_tips (string), role_summary (string), tailored_summary (string), "
+            "tailored_cv_bullets (array of 4-6 bullet strings), key_requirements (array of strings), "
+            "match_notes (string), company_insights (string), cover_letter (string), "
+            "key_talking_points (array of 6-10 strings), star_stories (array of 6-8 STAR summaries with "
+            "Situation/Task/Action/Result + metrics), quick_pitch (string), interview_focus (string).\n\n"
+            "ATS rules: plain text, no tables, no columns, no icons, no bullet symbols other than '- '. "
+            "Bullets must be short, action-led, and include metrics if possible. "
+            "If the job text includes Qualifications/Requirements, extract 3-6 key requirements into "
+            "key_requirements and use match_notes to compare against the candidate profile.\n\n"
+            f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
+            f"Preferences: {PREFERENCES}\n\n"
+            "Job:\n"
+            f"Title: {record.role}\n"
+            f"Company: {record.company}\n"
+            f"Location: {record.location}\n"
+            f"Posted: {record.posted}\n"
+            f"Summary: {record.notes}\n"
+        )
+        text = generate_gemini_text(prompt)
+        data = parse_gemini_payload(text or "")
         if not data:
             continue
 
@@ -1509,6 +1553,16 @@ def enhance_records_with_ai(records: List[JobRecord]) -> List[JobRecord]:
             prep_questions = [prep_questions]
         if isinstance(prep_questions, list):
             record.prep_questions = [str(q).strip() for q in prep_questions if str(q).strip()]
+        prep_answers = data.get("prep_answers", record.prep_answers)
+        if isinstance(prep_answers, str):
+            prep_answers = [prep_answers]
+        if isinstance(prep_answers, list):
+            record.prep_answers = [str(a).strip() for a in prep_answers if str(a).strip()]
+        scorecard = data.get("scorecard", record.scorecard)
+        if isinstance(scorecard, str):
+            scorecard = [scorecard]
+        if isinstance(scorecard, list):
+            record.scorecard = [str(s).strip() for s in scorecard if str(s).strip()]
         record.apply_tips = data.get("apply_tips", record.apply_tips) or record.apply_tips
         record.role_summary = data.get("role_summary", record.role_summary) or record.role_summary
         record.tailored_summary = data.get("tailored_summary", record.tailored_summary) or record.tailored_summary
@@ -1525,7 +1579,6 @@ def enhance_records_with_ai(records: List[JobRecord]) -> List[JobRecord]:
         record.match_notes = data.get("match_notes", record.match_notes) or record.match_notes
         record.company_insights = data.get("company_insights", record.company_insights) or record.company_insights
         record.cover_letter = data.get("cover_letter", record.cover_letter) or record.cover_letter
-        record.cv_edit_notes = data.get("cv_edit_notes", record.cv_edit_notes) or record.cv_edit_notes
         talking = data.get("key_talking_points", record.key_talking_points)
         if isinstance(talking, str):
             talking = [talking]
@@ -1539,7 +1592,59 @@ def enhance_records_with_ai(records: List[JobRecord]) -> List[JobRecord]:
         record.quick_pitch = data.get("quick_pitch", record.quick_pitch) or record.quick_pitch
         record.interview_focus = data.get("interview_focus", record.interview_focus) or record.interview_focus
 
-        time.sleep(0.5)
+        time.sleep(0.25)
+
+    return records
+
+
+def enhance_records_with_openai_cv(records: List[JobRecord]) -> List[JobRecord]:
+    """Generate tailored CV sections via OpenAI for each record."""
+    if not OPENAI_API_KEY or openai_lib is None:
+        return records
+
+    client = openai_lib.OpenAI(api_key=OPENAI_API_KEY)
+    limit = min(OPENAI_CV_MAX_JOBS, len(records))
+
+    for record in records[:limit]:
+        prompt = (
+            "You are a senior CV writer specialising in UK fintech and financial services product roles. "
+            "Given the candidate's real CV text and a target job description, produce tailored CV section "
+            "replacements that will pass ATS screening and impress a hiring manager.\n\n"
+            "Return JSON ONLY with a single key 'tailored_cv_sections' containing:\n"
+            "- summary: 2-3 sentence professional summary tailored to this specific role\n"
+            "- key_achievements: array of 5-7 bullet strings reordered/rewritten from the candidate's "
+            "real achievements to emphasise relevance to this JD (start each with '- ')\n"
+            "- vistra_bullets: array of 8-10 bullet strings for the Vistra Corporate Services role "
+            "tailored to this JD (start each with '- ')\n"
+            "- ebury_bullets: array of 4-5 bullet strings for the Ebury Partners role "
+            "tailored to this JD (start each with '- ')\n\n"
+            "Rules: plain text only, no tables, no icons. Bullets must be action-led with metrics. "
+            "Keep the candidate's real experience — rewrite emphasis and ordering, don't fabricate.\n\n"
+            f"Candidate CV:\n{JOB_DIGEST_PROFILE_TEXT}\n\n"
+            "Target job:\n"
+            f"Title: {record.role}\n"
+            f"Company: {record.company}\n"
+            f"Location: {record.location}\n"
+            f"Summary: {record.notes}\n"
+        )
+        try:
+            response = client.chat.completions.create(
+                model=OPENAI_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.4,
+                max_tokens=2000,
+            )
+            text = response.choices[0].message.content or ""
+            data = parse_gemini_payload(text)  # reuse JSON extractor
+            if data:
+                sections = data.get("tailored_cv_sections", data)
+                if isinstance(sections, dict):
+                    record.tailored_cv_sections = sections
+        except Exception as e:
+            print(f"OpenAI CV generation failed for {record.role} at {record.company}: {e}")
+            continue
+
+        time.sleep(0.3)
 
     return records
 
@@ -1604,12 +1709,14 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "match_notes": record.match_notes,
             "company_insights": record.company_insights,
             "cover_letter": record.cover_letter,
-            "cv_edit_notes": record.cv_edit_notes,
-            "apply_method": record.apply_method,
             "key_talking_points": record.key_talking_points,
             "star_stories": record.star_stories,
             "quick_pitch": record.quick_pitch,
             "interview_focus": record.interview_focus,
+            "prep_answers": record.prep_answers,
+            "scorecard": record.scorecard,
+            "tailored_cv_sections": record.tailored_cv_sections,
+            "applicant_count": record.applicant_count,
         }
         for key, value in optional_fields.items():
             if isinstance(value, list):
@@ -1645,44 +1752,20 @@ def write_source_stats(records: List[JobRecord]) -> None:
         return
 
 
-def _ai_generate(prompt: str) -> str:
-    """Call Gemini if available, otherwise fall back to OpenAI. Returns raw text."""
-    if GEMINI_API_KEY and genai is not None:
-        try:
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel(GEMINI_MODEL)
-            response = model.generate_content(prompt)
-            return getattr(response, "text", "") or ""
-        except Exception:
-            pass
-    if OPENAI_API_KEY and OpenAI is not None:
-        try:
-            client = OpenAI(api_key=OPENAI_API_KEY)
-            response = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return response.choices[0].message.content or ""
-        except Exception:
-            pass
-    return ""
-
-
 def write_role_suggestions() -> None:
-    client_db = init_firestore_client()
-    if client_db is None:
+    client = init_firestore_client()
+    if client is None:
         return
-
+    if not GROQ_API_KEY and (not GEMINI_API_KEY or genai is None):
+        return
     prompt = (
         "You are a UK career strategist. Based on the candidate profile, suggest 6-10 adjacent roles "
         "they could be suitable for beyond exact Product Manager titles. Return JSON ONLY with keys: "
         "roles (array of strings) and rationale (string). Keep roles UK market relevant.\n\n"
         f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
     )
-    text = _ai_generate(prompt)
-    if not text:
-        return
-    data = parse_gemini_payload(text) or {}
+    text = generate_groq_text(prompt) or generate_gemini_text(prompt)
+    data = parse_gemini_payload(text or "") or {}
     roles = data.get("roles", [])
     if isinstance(roles, str):
         roles = [roles]
@@ -1696,27 +1779,29 @@ def write_role_suggestions() -> None:
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        client_db.collection("role_suggestions").document(today).set(payload, merge=True)
+        client.collection("role_suggestions").document(today).set(payload, merge=True)
     except Exception:
         return
 
 
 def write_candidate_prep() -> None:
-    client_db = init_firestore_client()
-    if client_db is None:
+    client = init_firestore_client()
+    if client is None:
         return
-
+    if not GROQ_API_KEY and (not GEMINI_API_KEY or genai is None):
+        return
     prompt = (
-        "You are a UK executive interview coach. Create a concise interview prep sheet for Ade. "
-        "Return JSON ONLY with keys: key_stats (array of strings), key_talking_points (array of strings), "
-        "star_stories (array of 6-8 STAR summaries), and quick_pitch (string, 60-90 words). "
-        "Keep it clear, confident, and memorable.\n\n"
+        "You are a UK executive interview coach. Create a deeper interview prep sheet for Ade, "
+        "anchored in his actual work (KYC/onboarding/screening transformation, orchestration, dashboards, "
+        "operational controls, and stakeholder delivery). Return JSON ONLY with keys: "
+        "quick_pitch (string, 90-120 words), key_stats (array of 6-10 strings), "
+        "key_talking_points (array of 8-12 strings), star_stories (array of 8-10 STAR summaries with "
+        "Situation/Task/Action/Result + metrics), strengths (array of 4-6 strings), "
+        "risk_mitigations (array of 3-5 strings), interview_questions (array of 10 questions Ade should rehearse).\n\n"
         f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
     )
-    text = _ai_generate(prompt)
-    if not text:
-        return
-    data = parse_gemini_payload(text) or {}
+    text = generate_groq_text(prompt) or generate_gemini_text(prompt)
+    data = parse_gemini_payload(text or "") or {}
     key_stats = data.get("key_stats", [])
     if isinstance(key_stats, str):
         key_stats = [key_stats]
@@ -1730,6 +1815,18 @@ def write_candidate_prep() -> None:
         stories = [stories]
     stories = [str(s).strip() for s in stories if str(s).strip()]
     quick_pitch = data.get("quick_pitch", "")
+    strengths = data.get("strengths", [])
+    if isinstance(strengths, str):
+        strengths = [strengths]
+    strengths = [str(s).strip() for s in strengths if str(s).strip()]
+    risk_mitigations = data.get("risk_mitigations", [])
+    if isinstance(risk_mitigations, str):
+        risk_mitigations = [risk_mitigations]
+    risk_mitigations = [str(s).strip() for s in risk_mitigations if str(s).strip()]
+    interview_questions = data.get("interview_questions", [])
+    if isinstance(interview_questions, str):
+        interview_questions = [interview_questions]
+    interview_questions = [str(s).strip() for s in interview_questions if str(s).strip()]
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     payload = {
@@ -1738,10 +1835,13 @@ def write_candidate_prep() -> None:
         "key_talking_points": key_points,
         "star_stories": stories,
         "quick_pitch": quick_pitch,
+        "strengths": strengths,
+        "risk_mitigations": risk_mitigations,
+        "interview_questions": interview_questions,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
-        client_db.collection("candidate_prep").document(today).set(payload, merge=True)
+        client.collection("candidate_prep").document(today).set(payload, merge=True)
     except Exception:
         return
 
@@ -2069,15 +2169,15 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
     return list(jobs.values())
 
 
-def linkedin_job_details(session: requests.Session, job_id: str) -> Tuple[str, str, str]:
+def linkedin_job_details(session: requests.Session, job_id: str) -> Tuple[str, str, str, str]:
     detail_url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
     headers = {"User-Agent": USER_AGENT}
     try:
         resp = session.get(detail_url, headers=headers, timeout=20)
     except requests.RequestException:
-        return "", "", ""
+        return "", "", "", ""
     if resp.status_code != 200:
-        return "", "", ""
+        return "", "", "", ""
 
     soup = BeautifulSoup(resp.text, "html.parser")
     desc_el = soup.select_one("div.show-more-less-html__markup")
@@ -2089,7 +2189,13 @@ def linkedin_job_details(session: requests.Session, job_id: str) -> Tuple[str, s
     loc_el = soup.select_one("span.topcard__flavor--bullet")
     location_text = normalize_text(loc_el.get_text()) if loc_el else ""
 
-    return desc_text, posted_text, location_text
+    applicant_el = (
+        soup.select_one("span.num-applicants__caption")
+        or soup.select_one("figcaption.num-applicants__caption")
+    )
+    applicant_text = normalize_text(applicant_el.get_text()) if applicant_el else ""
+
+    return desc_text, posted_text, location_text, applicant_text
 
 
 def greenhouse_search(session: requests.Session) -> List[Dict[str, str]]:
@@ -3755,7 +3861,8 @@ def main() -> None:
         location = job.get("location", "")
         if not is_relevant_title(title):
             continue
-        desc_text, posted_detail, detail_location = linkedin_job_details(session, job["job_id"])
+
+        desc_text, posted_detail, detail_location, applicant_text = linkedin_job_details(session, job["job_id"])
         if detail_location:
             location = detail_location
         if not is_relevant_location(location, desc_text):
@@ -3789,6 +3896,7 @@ def main() -> None:
                 why_fit=why_fit,
                 cv_gap=cv_gap,
                 notes=summary,
+                applicant_count=applicant_text,
             )
         )
 
@@ -4013,14 +4121,12 @@ def main() -> None:
     records = filter_new_records(records, seen_cache)
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
-    # Derive application method from link URL
-    for record in records:
-        if not record.apply_method:
-            record.apply_method = derive_apply_method(record.link)
-
-    # Optional Gemini enhancement (fit %, gaps, prep)
-    records = enhance_records_with_ai(records)
+    # Optional Groq/Gemini enhancement (fit %, gaps, prep)
+    records = enhance_records_with_groq(records)
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
+
+    # Optional OpenAI tailored CV generation
+    records = enhance_records_with_openai_cv(records)
 
     # Optional Firebase persistence
     write_records_to_firestore(records)
@@ -4052,14 +4158,13 @@ def main() -> None:
             "Match_Notes": r.match_notes,
             "Company_Insights": r.company_insights,
             "Cover_Letter": r.cover_letter,
-            "CV_Edit_Notes": r.cv_edit_notes,
             "Key_Talking_Points": " | ".join(r.key_talking_points),
             "STAR_Stories": " | ".join(r.star_stories),
             "Quick_Pitch": r.quick_pitch,
             "Interview_Focus": r.interview_focus,
-            "CV_Edit_Notes": r.cv_edit_notes,
-            "Apply_Method": r.apply_method,
             "Prep_Questions": " | ".join(r.prep_questions),
+            "Prep_Answers": " | ".join(r.prep_answers),
+            "Scorecard": " | ".join(r.scorecard),
             "Apply_Tips": r.apply_tips,
             "Notes": r.notes,
         }
@@ -4074,6 +4179,43 @@ def main() -> None:
         df.to_excel(out_xlsx, index=False)
         df.to_csv(out_csv, index=False)
 
+    # Build pipeline summary for email
+    pipeline_summary_html = ""
+    try:
+        fs_client = init_firestore_client()
+        if fs_client:
+            all_docs = fs_client.collection(FIREBASE_COLLECTION).stream()
+            pipeline_counts = {"saved": 0, "applied": 0, "interview": 0, "offer": 0, "rejected": 0}
+            follow_ups_due = []
+            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            for d in all_docs:
+                data = d.to_dict()
+                status = (data.get("application_status") or "saved").lower()
+                if status in pipeline_counts:
+                    pipeline_counts[status] += 1
+                fu = data.get("follow_up_date", "")
+                if fu and fu[:10] <= today_str and status not in ("rejected", "offer"):
+                    follow_ups_due.append(f"{data.get('role', '?')} at {data.get('company', '?')}")
+            pipeline_cells = " | ".join(
+                f"<strong>{k.title()}</strong>: {v}" for k, v in pipeline_counts.items()
+            )
+            pipeline_summary_html = (
+                "<div style='background:#EEF2FF; border:1px solid #C7D2FE; padding:12px; "
+                "border-radius:8px; margin-bottom:14px; font-size:14px; color:#1E1B4B;'>"
+                f"<div style='font-weight:bold; margin-bottom:6px;'>Pipeline Summary</div>"
+                f"<div>{pipeline_cells}</div>"
+            )
+            if follow_ups_due:
+                fu_list = ", ".join(follow_ups_due[:5])
+                more = f" (+{len(follow_ups_due) - 5} more)" if len(follow_ups_due) > 5 else ""
+                pipeline_summary_html += (
+                    f"<div style='margin-top:8px; color:#DC2626;'>"
+                    f"<strong>Follow-ups due:</strong> {fu_list}{more}</div>"
+                )
+            pipeline_summary_html += "</div>"
+    except Exception:
+        pass
+
     # Build and send email
     top_pick = select_top_pick(records)
     top_records = records[:MAX_EMAIL_ROLES]
@@ -4081,6 +4223,9 @@ def main() -> None:
         top_records = [top_pick] + top_records
         top_records = top_records[:MAX_EMAIL_ROLES]
     html_body = build_email_html(top_records, WINDOW_HOURS)
+    # Inject pipeline summary at the top of the email body
+    if pipeline_summary_html and "<h2" in html_body:
+        html_body = html_body.replace("</h2>", "</h2>" + pipeline_summary_html, 1)
     text_lines = [
         f"Daily job digest (last {WINDOW_HOURS} hours).",
         f"Preferences: {PREFERENCES}",

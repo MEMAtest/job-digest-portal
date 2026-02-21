@@ -27,7 +27,7 @@
         <nav class="nav">
           <button class="nav-item nav-item--active" data-tab="dashboard">Dashboard</button>
           <button class="nav-item" data-tab="live">Live Roles</button>
-          <button class="nav-item" data-tab="top">Top Picks</button>
+          <button class="nav-item" data-tab="top">Apply Hub</button>
           <button class="nav-item" data-tab="prep">Preparation</button>
         </nav>
         <div class="sidebar-footer">
@@ -92,6 +92,9 @@
                 <option value="interview">Interview</option>
                 <option value="offer">Offer</option>
                 <option value="rejected">Rejected</option>
+                <option value="shortlisted">Shortlisted</option>
+                <option value="ready_to_apply">Ready to Apply</option>
+                <option value="dismissed">Dismissed</option>
               </select>
             </div>
             <div class="filter filter--toggle">
@@ -102,12 +105,15 @@
             </div>
           </section>
           <div id="quick-filter" class="quick-filter hidden"></div>
+          <div class="triage-entry">
+            <button id="triage-btn" class="btn btn-primary">Start triaging</button>
+          </div>
 
           <section id="jobs" class="job-grid"></section>
         </section>
 
         <section class="tab-section hidden" data-tab="top">
-          <section id="top-pick" class="top-pick hidden"></section>
+          <section id="apply-hub"></section>
         </section>
 
         <section class="tab-section hidden" data-tab="prep">
@@ -115,6 +121,15 @@
           <section id="candidate-prep" class="detail-box hidden"></section>
         </section>
       </main>
+
+      <div id="triage-overlay" class="triage-overlay hidden">
+        <div class="triage-overlay__header">
+          <button id="triage-close" class="triage-overlay__close" aria-label="Close triage overlay">&times;</button>
+          <h2>Triage Jobs</h2>
+          <p id="triage-progress">0 / 0 remaining</p>
+        </div>
+        <div id="triage-content" class="triage-content"></div>
+      </div>
 
       <div id="prep-overlay" class="prep-overlay hidden">
         <div class="prep-overlay__header">

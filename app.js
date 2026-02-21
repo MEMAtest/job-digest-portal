@@ -14,7 +14,7 @@ import {
 
 const summaryLine = document.getElementById("summary-line");
 const jobsContainer = document.getElementById("jobs");
-const topPickContainer = document.getElementById("top-pick");
+const topPickContainer = document.getElementById("top-pick"); // legacy, replaced by apply-hub
 const sourceStatsContainer = document.getElementById("source-stats");
 const roleSuggestionsContainer = document.getElementById("role-suggestions");
 const candidatePrepContainer = document.getElementById("candidate-prep");
@@ -50,6 +50,9 @@ const state = {
   locations: new Set(),
   candidatePrep: {},
   activePrepJob: null,
+  triageQueue: [],
+  triageIndex: 0,
+  triageStats: { dismissed: 0, shortlisted: 0, apply: 0 },
 };
 
 let quickFilterPredicate = null;
@@ -208,6 +211,32 @@ const showToast = (message, duration = 2500) => {
     el.classList.remove("toast--visible");
     setTimeout(() => el.remove(), 300);
   }, duration);
+};
+
+const showConfirmToast = (message, actionLabel, onConfirm, duration = 8000) => {
+  const existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  const el = document.createElement("div");
+  el.className = "toast toast--confirm";
+  const msgSpan = document.createElement("span");
+  msgSpan.textContent = message;
+  el.appendChild(msgSpan);
+  const btn = document.createElement("button");
+  btn.className = "toast__action";
+  btn.textContent = actionLabel;
+  const timer = setTimeout(() => {
+    el.classList.remove("toast--visible");
+    setTimeout(() => el.remove(), 300);
+  }, duration);
+  btn.addEventListener("click", () => {
+    clearTimeout(timer);
+    onConfirm();
+    el.classList.remove("toast--visible");
+    setTimeout(() => el.remove(), 300);
+  });
+  el.appendChild(btn);
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("toast--visible"));
 };
 
 const copyToClipboard = async (text) => {
@@ -423,7 +452,7 @@ const buildTailoredCvHtml = (job) => {
 
 const quickApply = async (job, card) => {
   const status = (job.application_status || "saved").toLowerCase();
-  const shouldMarkApplied = status === "saved";
+  const shouldMarkApplied = status === "saved" || status === "shortlisted" || status === "ready_to_apply";
 
   // 1. Clipboard — must happen first within user gesture
   const cvText = getTailoredCvPlainText(job);
@@ -440,47 +469,52 @@ const quickApply = async (job, card) => {
     window.open(job.link, "_blank", "noopener");
   }
 
-  // 3. Mark applied (only if currently "saved")
-  if (shouldMarkApplied && db) {
-    const today = new Date().toISOString().slice(0, 10);
-    const now = new Date().toISOString();
-    const payload = {
-      application_status: "applied",
-      application_date: `${today}T00:00:00.000Z`,
-      last_touch_date: now,
-      updated_at: now,
-    };
-    try {
-      await updateDoc(doc(db, collectionName, job.id), payload);
-      job.application_status = "applied";
-      job.application_date = payload.application_date;
-      job.last_touch_date = payload.last_touch_date;
+  // 3. Confirm toast — don't auto-mark as applied
+  if (shouldMarkApplied) {
+    if (db) {
+      showConfirmToast("CV copied & link opened", "Mark as Applied", async () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const now = new Date().toISOString();
+        const payload = {
+          application_status: "applied",
+          application_date: `${today}T00:00:00.000Z`,
+          last_touch_date: now,
+          updated_at: now,
+        };
+        try {
+          await updateDoc(doc(db, collectionName, job.id), payload);
+          job.application_status = "applied";
+          job.application_date = payload.application_date;
+          job.last_touch_date = payload.last_touch_date;
 
-      // Update card DOM
-      const metaDivs = card.querySelectorAll(".job-card__meta");
-      metaDivs.forEach((m) => {
-        if (m.textContent.startsWith("Status:")) m.textContent = "Status: applied";
+          if (card) {
+            const metaDivs = card.querySelectorAll(".job-card__meta");
+            metaDivs.forEach((m) => {
+              if (m.textContent.startsWith("Status:")) m.textContent = "Status: applied";
+            });
+            const trackingSelect = card.querySelector(".tracking-status");
+            if (trackingSelect) trackingSelect.value = "applied";
+            const appliedInput = card.querySelector(".tracking-applied");
+            if (appliedInput) appliedInput.value = today;
+            const lastTouchInput = card.querySelector(".tracking-last-touch");
+            if (lastTouchInput) lastTouchInput.value = now.slice(0, 10);
+            const qaBtn = card.querySelector(".btn-quick-apply");
+            if (qaBtn) {
+              qaBtn.textContent = "Re-copy & Open";
+              qaBtn.classList.add("btn-quick-apply--done");
+            }
+          }
+          showToast("Marked as applied");
+        } catch (err) {
+          console.error("quickApply Firestore update failed:", err);
+        }
       });
-      const trackingSelect = card.querySelector(".tracking-status");
-      if (trackingSelect) trackingSelect.value = "applied";
-      const appliedInput = card.querySelector(".tracking-applied");
-      if (appliedInput) appliedInput.value = today;
-      const lastTouchInput = card.querySelector(".tracking-last-touch");
-      if (lastTouchInput) lastTouchInput.value = now.slice(0, 10);
-
-      // Update Quick Apply button state
-      const qaBtn = card.querySelector(".btn-quick-apply");
-      if (qaBtn) {
-        qaBtn.textContent = "Re-copy & Open";
-        qaBtn.classList.add("btn-quick-apply--done");
-      }
-    } catch (err) {
-      console.error("quickApply Firestore update failed:", err);
+    } else {
+      showToast("Copied + opened link");
     }
+  } else {
+    showToast("Copied + opened link");
   }
-
-  // 4. Toast
-  showToast(shouldMarkApplied && db ? "Copied + marked applied" : "Copied + opened link");
 };
 
 const normaliseList = (items) => {
@@ -1021,6 +1055,189 @@ const switchPrepTab = (tabName) => {
   }
 };
 
+// ── Triage Mode ──
+
+const triageOverlay = document.getElementById("triage-overlay");
+const triageContent = document.getElementById("triage-content");
+const triageProgress = document.getElementById("triage-progress");
+const triageCloseBtn = document.getElementById("triage-close");
+
+const formatApplicantBadge = (text) => {
+  if (!text) return "";
+  const match = text.match(/(\d+)/);
+  if (!match) return "";
+  const num = parseInt(match[1], 10);
+  if (num >= 100) return `<span class="badge badge--applicants-red">${num}+ applicants — Act fast</span>`;
+  if (num >= 50) return `<span class="badge badge--applicants-amber">${num}+ applicants</span>`;
+  if (num > 0) return `<span class="badge badge--applicants-green">${escapeHtml(text)}</span>`;
+  return "";
+};
+
+const openTriageMode = (jobs) => {
+  const queue = jobs || state.jobs.filter((j) => {
+    const s = (j.application_status || "saved").toLowerCase();
+    return s === "saved";
+  });
+  if (!queue.length) {
+    showToast("No jobs to triage");
+    return;
+  }
+  state.triageQueue = [...queue];
+  state.triageIndex = 0;
+  state.triageStats = { dismissed: 0, shortlisted: 0, apply: 0 };
+  triageOverlay.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  renderTriageCard();
+};
+
+const closeTriageMode = () => {
+  triageOverlay.classList.add("hidden");
+  document.body.style.overflow = "";
+  state.triageQueue = [];
+  state.triageIndex = 0;
+};
+
+const renderTriageCard = () => {
+  if (!state.triageQueue || state.triageIndex >= state.triageQueue.length) {
+    const stats = state.triageStats || { dismissed: 0, shortlisted: 0, apply: 0 };
+    triageContent.innerHTML = `
+      <div class="triage-summary">
+        <h3>Triage complete</h3>
+        <div class="triage-summary__stats">
+          <div class="triage-summary__stat"><span class="triage-summary__num">${stats.dismissed}</span> Dismissed</div>
+          <div class="triage-summary__stat"><span class="triage-summary__num">${stats.shortlisted}</span> Shortlisted</div>
+          <div class="triage-summary__stat"><span class="triage-summary__num">${stats.apply}</span> Ready to Apply</div>
+        </div>
+        <button class="btn btn-primary triage-done-btn">Done</button>
+      </div>
+    `;
+    const doneBtn = triageContent.querySelector(".triage-done-btn");
+    if (doneBtn) doneBtn.addEventListener("click", () => { closeTriageMode(); renderJobs(); renderApplyHub(); });
+    triageProgress.textContent = "Done!";
+    return;
+  }
+
+  const job = state.triageQueue[state.triageIndex];
+  const remaining = state.triageQueue.length - state.triageIndex;
+  triageProgress.textContent = `${state.triageIndex + 1} / ${state.triageQueue.length} (${remaining} remaining)`;
+
+  const applicantBadge = formatApplicantBadge(job.applicant_count);
+
+  triageContent.innerHTML = `
+    <div class="triage-card" id="triage-active-card">
+      <div class="triage-card__badges">
+        <span class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</span>
+        <span class="${getLocationBadgeClass(job.location)}">${escapeHtml(job.location || "Unknown")}</span>
+        ${applicantBadge}
+      </div>
+      <h3 class="triage-card__role">${escapeHtml(job.role)}</h3>
+      <p class="triage-card__company">${escapeHtml(job.company)}</p>
+      <p class="triage-card__posted">${escapeHtml(formatPosted(job.posted))}</p>
+      <div class="triage-card__summary">${formatInlineText(job.tailored_summary || job.role_summary || "")}</div>
+      <div class="triage-card__fit">${formatInlineText(job.why_fit || "")}</div>
+      <div class="triage-actions">
+        <button class="triage-btn triage-btn--dismiss" data-action="dismiss">Not interested</button>
+        <button class="triage-btn triage-btn--maybe" data-action="shortlist">Shortlist</button>
+        <button class="triage-btn triage-btn--apply" data-action="apply">Apply</button>
+      </div>
+    </div>
+  `;
+
+  // Touch swipe support
+  const card = triageContent.querySelector("#triage-active-card");
+  if (card) {
+    let startX = 0, startY = 0, deltaX = 0, deltaY = 0, swiping = false;
+    card.addEventListener("touchstart", (e) => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      deltaX = 0;
+      deltaY = 0;
+      swiping = true;
+      card.style.transition = "none";
+    }, { passive: true });
+    card.addEventListener("touchmove", (e) => {
+      if (!swiping) return;
+      deltaX = e.touches[0].clientX - startX;
+      deltaY = e.touches[0].clientY - startY;
+      const rotate = deltaX * 0.05;
+      card.style.transform = `translate(${deltaX}px, ${Math.min(0, deltaY)}px) rotate(${rotate}deg)`;
+      card.style.opacity = Math.max(0.5, 1 - Math.abs(deltaX) / 400);
+    }, { passive: true });
+    card.addEventListener("touchend", () => {
+      if (!swiping) return;
+      swiping = false;
+      card.style.transition = "transform 0.3s ease, opacity 0.3s ease";
+      if (deltaX < -80) {
+        handleTriageAction("dismiss");
+      } else if (deltaX > 80) {
+        handleTriageAction("shortlist");
+      } else if (deltaY < -80) {
+        handleTriageAction("apply");
+      } else {
+        card.style.transform = "";
+        card.style.opacity = "";
+      }
+    });
+  }
+};
+
+const handleTriageAction = async (action) => {
+  const job = state.triageQueue[state.triageIndex];
+  if (!job) return;
+
+  const card = triageContent.querySelector("#triage-active-card");
+  const exitClass = action === "dismiss" ? "triage-card--exit-left" :
+                    action === "shortlist" ? "triage-card--exit-right" :
+                    "triage-card--exit-up";
+  if (card) card.classList.add(exitClass);
+
+  const statusMap = { dismiss: "dismissed", shortlist: "shortlisted", apply: "ready_to_apply" };
+  const newStatus = statusMap[action];
+  const now = new Date().toISOString();
+
+  if (db) {
+    try {
+      await updateDoc(doc(db, collectionName, job.id), {
+        application_status: newStatus,
+        updated_at: now,
+      });
+    } catch (err) {
+      console.error("Triage update failed:", err);
+    }
+  }
+  job.application_status = newStatus;
+
+  if (action === "dismiss") state.triageStats.dismissed++;
+  else if (action === "shortlist") state.triageStats.shortlisted++;
+  else if (action === "apply") state.triageStats.apply++;
+
+  state.triageIndex++;
+  setTimeout(() => renderTriageCard(), 300);
+};
+
+// Triage event listeners
+if (triageCloseBtn) {
+  triageCloseBtn.addEventListener("click", closeTriageMode);
+}
+
+if (triageOverlay) {
+  triageOverlay.addEventListener("click", (e) => {
+    const action = e.target.closest("[data-action]");
+    if (action) handleTriageAction(action.dataset.action);
+  });
+}
+
+const triageEntryBtn = document.getElementById("triage-btn");
+if (triageEntryBtn) {
+  triageEntryBtn.addEventListener("click", () => {
+    const savedJobs = state.jobs.filter((j) => {
+      const s = (j.application_status || "saved").toLowerCase();
+      return s === "saved";
+    });
+    openTriageMode(savedJobs);
+  });
+}
+
 const renderFilters = () => {
   sourceSelect.innerHTML = '<option value="">All sources</option>';
   Array.from(state.sources)
@@ -1044,29 +1261,181 @@ const renderFilters = () => {
 };
 
 const renderTopPick = (job) => {
-  if (!job) {
-    topPickContainer.classList.add("hidden");
+  // Legacy — replaced by Apply Hub
+};
+
+const BASE_CV_SECTIONS = {
+  summary: "Senior Product Manager with 8+ years across financial services, regtech and fintech. Specialist in onboarding, KYC/AML, and platform product strategy.",
+  key_achievements: [
+    "Led digital onboarding transformation serving 3M+ customers, reducing drop-off by 35%",
+    "Delivered KYC remediation platform processing 500K+ cases across 6 jurisdictions",
+    "Drove API-first integration strategy connecting 15+ downstream systems",
+    "Shipped sanctions screening product reducing false positives by 40%",
+    "Built product analytics framework improving feature adoption by 25%",
+  ],
+  vistra_bullets: [
+    "Own end-to-end onboarding and KYC product suite across 6 EMEA jurisdictions",
+    "Led platform migration reducing onboarding time from 21 to 7 days",
+    "Managed cross-functional team of 12 engineers and 3 designers",
+    "Delivered API integration layer connecting to 15+ compliance data providers",
+    "Shipped automated risk scoring reducing manual review by 60%",
+    "Drove product discovery and roadmap prioritisation using RICE framework",
+    "Established product analytics with Mixpanel tracking 50+ key events",
+    "Led regulatory change programme for EU AML 6th Directive compliance",
+  ],
+  ebury_bullets: [
+    "Owned client onboarding and KYB product for FX/payments platform",
+    "Reduced onboarding cycle time by 45% through workflow automation",
+    "Shipped API-first partner integration used by 200+ intermediaries",
+    "Led cross-border payments compliance product across 20+ currencies",
+  ],
+};
+
+const buildCvDiff = (job) => {
+  const tailored = job.tailored_cv_sections || {};
+  const sections = [
+    { key: "summary", label: "Professional Summary", isArray: false },
+    { key: "key_achievements", label: "Key Achievements", isArray: true },
+    { key: "vistra_bullets", label: "Vistra Experience", isArray: true },
+    { key: "ebury_bullets", label: "Ebury Experience", isArray: true },
+  ];
+
+  let html = "";
+  for (const sec of sections) {
+    const tailoredVal = tailored[sec.key];
+    const baseVal = BASE_CV_SECTIONS[sec.key];
+    const hasTailored = tailoredVal && (sec.isArray ? Array.isArray(tailoredVal) && tailoredVal.length > 0 : typeof tailoredVal === "string" && tailoredVal.trim() !== "");
+    const isChanged = hasTailored && JSON.stringify(tailoredVal) !== JSON.stringify(baseVal);
+
+    const cssClass = isChanged ? "cv-diff__section--changed" : "cv-diff__section--unchanged";
+    const labelSuffix = isChanged ? "Tailored" : "Unchanged";
+
+    let content;
+    if (sec.isArray) {
+      const items = hasTailored ? tailoredVal : baseVal;
+      content = formatList(items);
+    } else {
+      content = formatInlineText(hasTailored ? tailoredVal : baseVal);
+    }
+
+    html += `
+      <div class="cv-diff__section ${cssClass}">
+        <div class="cv-diff__label">${sec.label} — ${labelSuffix}</div>
+        <div class="cv-diff__content">${content}</div>
+      </div>
+    `;
+  }
+
+  if (job.cv_edit_notes) {
+    html += `<div class="cv-diff__notes"><strong>Edit notes:</strong> ${formatInlineText(job.cv_edit_notes)}</div>`;
+  }
+
+  return html;
+};
+
+const renderApplyHub = () => {
+  const hubContainer = document.getElementById("apply-hub");
+  if (!hubContainer) return;
+
+  const readyJobs = state.jobs.filter((j) => (j.application_status || "saved").toLowerCase() === "ready_to_apply");
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const recentlyApplied = state.jobs.filter((j) => {
+    if ((j.application_status || "saved").toLowerCase() !== "applied") return false;
+    const dt = parseDateValue(j.application_date);
+    return dt && dt >= sevenDaysAgo;
+  });
+
+  if (!readyJobs.length && !recentlyApplied.length) {
+    hubContainer.innerHTML = `
+      <div class="hub-empty">
+        <h3>No jobs ready to apply</h3>
+        <p>Use triage mode to mark jobs as "Apply" — they'll appear here with tailored CV diffs and quick actions.</p>
+      </div>
+    `;
     return;
   }
 
-  topPickContainer.classList.remove("hidden");
-  topPickContainer.innerHTML = `
-    <div class="section-title">Top Pick</div>
-    <h2>${escapeHtml(job.role)}</h2>
-    <p class="job-card__meta">${escapeHtml(job.company)} · ${escapeHtml(job.location)} · ${escapeHtml(
-      formatPosted(job.posted)
-    )}</p>
-    <div class="job-card__details" style="margin-top:12px;">
-      <div class="detail-box">
-        <div class="section-title">Why you fit</div>
-        <div>${formatInlineText(job.why_fit || "Not available yet.")}</div>
+  const renderHubCard = (job, isApplied) => {
+    const statusValue = (job.application_status || "saved").toLowerCase();
+    return `
+      <div class="hub-card${isApplied ? " hub-card--applied" : ""}" data-job-id="${escapeHtml(job.id)}">
+        <div class="hub-card__header">
+          <div>
+            <h3>${escapeHtml(job.role)}</h3>
+            <p>${escapeHtml(job.company)} · ${escapeHtml(job.location)}</p>
+          </div>
+          <span class="${formatFitBadge(job.fit_score)}">${job.fit_score}%</span>
+        </div>
+
+        <div class="hub-card__section">
+          <h4>Key Requirements</h4>
+          ${formatList(job.key_requirements || [])}
+        </div>
+
+        <div class="hub-card__section">
+          <h4>What Changed in Your CV</h4>
+          <div class="cv-diff">${buildCvDiff(job)}</div>
+        </div>
+
+        <div class="hub-card__section">
+          <h4>Tailored Summary</h4>
+          <div>${formatInlineText(job.tailored_summary || "")}</div>
+        </div>
+
+        <details class="hub-card__section">
+          <summary><h4 style="display:inline;cursor:pointer;">Cover Letter</h4></summary>
+          <div class="long-text">${formatInlineText(job.cover_letter || "")}</div>
+        </details>
+
+        <div class="hub-card__actions">
+          <button class="btn btn-primary btn-quick-apply" data-job-id="${escapeHtml(job.id)}">${statusValue === "applied" ? "Re-copy & Open" : "Copy & View"}</button>
+          <button class="btn btn-secondary download-cv-btn" data-job-id="${escapeHtml(job.id)}">Download CV PDF</button>
+          <button class="btn btn-tertiary copy-cv-text-btn" data-job-id="${escapeHtml(job.id)}">Copy CV text</button>
+        </div>
       </div>
-      <div class="detail-box">
-        <div class="section-title">Potential gaps</div>
-        <div>${formatInlineText(job.cv_gap || "Not available yet.")}</div>
-      </div>
-    </div>
-  `;
+    `;
+  };
+
+  let html = "";
+  if (readyJobs.length) {
+    html += `<div class="section-title" style="margin-bottom:12px;">Ready to Apply (${readyJobs.length})</div>`;
+    html += readyJobs.map((j) => renderHubCard(j, false)).join("");
+  }
+  if (recentlyApplied.length) {
+    html += `<div class="section-title" style="margin-top:24px;margin-bottom:12px;">Recently Applied (${recentlyApplied.length})</div>`;
+    html += recentlyApplied.map((j) => renderHubCard(j, true)).join("");
+  }
+
+  hubContainer.innerHTML = html;
+
+  // Wire up hub card buttons
+  hubContainer.querySelectorAll(".btn-quick-apply").forEach((btn) => {
+    const jobId = btn.dataset.jobId;
+    const job = state.jobs.find((j) => j.id === jobId);
+    if (job) btn.addEventListener("click", () => quickApply(job, btn.closest(".hub-card")));
+  });
+
+  hubContainer.querySelectorAll(".download-cv-btn").forEach((btn) => {
+    const jobId = btn.dataset.jobId;
+    const job = state.jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    btn.addEventListener("click", async () => {
+      const cvEl = buildTailoredCvHtml(job);
+      const opt = { margin: [10, 10, 10, 10], filename: `CV_${job.company}_${job.role}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, "_"), html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4" } };
+      try { await html2pdf().set(opt).from(cvEl).save(); showToast("CV downloaded"); } catch (err) { console.error(err); showToast("Download failed"); }
+    });
+  });
+
+  hubContainer.querySelectorAll(".copy-cv-text-btn").forEach((btn) => {
+    const jobId = btn.dataset.jobId;
+    const job = state.jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    btn.addEventListener("click", () => {
+      copyToClipboard(getTailoredCvPlainText(job));
+      showToast("CV text copied");
+    });
+  });
 };
 
 const renderJobs = () => {
@@ -1093,6 +1462,7 @@ const renderJobs = () => {
     const matchesStatus = !statusFilter || jobStatus === statusFilter;
     const matchesUkOnly = !ukOnly || isUkOrRemote(job.location);
     const matchesQuick = !quickFilterPredicate || quickFilterPredicate(job);
+    const matchesDismissed = statusFilter === "dismissed" || jobStatus !== "dismissed";
 
     return (
       matchesSearch &&
@@ -1101,7 +1471,8 @@ const renderJobs = () => {
       matchesLocation &&
       matchesStatus &&
       matchesUkOnly &&
-      matchesQuick
+      matchesQuick &&
+      matchesDismissed
     );
   });
 
@@ -1148,6 +1519,7 @@ const renderJobs = () => {
           <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
           <div class="${getLocationBadgeClass(job.location)}" title="${escapeHtml(job.location)}">${escapeHtml(job.location || "Unknown")}</div>
           ${job.apply_method ? `<span class="badge badge--method">${escapeHtml(job.apply_method)}</span>` : ""}
+          ${formatApplicantBadge(job.applicant_count)}
         </div>
       </div>
       <div class="detail-carousel-wrap">
@@ -1257,6 +1629,9 @@ const renderJobs = () => {
               <option value="interview" ${statusValue === "interview" ? "selected" : ""}>Interview</option>
               <option value="offer" ${statusValue === "offer" ? "selected" : ""}>Offer</option>
               <option value="rejected" ${statusValue === "rejected" ? "selected" : ""}>Rejected</option>
+              <option value="shortlisted" ${statusValue === "shortlisted" ? "selected" : ""}>Shortlisted</option>
+              <option value="ready_to_apply" ${statusValue === "ready_to_apply" ? "selected" : ""}>Ready to Apply</option>
+              <option value="dismissed" ${statusValue === "dismissed" ? "selected" : ""}>Dismissed</option>
             </select>
             <label>Applied date</label>
             <input type="date" class="tracking-applied" value="${appliedDate}" />
@@ -1308,7 +1683,7 @@ const renderJobs = () => {
         <div class="carousel-dots" data-carousel-dots="${escapeHtml(job.id)}"></div>
       </div>
       <div class="job-card__actions">
-        <button class="btn btn-quick-apply${statusValue !== "saved" ? " btn-quick-apply--done" : ""}">${statusValue === "saved" ? "Quick Apply" : "Re-copy & Open"}</button>
+        <button class="btn btn-quick-apply${statusValue !== "saved" && statusValue !== "shortlisted" && statusValue !== "ready_to_apply" ? " btn-quick-apply--done" : ""}">${statusValue === "applied" || statusValue === "interview" || statusValue === "offer" ? "Re-copy & Open" : "Copy & View"}</button>
         <button class="btn btn-prep" data-job-id="${escapeHtml(job.id)}">Prep</button>
         <a href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View & Apply</a>
       </div>
@@ -1772,6 +2147,8 @@ const renderDashboardStats = (jobs) => {
   }).length;
 
   const savedCount = jobs.filter((job) => safeStatus(job) === "saved").length;
+  const shortlistedCount = jobs.filter((job) => safeStatus(job) === "shortlisted").length;
+  const readyToApplyCount = jobs.filter((job) => safeStatus(job) === "ready_to_apply").length;
   const interviewCount = jobs.filter((job) => safeStatus(job) === "interview").length;
   const offerCount = jobs.filter((job) => safeStatus(job) === "offer").length;
   const uniqueCompanies = new Set(jobs.map((job) => job.company).filter(Boolean)).size;
@@ -1805,7 +2182,17 @@ const renderDashboardStats = (jobs) => {
     <div class="stat-card stat-card--clickable" data-stat="saved">
       <div class="stat-card__label">Saved</div>
       <div class="stat-card__value">${savedCount}</div>
-      <div class="stat-card__trend">Not yet applied</div>
+      <div class="stat-card__trend">Tap to triage</div>
+    </div>
+    <div class="stat-card stat-card--clickable" data-stat="shortlisted">
+      <div class="stat-card__label">Shortlisted</div>
+      <div class="stat-card__value">${shortlistedCount}</div>
+      <div class="stat-card__trend">Worth a closer look</div>
+    </div>
+    <div class="stat-card stat-card--clickable" data-stat="readyToApply">
+      <div class="stat-card__label">Ready to Apply</div>
+      <div class="stat-card__value">${readyToApplyCount}</div>
+      <div class="stat-card__trend">Open Apply Hub</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="interview">
       <div class="stat-card__label">Interviews</div>
@@ -1874,7 +2261,20 @@ const renderDashboardStats = (jobs) => {
         return;
       }
       if (stat === "saved") {
-        applyQuickFilter({ label: "Saved roles", status: "saved" });
+        const savedJobs = jobs.filter((j) => safeStatus(j) === "saved");
+        if (savedJobs.length > 0) {
+          openTriageMode(savedJobs);
+        } else {
+          applyQuickFilter({ label: "Saved roles", status: "saved" });
+        }
+        return;
+      }
+      if (stat === "shortlisted") {
+        applyQuickFilter({ label: "Shortlisted roles", status: "shortlisted" });
+        return;
+      }
+      if (stat === "readyToApply") {
+        setActiveTab("top");
         return;
       }
       if (stat === "interview") {
@@ -1898,8 +2298,8 @@ const renderPipelineView = (jobs) => {
   if (!container) return;
 
   const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
-  const statuses = ["saved", "applied", "interview", "offer", "rejected"];
-  const labels = { saved: "Saved", applied: "Applied", interview: "Interview", offer: "Offer", rejected: "Rejected" };
+  const statuses = ["saved", "shortlisted", "ready_to_apply", "applied", "interview", "offer", "rejected"];
+  const labels = { saved: "Saved", shortlisted: "Shortlisted", ready_to_apply: "Ready to Apply", applied: "Applied", interview: "Interview", offer: "Offer", rejected: "Rejected" };
   const groups = {};
   statuses.forEach((s) => (groups[s] = []));
   jobs.forEach((job) => {
@@ -2024,7 +2424,11 @@ if (prepCloseBtn) {
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
-    closePrepMode();
+    if (!triageOverlay.classList.contains("hidden")) {
+      closeTriageMode();
+    } else {
+      closePrepMode();
+    }
   }
 });
 
@@ -2078,8 +2482,8 @@ const loadJobs = async () => {
     renderPipelineView(jobs);
     renderFollowUps(jobs);
     renderFilters();
-    renderTopPick(jobs[0]);
     renderJobs();
+    renderApplyHub();
 
     summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
   } catch (error) {

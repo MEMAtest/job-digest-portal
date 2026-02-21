@@ -1635,3 +1635,321 @@ body {
     opacity: 0.5;
   }
 }
+
+/* ── Triage Overlay ── */
+.triage-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #f4f6fb;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.triage-overlay.hidden {
+  display: none;
+}
+.triage-overlay__header {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  position: relative;
+}
+.triage-overlay__header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.triage-overlay__header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+.triage-overlay__close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  font-size: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  line-height: 1;
+}
+.triage-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ── Triage Card ── */
+.triage-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  user-select: none;
+}
+.triage-card--exit-left {
+  transform: translateX(-120%) rotate(-8deg);
+  opacity: 0;
+}
+.triage-card--exit-right {
+  transform: translateX(120%) rotate(8deg);
+  opacity: 0;
+}
+.triage-card--exit-up {
+  transform: translateY(-120%);
+  opacity: 0;
+}
+.triage-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.triage-card__role {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 12px 0 4px;
+}
+.triage-card__company {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+.triage-card__posted {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 4px 0 0;
+}
+.triage-card__summary {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+  margin: 16px 0;
+}
+.triage-card__fit {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 20px;
+}
+
+/* ── Triage Action Buttons ── */
+.triage-actions {
+  display: flex;
+  gap: 10px;
+}
+.triage-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.triage-btn:active {
+  transform: scale(0.96);
+}
+.triage-btn--dismiss {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+.triage-btn--maybe {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+.triage-btn--apply {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+/* ── Triage Summary ── */
+.triage-summary {
+  text-align: center;
+  max-width: 400px;
+}
+.triage-summary h3 {
+  font-size: 22px;
+  margin-bottom: 20px;
+}
+.triage-summary__stats {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.triage-summary__stat {
+  font-size: 14px;
+  color: #475569;
+}
+.triage-summary__num {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* ── Triage Entry Button ── */
+.triage-entry {
+  margin-bottom: 16px;
+}
+
+/* ── Application Hub ── */
+.hub-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: #64748b;
+}
+.hub-empty h3 {
+  font-size: 18px;
+  color: #334155;
+  margin-bottom: 8px;
+}
+.hub-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.hub-card--applied {
+  opacity: 0.7;
+}
+.hub-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.hub-card__header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+.hub-card__header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+.hub-card__section {
+  margin-bottom: 16px;
+}
+.hub-card__section h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 8px;
+  margin-top: 0;
+}
+.hub-card__actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+/* ── CV Diff ── */
+.cv-diff__section {
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  border-left: 3px solid #e2e8f0;
+}
+.cv-diff__section--changed {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+.cv-diff__section--unchanged {
+  border-left-color: #e2e8f0;
+  background: #f8fafc;
+  opacity: 0.7;
+}
+.cv-diff__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.cv-diff__section--changed .cv-diff__label {
+  color: #16a34a;
+}
+.cv-diff__section--unchanged .cv-diff__label {
+  color: #94a3b8;
+}
+.cv-diff__content {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+}
+.cv-diff__content ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.cv-diff__notes {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+/* ── Applicant Badges ── */
+.badge--applicants-red {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  animation: pulse-red 2s infinite;
+}
+.badge--applicants-amber {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+.badge--applicants-green {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ── Confirm Toast ── */
+.toast--confirm {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.toast__action {
+  background: #fff;
+  color: #4f46e5;
+  border: 1px solid #4f46e5;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.toast__action:hover {
+  background: #4f46e5;
+  color: #fff;
+}
