@@ -498,7 +498,7 @@ export const renderDashboardStats = (jobs) => {
       <div class="stat-card__trend">Previous day</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="saved">
-      <div class="stat-card__label">Saved</div>
+      <div class="stat-card__label">New</div>
       <div class="stat-card__value">${savedCount}</div>
       <div class="stat-card__trend">Tap to triage</div>
     </div>
@@ -583,7 +583,7 @@ export const renderDashboardStats = (jobs) => {
         if (savedJobs.length > 0) {
           openTriageMode(savedJobs);
         } else {
-          applyQuickFilter({ label: "Saved roles", status: "saved" });
+          applyQuickFilter({ label: "New roles", status: "saved" });
         }
         return;
       }
@@ -618,7 +618,7 @@ export const renderPipelineView = (jobs) => {
   const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
   const statuses = ["saved", "shortlisted", "ready_to_apply", "applied", "interview", "offer", "rejected"];
   const labels = {
-    saved: "Saved",
+    saved: "New",
     shortlisted: "Shortlisted",
     ready_to_apply: "Ready to Apply",
     applied: "Applied",

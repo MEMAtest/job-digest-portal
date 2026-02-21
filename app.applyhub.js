@@ -387,7 +387,7 @@ export const renderApplyHub = () => {
           <textarea id="notes-${escapeHtml(job.id)}" class="hub-notes" data-job-id="${escapeHtml(job.id)}" maxlength="500" placeholder="Add notes — recruiter name, referral, conversation context...">${escapeHtml(noteText)}</textarea>
           <div class="hub-notes__meta">
             <span class="hub-notes__count">${noteCount}/500</span>
-            <span class="hub-notes__saved hidden">Saved</span>
+            <span class="hub-notes__saved hidden">Updated</span>
           </div>
         </div>
       </div>
