@@ -94,7 +94,7 @@
           <section class="filters">
             <div class="filter">
               <label for="search">Search</label>
-              <input id="search" type="text" placeholder="Product manager, onboarding, KYC…" />
+              <input id="search" type="text" placeholder="Search role or company…" />
             </div>
             <div class="filter">
               <label for="minFit">Min Fit</label>
@@ -148,7 +148,12 @@
             <button id="triage-btn" class="btn btn-primary">Start triaging</button>
           </div>
 
-          <section id="jobs" class="job-grid"></section>
+          <section id="jobs" class="jobs-split">
+            <div id="job-list" class="job-list"></div>
+            <div id="job-detail" class="job-detail">
+              <div class="job-detail-empty">Select a role to view details.</div>
+            </div>
+          </section>
         </section>
 
         <section class="tab-section hidden" data-tab="top">
@@ -182,6 +187,10 @@
           </section>
         </section>
       </main>
+
+      <div class="page-footer">
+        <span id="last-updated-footer">Updated: --</span>
+      </div>
 
       <div id="triage-overlay" class="triage-overlay hidden">
         <div class="triage-overlay__header">

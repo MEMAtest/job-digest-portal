@@ -190,174 +190,224 @@ export const getFilteredJobs = () => {
   return filtered;
 };
 
-export const renderJobs = () => {
-  const filtered = getFilteredJobs();
+const buildAtsKeywordSection = (job) => {
+  const found = job.ats_keywords_found || [];
+  const missing = job.ats_keywords_missing || [];
+  const coverage = job.ats_keyword_coverage || 0;
+  const matched = found.length;
+  const missingCount = missing.length;
 
-  if (mobileNavObserver) {
-    mobileNavObserver.disconnect();
-    mobileNavObserver = null;
+  if (matched === 0 && missingCount === 0) {
+    return '<div style="font-size:12px;color:#64748b;">No ATS data available yet.</div>';
   }
 
-  jobsContainer.innerHTML = "";
-  const isMobile = window.matchMedia("(max-width: 900px)").matches;
+  const badgeColor = coverage >= 70 ? "#059669" : coverage >= 40 ? "#d97706" : "#dc2626";
+  const badgeBg = coverage >= 70 ? "#ecfdf5" : coverage >= 40 ? "#fffbeb" : "#fef2f2";
 
-  const filteredIds = new Set(filtered.map((j) => j.id));
-  for (const id of state.selectedJobs) {
-    if (!filteredIds.has(id)) state.selectedJobs.delete(id);
-  }
-  updateBulkBar();
+  const pill = (text, color, bg) =>
+    `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:500;color:${color};background:${bg};margin:2px;">${escapeHtml(text)}</span>`;
 
-  const existingSelectAll = document.querySelector(".bulk-select-all-bar");
-  if (existingSelectAll) existingSelectAll.remove();
-  if (filtered.length > 0) {
-    const selectAllBar = document.createElement("div");
-    selectAllBar.className = "bulk-select-all-bar";
-    selectAllBar.innerHTML = `<label class="toggle-label"><input type="checkbox" class="bulk-select-all" ${
-      state.selectedJobs.size === filtered.length && filtered.length > 0 ? "checked" : ""
-    } /> Select all (${filtered.length})</label>`;
-    jobsContainer.parentNode.insertBefore(selectAllBar, jobsContainer);
-    const selectAllCb = selectAllBar.querySelector(".bulk-select-all");
-    selectAllCb.addEventListener("change", () => {
-      if (selectAllCb.checked) {
-        filtered.forEach((j) => state.selectedJobs.add(j.id));
-      } else {
-        state.selectedJobs.clear();
-      }
-      document.querySelectorAll(".bulk-check").forEach((cb) => {
-        cb.checked = selectAllCb.checked;
-      });
-      updateBulkBar();
-    });
-  }
+  const matchedPills = found.map((kw) => pill(kw, "#065f46", "#d1fae5")).join("");
+  const missingPills = missing.map((kw) => pill(kw, "#92400e", "#fef3c7")).join("");
 
-  filtered.forEach((job) => {
-    const bulletList = formatList(job.tailored_cv_bullets || []);
-    const requirementsList = formatList(job.key_requirements || []);
-    const talkingPoints = formatList(job.key_talking_points || []);
-    const starStories = formatList(job.star_stories || []);
-    const prepQaBlocks = buildPrepQa(job);
-    const scorecardList = formatList(job.scorecard || []);
-    const statusValue = (job.application_status || "saved").toLowerCase();
-    const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
-    const lastTouchDate = job.last_touch_date ? job.last_touch_date.slice(0, 10) : "";
-    const dismissNote = statusValue === "dismissed" ? formatDismissReason(job.dismiss_reason) : "";
+  return `
+    <div style="margin-bottom:8px;">
+      <span style="display:inline-block;padding:3px 10px;border-radius:9999px;font-size:12px;font-weight:700;color:${badgeColor};background:${badgeBg};margin-right:8px;">${coverage}%</span>
+      <span style="font-size:12px;color:#64748b;">${matched} matched, ${missingCount} missing</span>
+    </div>
+    ${matched > 0 ? `<div style="margin-bottom:6px;font-size:12px;font-weight:600;color:#059669;">Matched</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">${matchedPills}</div>` : ""}
+    ${missingCount > 0 ? `<div style="font-size:12px;font-weight:600;color:#d97706;">Missing</div><div style="display:flex;flex-wrap:wrap;gap:4px;">${missingPills}</div>` : ""}
+  `;
+};
 
-    const card = document.createElement("div");
-    card.className = "job-card";
-    const postedDisplay = job.posted_raw || job.posted || job.posted_date || "";
-    const applicantDisplay = job.applicant_count ? ` · ${job.applicant_count} applicants` : "";
-    const openStatus =
-      job.job_status ||
-      (job.is_open === true ? "Open" : "") ||
-      (job.is_open === false ? "Closed" : "") ||
-      (job.is_closed ? "Closed" : "");
-    const statusSuffix = openStatus ? ` · ${openStatus}` : "";
+const formatStatusLabel = (statusValue) => {
+  if (!statusValue || statusValue === "saved") return "new";
+  return statusValue.replace(/_/g, " ");
+};
 
-    card.innerHTML = `
-      <div class="job-card__header">
-        <div class="job-card__info">
-          <label class="bulk-check-label"><input type="checkbox" class="bulk-check" data-job-id="${escapeHtml(job.id)}" ${
-      state.selectedJobs.has(job.id) ? "checked" : ""
-    } /></label>
-          <div class="job-card__text">
-            <div class="job-card__title">${escapeHtml(job.role)}</div>
-            <div class="job-card__company">${escapeHtml(job.company || "Company not listed")}</div>
-            <div class="job-card__meta">${escapeHtml(formatPosted(postedDisplay))} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
-            <div class="job-card__meta">Status: ${escapeHtml(statusValue)}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
-          </div>
+const ensureJobsCvModal = () => {
+  if (document.getElementById("jobs-cv-modal")) return;
+  const modal = document.createElement("div");
+  modal.className = "cv-preview-modal";
+  modal.id = "jobs-cv-modal";
+  modal.innerHTML = `
+    <div class="cv-preview-modal__backdrop"></div>
+    <div class="cv-preview-modal__content">
+      <div class="cv-preview-modal__header">
+        <h3 id="cv-modal-title">CV Preview</h3>
+        <button class="cv-preview-modal__close">&times;</button>
+      </div>
+      <div class="cv-preview-modal__body"></div>
+      <div class="cv-preview-modal__actions" style="padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;gap:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="cv-modal-download">Download PDF</button>
+        <button class="btn btn-secondary" id="cv-modal-copy">Copy as text</button>
+        <button class="btn btn-tertiary" id="cv-modal-close">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const close = () => modal.classList.remove("cv-preview-modal--visible");
+  modal.querySelector(".cv-preview-modal__backdrop").addEventListener("click", close);
+  modal.querySelector(".cv-preview-modal__close").addEventListener("click", close);
+  document.getElementById("cv-modal-close").addEventListener("click", close);
+};
+
+const openJobsCvModal = (job) => {
+  ensureJobsCvModal();
+  const modal = document.getElementById("jobs-cv-modal");
+  const body = modal.querySelector(".cv-preview-modal__body");
+  const title = document.getElementById("cv-modal-title");
+  title.textContent = `CV Preview — ${job.company || "Company"}`;
+  body.innerHTML = "";
+  body.appendChild(buildTailoredCvHtml(job));
+  modal.classList.add("cv-preview-modal--visible");
+
+  const downloadBtn = document.getElementById("cv-modal-download");
+  const copyBtn = document.getElementById("cv-modal-copy");
+
+  const newDownload = downloadBtn.cloneNode(true);
+  downloadBtn.replaceWith(newDownload);
+  newDownload.addEventListener("click", async () => {
+    const htmlEl = buildTailoredCvHtml(job);
+    const companySlug = (job.company || "Company").replace(/[^a-zA-Z0-9]/g, "");
+    const options = {
+      margin: [10, 15],
+      filename: `AdeOmosanya_CV_${companySlug}.pdf`,
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: "mm", format: "a4" },
+    };
+    try {
+      showToast("Generating PDF…");
+      await renderPdfFromElement(htmlEl, options);
+      showToast("PDF ready");
+    } catch (err) {
+      console.error(err);
+      showToast("PDF failed to generate.");
+    }
+  });
+
+  const newCopy = copyBtn.cloneNode(true);
+  copyBtn.replaceWith(newCopy);
+  newCopy.addEventListener("click", () => {
+    copyToClipboard(getTailoredCvPlainText(job));
+  });
+};
+
+const renderJobDetail = (job, detailEl) => {
+  if (!job || !detailEl) return;
+
+  const bulletList = formatList(job.tailored_cv_bullets || []);
+  const requirementsList = formatList(job.key_requirements || []);
+  const talkingPoints = formatList(job.key_talking_points || []);
+  const starStories = formatList(job.star_stories || []);
+  const prepQaBlocks = buildPrepQa(job);
+  const scorecardList = formatList(job.scorecard || []);
+  const statusValue = (job.application_status || "saved").toLowerCase();
+  const statusLabel = formatStatusLabel(statusValue);
+  const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
+  const lastTouchDate = job.last_touch_date ? job.last_touch_date.slice(0, 10) : "";
+  const dismissNote = statusValue === "dismissed" ? formatDismissReason(job.dismiss_reason) : "";
+  const postedDisplay = job.posted_raw || job.posted || job.posted_date || "";
+  const applicantDisplay = job.applicant_count ? `${job.applicant_count} applicants` : "";
+  const openStatus =
+    job.job_status ||
+    (job.is_open === true ? "Open" : "") ||
+    (job.is_open === false ? "Closed" : "") ||
+    (job.is_closed ? "Closed" : "");
+  const metaParts = [formatPosted(postedDisplay), job.source, applicantDisplay, openStatus].filter(Boolean);
+  const metaLine = metaParts.join(" · ");
+  const isManual = job.manual_link || job.source === "Manual";
+  const manualBadge = isManual ? `<span class="badge badge--manual">Pasted</span>` : "";
+
+  detailEl.innerHTML = `
+    <div class="job-detail-card">
+      <div class="job-detail-header">
+        <div>
+          <div class="job-detail-title">${escapeHtml(job.role)}</div>
+          <div class="job-detail-company">${escapeHtml(job.company || "Company not listed")}</div>
+          <div class="job-detail-meta">${escapeHtml(metaLine || "")}</div>
+          <div class="job-detail-meta">Status: ${escapeHtml(statusLabel)}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
         </div>
-        <div class="job-card__badges">
+        <div class="job-detail-badges">
           <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
           <div class="${getLocationBadgeClass(job.location)}" title="${escapeHtml(job.location)}">${escapeHtml(job.location || "Unknown")}</div>
+          ${manualBadge}
           ${job.apply_method ? `<span class="badge badge--method">${escapeHtml(job.apply_method)}</span>` : ""}
           ${formatApplicantBadge(job.applicant_count)}
         </div>
       </div>
-      <div class="detail-carousel-wrap">
-        <div class="detail-carousel-header">
-          <div class="detail-carousel-hint">Swipe for more</div>
-          <div class="detail-carousel-controls">
-            <button class="carousel-btn carousel-btn--prev" aria-label="Previous card">&#x2039;</button>
-            <button class="carousel-btn carousel-btn--next" aria-label="Next card">&#x203A;</button>
-          </div>
-        </div>
-        <div class="detail-carousel-toolbar">
-          <button class="btn btn-tertiary detail-toggle" type="button">Show all sections</button>
-        </div>
-        <div class="job-card__details detail-carousel" id="carousel-${escapeHtml(job.id)}">
-        <div class="detail-box" data-section="role_summary">
+      <div class="job-detail-actions">
+        <button class="btn btn-quick-apply${
+          statusValue !== "saved" && statusValue !== "shortlisted" && statusValue !== "ready_to_apply" ? " btn-quick-apply--done" : ""
+        }">${statusValue === "applied" || statusValue === "interview" || statusValue === "offer" ? "Re-copy & Open" : "Apply now"}</button>
+        <button class="btn btn-secondary btn-shortlist"${statusValue === "shortlisted" ? " disabled" : ""}>${
+          statusValue === "shortlisted" ? "Shortlisted" : "Shortlist"
+        }</button>
+        <button class="btn btn-secondary btn-dismiss">Dismiss</button>
+        <button class="btn btn-prep" data-job-id="${escapeHtml(job.id)}">Prep</button>
+        <a class="btn btn-tertiary" href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View link</a>
+      </div>
+      <div class="job-detail-tabs">
+        <button class="detail-tab detail-tab--active" data-tab="summary">Summary</button>
+        <button class="detail-tab" data-tab="fit">Fit</button>
+        <button class="detail-tab" data-tab="ats">ATS</button>
+        <button class="detail-tab" data-tab="prep">Prep</button>
+        <button class="detail-tab" data-tab="apply">Apply</button>
+      </div>
+      <div class="detail-tab-panel is-active" data-tab="summary">
+        <div class="detail-box">
           <div class="section-title">Role summary</div>
           <div>${formatInlineText(job.role_summary || "Not available yet.")}</div>
         </div>
-        <div class="detail-box" data-section="tailored_summary">
+        <div class="detail-box">
+          <div class="section-title">Key requirements</div>
+          ${requirementsList}
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Company insights</div>
+          <div>${formatInlineText(job.company_insights || "Not available yet.")}</div>
+        </div>
+      </div>
+      <div class="detail-tab-panel" data-tab="fit">
+        <div class="detail-box">
+          <div class="section-title">Why you fit</div>
+          <div>${formatInlineText(job.why_fit || "Not available yet.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Potential gaps</div>
+          <div>${formatInlineText(job.cv_gap || "Not available yet.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Match notes</div>
+          <div>${formatInlineText(job.match_notes || "Not available yet.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Hiring scorecard</div>
+          ${scorecardList}
+        </div>
+      </div>
+      <div class="detail-tab-panel" data-tab="ats">
+        <div class="detail-box">
           <div class="section-title">Tailored summary</div>
           <div>${formatInlineText(job.tailored_summary || "Not available yet.")}</div>
         </div>
-        <div class="detail-box" data-section="tailored_bullets">
+        <div class="detail-box">
           <div class="section-title">Tailored CV bullets (ATS-ready)</div>
           ${bulletList}
           <button class="btn btn-tertiary copy-btn" data-copy-type="bullets" data-job-id="${escapeHtml(job.id)}">Copy bullets</button>
         </div>
-        <div class="detail-box" data-section="why_fit">
-          <div class="section-title">Why you fit</div>
-          <div>${formatInlineText(job.why_fit || "Not available yet.")}</div>
+        <div class="detail-box">
+          <div class="section-title">ATS keyword coverage</div>
+          ${buildAtsKeywordSection(job)}
         </div>
-        <div class="detail-box" data-section="gaps">
-          <div class="section-title">Potential gaps</div>
-          <div>${formatInlineText(job.cv_gap || "Not available yet.")}</div>
-        </div>
-        <div class="detail-box" data-section="cv_edits">
+        <div class="detail-box">
           <div class="section-title">CV edits for this role</div>
           <div>${formatInlineText(job.cv_edit_notes || "Not available yet.")}</div>
         </div>
-        <div class="detail-box" data-section="key_requirements">
-          <div class="section-title">Key requirements</div>
-          ${requirementsList}
-        </div>
-        <div class="detail-box" data-section="match_notes">
-          <div class="section-title">Match notes</div>
-          <div>${formatInlineText(job.match_notes || "Not available yet.")}</div>
-        </div>
-        <div class="detail-box" data-section="interview_focus">
-          <div class="section-title">Interview focus</div>
-          <div>${formatInlineText(job.interview_focus || "Not available yet.")}</div>
-        </div>
-        <div class="detail-box" data-section="quick_pitch">
-          <div class="section-title">Quick pitch</div>
-          <div>${formatInlineText(job.quick_pitch || "Not available yet.")}</div>
-        </div>
-        <div class="detail-box" data-section="talking_points">
-          <div class="section-title">Key talking points</div>
-          ${talkingPoints}
-        </div>
-        <div class="detail-box" data-section="star_stories">
-          <div class="section-title">STAR stories (10/10)</div>
-          ${starStories}
-        </div>
-        <div class="detail-box" data-section="company_insights">
-          <div class="section-title">Company insights</div>
-          <div>${formatInlineText(job.company_insights || "Not available yet.")}</div>
-        </div>
-        <div class="detail-box" data-section="interview_qa">
-          <div class="section-title">Interview Q&amp;A (8–10/10)</div>
-          ${prepQaBlocks}
-        </div>
-        <div class="detail-box" data-section="scorecard">
-          <div class="section-title">Hiring scorecard</div>
-          ${scorecardList}
-        </div>
-        <div class="detail-box" data-section="how_to_apply">
-          <div class="section-title">How to apply</div>
-          <div>${formatInlineText(job.apply_tips || "Apply with CV tailored to onboarding + KYC impact.")}</div>
-        </div>
-        <div class="detail-box" data-section="cover_letter">
-          <div class="section-title">Cover letter</div>
-          <div class="long-text">${formatInlineText(job.cover_letter || "Not available yet.")}</div>
-          <button class="btn btn-tertiary copy-btn" data-copy-type="cover_letter" data-job-id="${escapeHtml(job.id)}">Copy cover letter</button>
-        </div>
-        <div class="detail-box" data-section="tailored_cv">
+        <div class="detail-box">
           <div class="section-title">Tailored CV</div>
-          <div class="cv-preview" style="font-size:11px;color:#475569;margin-bottom:8px;">${
+          <div class="cv-preview">${
             job.tailored_cv_sections?.summary
               ? escapeHtml(job.tailored_cv_sections.summary).slice(0, 150) + "…"
               : "CV will be tailored with your profile. Download to preview."
@@ -365,7 +415,36 @@ export const renderJobs = () => {
           <button class="btn btn-primary download-cv-btn" data-job-id="${escapeHtml(job.id)}">Download PDF</button>
           <button class="btn btn-tertiary copy-cv-text-btn" data-job-id="${escapeHtml(job.id)}">Copy as text</button>
         </div>
-        <div class="detail-box tracking" data-section="tracking">
+      </div>
+      <div class="detail-tab-panel" data-tab="prep">
+        <div class="detail-box">
+          <div class="section-title">Quick pitch</div>
+          <div>${formatInlineText(job.quick_pitch || "Not available yet.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Key talking points</div>
+          ${talkingPoints}
+        </div>
+        <div class="detail-box">
+          <div class="section-title">STAR stories (10/10)</div>
+          ${starStories}
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Interview Q&amp;A (8–10/10)</div>
+          ${prepQaBlocks}
+        </div>
+      </div>
+      <div class="detail-tab-panel" data-tab="apply">
+        <div class="detail-box">
+          <div class="section-title">How to apply</div>
+          <div>${formatInlineText(job.apply_tips || "Apply with CV tailored to onboarding + KYC impact.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Cover letter</div>
+          <div class="long-text">${formatInlineText(job.cover_letter || "Not available yet.")}</div>
+          <button class="btn btn-tertiary copy-btn" data-copy-type="cover_letter" data-job-id="${escapeHtml(job.id)}">Copy cover letter</button>
+        </div>
+        <div class="detail-box tracking">
           <div class="section-title">Application tracking</div>
           <div class="tracking-grid">
             <label>Status</label>
@@ -411,338 +490,147 @@ export const renderJobs = () => {
           <button class="btn btn-primary save-tracking">Save update</button>
           <div class="tracking-status-msg"></div>
         </div>
-        </div>
-        <div class="carousel-dots" data-carousel-dots="${escapeHtml(job.id)}"></div>
       </div>
-      <div class="job-card__actions">
-        <button class="btn btn-quick-apply${
-          statusValue !== "saved" && statusValue !== "shortlisted" && statusValue !== "ready_to_apply" ? " btn-quick-apply--done" : ""
-        }">${statusValue === "applied" || statusValue === "interview" || statusValue === "offer" ? "Re-open" : "Apply now"}</button>
-        <button class="btn btn-secondary btn-shortlist"${statusValue === "shortlisted" ? " disabled" : ""}>${
-          statusValue === "shortlisted" ? "Shortlisted" : "Shortlist"
-        }</button>
-        <button class="btn btn-secondary btn-dismiss">Dismiss</button>
-        <button class="btn btn-prep" data-job-id="${escapeHtml(job.id)}">Prep</button>
-        <a href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View link</a>
-      </div>
-    `;
-    jobsContainer.appendChild(card);
+    </div>
+  `;
 
-    const bulkCheck = card.querySelector(".bulk-check");
-    if (bulkCheck) {
-      bulkCheck.addEventListener("change", () => {
-        if (bulkCheck.checked) {
-          state.selectedJobs.add(job.id);
-        } else {
-          state.selectedJobs.delete(job.id);
-        }
+  detailEl.querySelectorAll(".detail-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      detailEl.querySelectorAll(".detail-tab").forEach((btn) => btn.classList.remove("detail-tab--active"));
+      detailEl.querySelectorAll(".detail-tab-panel").forEach((panel) => panel.classList.remove("is-active"));
+      tab.classList.add("detail-tab--active");
+      const panel = detailEl.querySelector(`.detail-tab-panel[data-tab="${tab.dataset.tab}"]`);
+      if (panel) panel.classList.add("is-active");
+    });
+  });
+
+  const qaBtn = detailEl.querySelector(".btn-quick-apply");
+  if (qaBtn) {
+    qaBtn.addEventListener("click", () => quickApply(job));
+  }
+
+  const shortlistBtn = detailEl.querySelector(".btn-shortlist");
+  if (shortlistBtn) {
+    shortlistBtn.addEventListener("click", async () => {
+      if (shortlistBtn.classList.contains("disabled")) return;
+      if (!db) {
+        showToast("Missing Firebase config.");
+        return;
+      }
+      const now = new Date().toISOString();
+      try {
+        await updateDoc(doc(db, collectionName, job.id), {
+          application_status: "shortlisted",
+          updated_at: now,
+        });
+        job.application_status = "shortlisted";
+        state.selectedJobs.delete(job.id);
         updateBulkBar();
-      });
-    }
-
-    const qaBtn = card.querySelector(".btn-quick-apply");
-    if (qaBtn) {
-      qaBtn.addEventListener("click", () => quickApply(job, card));
-    }
-
-    const shortlistBtn = card.querySelector(".btn-shortlist");
-    if (shortlistBtn) {
-      shortlistBtn.addEventListener("click", async () => {
-        if (shortlistBtn.classList.contains("disabled")) return;
-        if (!db) {
-          showToast("Missing Firebase config.");
-          return;
-        }
-        const now = new Date().toISOString();
-        try {
-          await updateDoc(doc(db, collectionName, job.id), {
-            application_status: "shortlisted",
-            updated_at: now,
-          });
-          job.application_status = "shortlisted";
-          shortlistBtn.classList.add("disabled");
-          shortlistBtn.textContent = "Shortlisted";
-          state.selectedJobs.delete(job.id);
-          updateBulkBar();
-          const trackingSelect = card.querySelector(".tracking-status");
-          if (trackingSelect) trackingSelect.value = "shortlisted";
-          const metaDivs = card.querySelectorAll(".job-card__meta");
-          metaDivs.forEach((m) => {
-            if (m.textContent.startsWith("Status:")) m.textContent = "Status: shortlisted";
-          });
-          showToast("Moved to Shortlisted");
-          card.remove();
-        } catch (err) {
-          console.error(err);
-          showToast("Shortlist failed.");
-        }
-      });
-    }
-
-    const dismissBtn = card.querySelector(".btn-dismiss");
-    if (dismissBtn) {
-      dismissBtn.addEventListener("click", async () => {
-        if (!db) {
-          showToast("Missing Firebase config.");
-          return;
-        }
-        const now = new Date().toISOString();
-        try {
-          await updateDoc(doc(db, collectionName, job.id), {
-            application_status: "dismissed",
-            dismiss_reason: "manual",
-            updated_at: now,
-          });
-          job.application_status = "dismissed";
-          job.dismiss_reason = "manual";
-          state.selectedJobs.delete(job.id);
-          updateBulkBar();
-          card.remove();
-          showToast("Dismissed");
-        } catch (err) {
-          console.error(err);
-          showToast("Dismiss failed.");
-        }
-      });
-    }
-
-    const prepBtn = card.querySelector(".btn-prep");
-    if (prepBtn) {
-      prepBtn.addEventListener("click", () => openPrepMode(prepBtn.dataset.jobId));
-    }
-
-    const carousel = card.querySelector(".detail-carousel");
-    const prevBtn = card.querySelector(".carousel-btn--prev");
-    const nextBtn = card.querySelector(".carousel-btn--next");
-    const dotsContainer = card.querySelector(".carousel-dots");
-    const detailToggle = card.querySelector(".detail-toggle");
-
-    const detailCards = carousel ? Array.from(carousel.querySelectorAll(".detail-box")) : [];
-    const essentialSections = new Set([
-      "role_summary",
-      "tailored_summary",
-      "tailored_bullets",
-      "why_fit",
-      "key_requirements",
-    ]);
-    let detailExpanded = false;
-
-    if (isMobile) {
-      detailCards.forEach((box) => {
-        const title = box.querySelector(".section-title");
-        if (!title) return;
-        const body = document.createElement("div");
-        body.className = "accordion-body";
-        while (title.nextSibling) {
-          body.appendChild(title.nextSibling);
-        }
-        box.appendChild(body);
-        title.addEventListener("click", () => {
-          box.classList.toggle("accordion-open");
-        });
-      });
-
-      const quickSaveBtn = document.createElement("button");
-      quickSaveBtn.className = "quick-save-btn";
-      const statusVal = (job.application_status || "saved").toLowerCase();
-      if (statusVal === "saved") quickSaveBtn.classList.add("is-saved");
-      quickSaveBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-3.5L5 21V5z"/></svg>`;
-      card.appendChild(quickSaveBtn);
-
-      quickSaveBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (!db) return;
-        const currentStatus = (job.application_status || "saved").toLowerCase();
-        if (!["saved", "applied"].includes(currentStatus)) return;
-        const wasSaved = quickSaveBtn.classList.contains("is-saved");
-        const newStatus = wasSaved ? "applied" : "saved";
-
-        quickSaveBtn.classList.toggle("is-saved");
-        quickSaveBtn.classList.add("is-saving");
-
-        try {
-          await updateDoc(doc(db, collectionName, job.id), {
-            application_status: newStatus,
-            updated_at: new Date().toISOString(),
-          });
-          job.application_status = newStatus;
-          const trackingSelect = card.querySelector(".tracking-status");
-          if (trackingSelect) trackingSelect.value = newStatus;
-          const metaDivs = card.querySelectorAll(".job-card__meta");
-          metaDivs.forEach((m) => {
-            if (m.textContent.startsWith("Status:")) m.textContent = `Status: ${newStatus}`;
-          });
-        } catch (err) {
-          console.error("Quick-save failed:", err);
-          quickSaveBtn.classList.toggle("is-saved");
-        } finally {
-          quickSaveBtn.classList.remove("is-saving");
-        }
-      });
-    } else {
-      detailCards.forEach((box) => {
-        const key = box.dataset.section;
-        if (!essentialSections.has(key)) {
-          box.classList.add("detail-box--hidden");
-        }
-      });
-      if (detailToggle) {
-        detailToggle.addEventListener("click", () => {
-          detailExpanded = !detailExpanded;
-          detailCards.forEach((box) => {
-            const key = box.dataset.section;
-            if (!essentialSections.has(key)) {
-              box.classList.toggle("detail-box--hidden", !detailExpanded);
-            }
-          });
-          detailToggle.textContent = detailExpanded ? "Show key sections" : "Show all sections";
-        });
+        showToast("Moved to Shortlisted");
+        renderJobs();
+      } catch (err) {
+        console.error(err);
+        showToast("Shortlist failed.");
       }
-
-      // Desktop no longer uses the carousel buttons/dots.
-      if (prevBtn) prevBtn.style.display = "none";
-      if (nextBtn) nextBtn.style.display = "none";
-      if (dotsContainer) dotsContainer.style.display = "none";
-
-      const snapToIndex = (index) => {
-        if (!carousel || !detailCards[index]) return;
-        const target = detailCards[index];
-        const left = target.offsetLeft - carousel.offsetLeft;
-        carousel.scrollTo({ left, behavior: "smooth" });
-      };
-
-      const renderDots = () => {
-        if (!dotsContainer) return;
-        dotsContainer.innerHTML = "";
-        detailCards.forEach((_, idx) => {
-          const dot = document.createElement("button");
-          dot.className = "carousel-dot";
-          dot.setAttribute("aria-label", `Go to card ${idx + 1}`);
-          dot.addEventListener("click", () => snapToIndex(idx));
-          dotsContainer.appendChild(dot);
-        });
-      };
-
-      const updateActiveDot = () => {
-        if (!carousel || !dotsContainer) return;
-        const scrollLeft = carousel.scrollLeft;
-        let activeIdx = 0;
-        let bestDistance = Number.POSITIVE_INFINITY;
-        detailCards.forEach((cardEl, idx) => {
-          const distance = Math.abs(cardEl.offsetLeft - carousel.offsetLeft - scrollLeft);
-          if (distance < bestDistance) {
-            bestDistance = distance;
-            activeIdx = idx;
-          }
-        });
-        dotsContainer.querySelectorAll(".carousel-dot").forEach((dot, idx) => {
-          dot.classList.toggle("active", idx === activeIdx);
-        });
-      };
-
-      if (carousel) {
-        renderDots();
-        updateActiveDot();
-        carousel.addEventListener("scroll", () => {
-          window.requestAnimationFrame(updateActiveDot);
-        });
-      }
-
-      if (prevBtn) {
-        prevBtn.addEventListener("click", () => {
-          const active = dotsContainer?.querySelector(".carousel-dot.active");
-          const idx = active ? Array.from(dotsContainer.children).indexOf(active) : 0;
-          snapToIndex(Math.max(0, idx - 1));
-        });
-      }
-
-      if (nextBtn) {
-        nextBtn.addEventListener("click", () => {
-          const active = dotsContainer?.querySelector(".carousel-dot.active");
-          const idx = active ? Array.from(dotsContainer.children).indexOf(active) : 0;
-          snapToIndex(Math.min(detailCards.length - 1, idx + 1));
-        });
-      }
-    }
-
-    card.querySelectorAll(".copy-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const jobId = btn.dataset.jobId;
-        const copyType = btn.dataset.copyType;
-        const target = state.jobs.find((item) => item.id === jobId);
-        if (!target) return;
-        const text =
-          copyType === "bullets"
-            ? (target.tailored_cv_bullets || []).join("\n")
-            : target.cover_letter || "";
-        copyToClipboard(text);
-      });
     });
+  }
 
-    card.querySelectorAll(".prep-qa__select").forEach((select) => {
-      const answerEl = select.closest(".prep-qa")?.querySelector(".prep-qa__answer");
-      select.addEventListener("change", () => {
-        const selected = select.selectedOptions[0];
-        if (!answerEl) return;
-        const raw = selected?.dataset?.answer || "";
-        let decoded = raw;
-        try {
-          decoded = decodeURIComponent(raw);
-        } catch (error) {
-          decoded = raw;
-        }
-        answerEl.innerHTML = formatInlineText(decoded || "Not available yet.");
-      });
+  const dismissBtn = detailEl.querySelector(".btn-dismiss");
+  if (dismissBtn) {
+    dismissBtn.addEventListener("click", async () => {
+      if (!db) {
+        showToast("Missing Firebase config.");
+        return;
+      }
+      const now = new Date().toISOString();
+      try {
+        await updateDoc(doc(db, collectionName, job.id), {
+          application_status: "dismissed",
+          dismiss_reason: "manual",
+          updated_at: now,
+        });
+        job.application_status = "dismissed";
+        job.dismiss_reason = "manual";
+        state.selectedJobs.delete(job.id);
+        updateBulkBar();
+        showToast("Dismissed");
+        renderJobs();
+      } catch (err) {
+        console.error(err);
+        showToast("Dismiss failed.");
+      }
     });
+  }
 
-    const downloadCvBtn = card.querySelector(".download-cv-btn");
-    if (downloadCvBtn) {
-      downloadCvBtn.addEventListener("click", async () => {
-        const target = state.jobs.find((item) => item.id === downloadCvBtn.dataset.jobId);
-        if (!target) return;
-        const htmlEl = buildTailoredCvHtml(target);
-        const companySlug = (target.company || "Company").replace(/[^a-zA-Z0-9]/g, "");
-        const options = {
-          margin: [10, 15],
-          filename: `AdeOmosanya_CV_${companySlug}.pdf`,
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: "mm", format: "a4" },
-        };
-        try {
-          showToast("Generating PDF…");
-          await renderPdfFromElement(htmlEl, options);
-          showToast("PDF ready");
-        } catch (err) {
-          console.error(err);
-          showToast("PDF failed to generate.");
-        }
-      });
-    }
+  const prepBtn = detailEl.querySelector(".btn-prep");
+  if (prepBtn) {
+    prepBtn.addEventListener("click", () => openPrepMode(prepBtn.dataset.jobId));
+  }
 
-    const copyCvTextBtn = card.querySelector(".copy-cv-text-btn");
-    if (copyCvTextBtn) {
-      copyCvTextBtn.addEventListener("click", () => {
-        const target = state.jobs.find((item) => item.id === copyCvTextBtn.dataset.jobId);
-        if (!target) return;
-        copyToClipboard(getTailoredCvPlainText(target));
-      });
-    }
+  detailEl.querySelectorAll(".copy-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const jobId = btn.dataset.jobId;
+      const copyType = btn.dataset.copyType;
+      const target = state.jobs.find((item) => item.id === jobId);
+      if (!target) return;
+      const text =
+        copyType === "bullets"
+          ? (target.tailored_cv_bullets || []).join("\n")
+          : target.cover_letter || "";
+      copyToClipboard(text);
+    });
+  });
 
-    const saveBtn = card.querySelector(".save-tracking");
-    const statusEl = card.querySelector(".tracking-status");
-    const appliedEl = card.querySelector(".tracking-applied");
-    const lastTouchEl = card.querySelector(".tracking-last-touch");
-    const nextActionEl = card.querySelector(".tracking-next-action");
-    const notesEl = card.querySelector(".tracking-notes");
-    const salaryEl = card.querySelector(".tracking-salary");
-    const appliedViaEl = card.querySelector(".tracking-applied-via");
-    const followUpEl = card.querySelector(".tracking-follow-up");
-    const interviewerNameEl = card.querySelector(".tracking-interviewer-name");
-    const interviewerEmailEl = card.querySelector(".tracking-interviewer-email");
-    const interviewDateEl = card.querySelector(".tracking-interview-date");
-    const statusMsg = card.querySelector(".tracking-status-msg");
-    const validationMsg = card.querySelector(".tracking-validation-msg");
+  detailEl.querySelectorAll(".prep-qa__select").forEach((select) => {
+    const answerEl = select.closest(".prep-qa")?.querySelector(".prep-qa__answer");
+    select.addEventListener("change", () => {
+      const selected = select.selectedOptions[0];
+      if (!answerEl) return;
+      const raw = selected?.dataset?.answer || "";
+      let decoded = raw;
+      try {
+        decoded = decodeURIComponent(raw);
+      } catch (error) {
+        decoded = raw;
+      }
+      answerEl.innerHTML = formatInlineText(decoded || "Not available yet.");
+    });
+  });
 
+  const downloadCvBtn = detailEl.querySelector(".download-cv-btn");
+  if (downloadCvBtn) {
+    downloadCvBtn.addEventListener("click", () => {
+      const target = state.jobs.find((item) => item.id === downloadCvBtn.dataset.jobId);
+      if (!target) return;
+      openJobsCvModal(target);
+    });
+  }
+
+  const copyCvTextBtn = detailEl.querySelector(".copy-cv-text-btn");
+  if (copyCvTextBtn) {
+    copyCvTextBtn.addEventListener("click", () => {
+      const target = state.jobs.find((item) => item.id === copyCvTextBtn.dataset.jobId);
+      if (!target) return;
+      copyToClipboard(getTailoredCvPlainText(target));
+    });
+  }
+
+  const saveBtn = detailEl.querySelector(".save-tracking");
+  const statusEl = detailEl.querySelector(".tracking-status");
+  const appliedEl = detailEl.querySelector(".tracking-applied");
+  const lastTouchEl = detailEl.querySelector(".tracking-last-touch");
+  const nextActionEl = detailEl.querySelector(".tracking-next-action");
+  const notesEl = detailEl.querySelector(".tracking-notes");
+  const salaryEl = detailEl.querySelector(".tracking-salary");
+  const appliedViaEl = detailEl.querySelector(".tracking-applied-via");
+  const followUpEl = detailEl.querySelector(".tracking-follow-up");
+  const interviewerNameEl = detailEl.querySelector(".tracking-interviewer-name");
+  const interviewerEmailEl = detailEl.querySelector(".tracking-interviewer-email");
+  const interviewDateEl = detailEl.querySelector(".tracking-interview-date");
+  const statusMsg = detailEl.querySelector(".tracking-status-msg");
+  const validationMsg = detailEl.querySelector(".tracking-validation-msg");
+
+  if (saveBtn) {
     saveBtn.addEventListener("click", async () => {
       if (!db) {
         statusMsg.textContent = "Missing Firebase config.";
@@ -781,96 +669,128 @@ export const renderJobs = () => {
       };
       try {
         await updateDoc(doc(db, collectionName, job.id), payload);
-        job.application_status = payload.application_status;
-        job.application_date = payload.application_date;
-        job.last_touch_date = payload.last_touch_date;
-        job.next_action = payload.next_action;
-        job.application_notes = payload.application_notes;
-        job.salary_range = payload.salary_range;
-        job.applied_via = payload.applied_via;
-        job.follow_up_date = payload.follow_up_date;
-        job.interviewer_name = payload.interviewer_name;
-        job.interviewer_email = payload.interviewer_email;
-        job.interview_date = payload.interview_date;
+        Object.assign(job, payload);
         statusMsg.textContent = "Updated.";
       } catch (error) {
         console.error(error);
         statusMsg.textContent = "Save failed.";
       }
     });
-  });
-
-  const existingNav = document.querySelector(".mobile-job-nav");
-  if (existingNav) existingNav.remove();
-
-  if (isMobile && filtered.length > 0) {
-    const nav = document.createElement("div");
-    nav.className = "mobile-job-nav";
-
-    const prevBtn = document.createElement("button");
-    prevBtn.className = "mobile-job-nav__btn";
-    prevBtn.textContent = "\u2039";
-    prevBtn.setAttribute("aria-label", "Previous job");
-
-    const counter = document.createElement("span");
-    counter.className = "mobile-job-nav__counter";
-    counter.textContent = `1 of ${filtered.length}`;
-
-    const nextBtn = document.createElement("button");
-    nextBtn.className = "mobile-job-nav__btn";
-    nextBtn.textContent = "\u203A";
-    nextBtn.setAttribute("aria-label", "Next job");
-
-    nav.appendChild(prevBtn);
-    nav.appendChild(counter);
-    nav.appendChild(nextBtn);
-
-    jobsContainer.parentNode.insertBefore(nav, jobsContainer);
-
-    const cards = Array.from(jobsContainer.querySelectorAll(".job-card"));
-    let currentIndex = 0;
-
-    const scrollToCard = (index) => {
-      if (cards[index]) {
-        cards[index].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
-      }
-    };
-
-    prevBtn.addEventListener("click", () => {
-      if (currentIndex > 0) {
-        currentIndex--;
-        scrollToCard(currentIndex);
-      }
-    });
-
-    nextBtn.addEventListener("click", () => {
-      if (currentIndex < cards.length - 1) {
-        currentIndex++;
-        scrollToCard(currentIndex);
-      }
-    });
-
-    mobileNavObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const idx = cards.indexOf(entry.target);
-            if (idx !== -1) {
-              currentIndex = idx;
-              counter.textContent = `${idx + 1} of ${filtered.length}`;
-            }
-          }
-        });
-      },
-      { root: jobsContainer, threshold: 0.6 }
-    );
-
-    cards.forEach((c) => mobileNavObserver.observe(c));
   }
+};
+
+export const renderJobs = () => {
+  const filtered = getFilteredJobs();
+
+  if (mobileNavObserver) {
+    mobileNavObserver.disconnect();
+    mobileNavObserver = null;
+  }
+
+  const filteredIds = new Set(filtered.map((j) => j.id));
+  for (const id of state.selectedJobs) {
+    if (!filteredIds.has(id)) state.selectedJobs.delete(id);
+  }
+  updateBulkBar();
+
+  const existingSelectAll = document.querySelector(".bulk-select-all-bar");
+  if (existingSelectAll) existingSelectAll.remove();
+  if (filtered.length > 0) {
+    const selectAllBar = document.createElement("div");
+    selectAllBar.className = "bulk-select-all-bar";
+    selectAllBar.innerHTML = `<label class="toggle-label"><input type="checkbox" class="bulk-select-all" ${
+      state.selectedJobs.size === filtered.length && filtered.length > 0 ? "checked" : ""
+    } /> Select all (${filtered.length})</label>`;
+    jobsContainer.parentNode.insertBefore(selectAllBar, jobsContainer);
+    const selectAllCb = selectAllBar.querySelector(".bulk-select-all");
+    selectAllCb.addEventListener("change", () => {
+      if (selectAllCb.checked) {
+        filtered.forEach((j) => state.selectedJobs.add(j.id));
+      } else {
+        state.selectedJobs.clear();
+      }
+      document.querySelectorAll(".bulk-check").forEach((cb) => {
+        cb.checked = selectAllCb.checked;
+      });
+      updateBulkBar();
+    });
+  }
+
+  const listEl = document.getElementById("job-list");
+  const detailEl = document.getElementById("job-detail");
+  if (!listEl || !detailEl) {
+    jobsContainer.innerHTML = `<div class="detail-box">Layout error: job list panel missing.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = "";
+  detailEl.innerHTML = "";
 
   if (!filtered.length) {
-    jobsContainer.innerHTML = `<div class="detail-box">No roles match these filters yet. Try lowering the fit threshold or clearing filters.</div>`;
+    detailEl.innerHTML = `<div class="job-detail-empty">No roles match these filters yet. Try lowering the fit threshold or clearing filters.</div>`;
+    return;
   }
+
+  if (!state.selectedJobId || !filteredIds.has(state.selectedJobId)) {
+    state.selectedJobId = filtered[0].id;
+  }
+
+  filtered.forEach((job) => {
+    const statusValue = (job.application_status || "saved").toLowerCase();
+    const statusLabel = formatStatusLabel(statusValue);
+    const postedDisplay = job.posted_raw || job.posted || job.posted_date || "";
+    const applicantDisplay = job.applicant_count ? ` · ${job.applicant_count} applicants` : "";
+    const openStatus =
+      job.job_status ||
+      (job.is_open === true ? "Open" : "") ||
+      (job.is_open === false ? "Closed" : "") ||
+      (job.is_closed ? "Closed" : "");
+    const statusSuffix = openStatus ? ` · ${openStatus}` : "";
+    const isManual = job.manual_link || job.source === "Manual";
+
+    const item = document.createElement("div");
+    item.className = `job-list-item${job.id === state.selectedJobId ? " is-active" : ""}`;
+    item.innerHTML = `
+      <label class="bulk-check-label"><input type="checkbox" class="bulk-check" data-job-id="${escapeHtml(job.id)}" ${
+      state.selectedJobs.has(job.id) ? "checked" : ""
+    } /></label>
+      <div class="job-list-main">
+        <div class="job-list-title">${escapeHtml(job.role)}</div>
+        <div class="job-list-company">${escapeHtml(job.company || "Company not listed")}</div>
+        <div class="job-list-meta">${escapeHtml(formatPosted(postedDisplay))} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
+        <div class="job-list-meta">Status: ${escapeHtml(statusLabel)}</div>
+      </div>
+      <div class="job-list-badges">
+        <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
+        ${isManual ? `<span class="badge badge--manual">Pasted</span>` : ""}
+      </div>
+    `;
+
+    const bulkCheck = item.querySelector(".bulk-check");
+    if (bulkCheck) {
+      bulkCheck.addEventListener("change", (event) => {
+        event.stopPropagation();
+        if (bulkCheck.checked) {
+          state.selectedJobs.add(job.id);
+        } else {
+          state.selectedJobs.delete(job.id);
+        }
+        updateBulkBar();
+      });
+    }
+
+    item.addEventListener("click", () => {
+      state.selectedJobId = job.id;
+      document.querySelectorAll(".job-list-item").forEach((el) => el.classList.remove("is-active"));
+      item.classList.add("is-active");
+      renderJobDetail(job, detailEl);
+    });
+
+    listEl.appendChild(item);
+  });
+
+  const selectedJob = filtered.find((j) => j.id === state.selectedJobId) || filtered[0];
+  renderJobDetail(selectedJob, detailEl);
 };
 
 state.handlers.renderJobs = renderJobs;

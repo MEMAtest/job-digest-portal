@@ -41,6 +41,7 @@ export const alertBanner = document.getElementById("alert-banner");
 export const followUpBanner = document.getElementById("follow-up-banner");
 export const triagePrompt = document.getElementById("triage-prompt");
 export const lastUpdatedLabel = document.getElementById("last-updated-label");
+export const lastUpdatedFooter = document.getElementById("last-updated-footer");
 export const prepOverlay = document.getElementById("prep-overlay");
 export const prepOverlayTitle = document.getElementById("prep-overlay-title");
 export const prepOverlayMeta = document.getElementById("prep-overlay-meta");
@@ -91,6 +92,7 @@ export const state = {
   triageStats: { dismissed: 0, shortlisted: 0, apply: 0 },
   triageLastAction: null,
   selectedJobs: new Set(),
+  selectedJobId: null,
   baseCvSections: null,
   cvHubSort: { field: "fit_score", dir: "desc" },
   cvHubFilter: "all",

@@ -35,6 +35,7 @@ import {
   escapeHtml,
   showToast,
   lastUpdatedLabel,
+  lastUpdatedFooter,
 } from "./app.core.js";
 import { renderFilters, renderJobs } from "./app.jobs.js";
 import { renderApplyHub } from "./app.applyhub.js";
@@ -137,6 +138,15 @@ if (quickDismissed) {
 }
 
 if (manualLinkSubmit) {
+  const triggerRunRequest = async () => {
+    if (!db) {
+      throw new Error("Missing Firebase config.");
+    }
+    const ref = doc(db, runRequestsCollection, "latest");
+    await setDoc(ref, { status: "pending", requested_at: new Date().toISOString() });
+    return ref;
+  };
+
   const submitManualLink = async () => {
     const link = manualLinkInput?.value?.trim() || "";
     if (!link) {
@@ -162,7 +172,8 @@ if (manualLinkSubmit) {
         created_at: new Date().toISOString(),
       });
       if (manualLinkInput) manualLinkInput.value = "";
-      showToast("Link queued. It will appear after the next run.");
+      await triggerRunRequest();
+      showToast("Link queued and run triggered.");
     } catch (err) {
       console.error(err);
       showToast("Failed to queue link.");
@@ -241,6 +252,7 @@ const loadJobs = async () => {
     const nowLabel = new Date().toLocaleString();
     summaryLine.textContent = `${jobs.length} roles loaded · Last update ${nowLabel}`;
     if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${nowLabel}`;
+    if (lastUpdatedFooter) lastUpdatedFooter.textContent = `Updated: ${nowLabel}`;
   } catch (error) {
     console.error(error);
     const message = error?.message || "Unknown error";

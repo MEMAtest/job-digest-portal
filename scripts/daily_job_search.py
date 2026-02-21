@@ -1893,10 +1893,15 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
         }
         is_new_doc = not existing_data
         effective_threshold = min(AUTO_DISMISS_BELOW, 70) if AUTO_DISMISS_BELOW > 0 else 0
+        existing_status = (existing_data.get("application_status") or "").lower()
+        if record.source == "Manual":
+            data["manual_link"] = True
         if is_new_doc and effective_threshold and record.fit_score < effective_threshold:
             data["application_status"] = "dismissed"
             data["dismiss_reason"] = f"auto_low_fit_{effective_threshold}"
-        elif not existing_data.get("application_status"):
+        elif record.source == "Manual" and (not existing_status or existing_status in {"saved", "new"}):
+            data["application_status"] = "shortlisted"
+        elif not existing_status:
             data["application_status"] = "saved"
         optional_fields = {
             "role_summary": record.role_summary,
