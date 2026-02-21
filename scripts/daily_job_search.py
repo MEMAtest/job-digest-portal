@@ -2091,6 +2091,76 @@ def write_role_suggestions() -> None:
         return
 
 
+def backfill_role_summaries(limit: Optional[int] = None) -> None:
+    client = init_firestore_client()
+    if client is None:
+        print("Backfill skipped: Firestore client not available.")
+        return
+
+    records: List[JobRecord] = []
+    doc_ids: List[str] = []
+    processed = 0
+
+    try:
+        for doc in client.collection(FIREBASE_COLLECTION).stream():
+            data = doc.to_dict() or {}
+            role = data.get("role") or ""
+            if not role:
+                continue
+            notes = data.get("notes") or data.get("role_summary") or ""
+            record = JobRecord(
+                role=role,
+                company=data.get("company") or "",
+                location=data.get("location") or "",
+                link=data.get("link") or "",
+                posted=data.get("posted") or "",
+                posted_raw=data.get("posted_raw") or data.get("posted") or "",
+                posted_date=data.get("posted_date") or "",
+                source=data.get("source") or "",
+                fit_score=int(data.get("fit_score") or 0),
+                preference_match=data.get("preference_match") or "",
+                why_fit=data.get("why_fit") or "",
+                cv_gap=data.get("cv_gap") or "",
+                notes=notes,
+            )
+            records.append(record)
+            doc_ids.append(doc.id)
+            processed += 1
+            if limit and processed >= limit:
+                break
+    except Exception as exc:
+        print(f"Backfill failed while reading jobs: {exc}")
+        return
+
+    if not records:
+        print("Backfill skipped: no jobs found.")
+        return
+
+    if GROQ_API_KEY and GroqClient is not None:
+        records = enhance_records_with_groq(records)
+    elif GEMINI_API_KEY and genai is not None:
+        records = enhance_records_with_gemini(records)
+    else:
+        print("Backfill skipped: no LLM keys configured.")
+        return
+
+    updated = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for doc_id, record in zip(doc_ids, records):
+        if not record.role_summary:
+            continue
+        try:
+            client.collection(FIREBASE_COLLECTION).document(doc_id).set(
+                {"role_summary": record.role_summary, "updated_at": now_iso},
+                merge=True,
+            )
+            updated += 1
+        except Exception:
+            continue
+
+    print(f"Backfill complete: updated {updated} role summaries.")
+
+
 def write_candidate_prep() -> None:
     client = init_firestore_client()
     if client is None:
@@ -4755,10 +4825,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Daily job digest runner")
     parser.add_argument("--smoke-test", action="store_true", help="Run a source connectivity smoke test")
     parser.add_argument("--force", action="store_true", help="Force a run outside schedule")
+    parser.add_argument(
+        "--backfill-role-summary",
+        action="store_true",
+        help="Regenerate role summaries for existing Firestore jobs",
+    )
+    parser.add_argument(
+        "--backfill-limit",
+        type=int,
+        default=0,
+        help="Limit number of jobs to backfill (0 = all)",
+    )
     args = parser.parse_args()
 
     if args.smoke_test:
         run_smoke_test()
+    elif args.backfill_role_summary:
+        backfill_role_summaries(limit=args.backfill_limit or None)
     else:
         if not should_run_now(force=args.force):
             print("Skipping run: outside scheduled run window or already sent for this slot.")
