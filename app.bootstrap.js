@@ -34,6 +34,7 @@ import {
   db,
   escapeHtml,
   showToast,
+  lastUpdatedLabel,
 } from "./app.core.js";
 import { renderFilters, renderJobs } from "./app.jobs.js";
 import { renderApplyHub } from "./app.applyhub.js";
@@ -237,7 +238,9 @@ const loadJobs = async () => {
     renderCvHub();
     renderTriagePrompt(jobs);
 
-    summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
+    const nowLabel = new Date().toLocaleString();
+    summaryLine.textContent = `${jobs.length} roles loaded · Last update ${nowLabel}`;
+    if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${nowLabel}`;
   } catch (error) {
     console.error(error);
     const message = error?.message || "Unknown error";

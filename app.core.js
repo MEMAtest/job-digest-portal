@@ -40,6 +40,7 @@ export const breadcrumbLine = document.getElementById("breadcrumb");
 export const alertBanner = document.getElementById("alert-banner");
 export const followUpBanner = document.getElementById("follow-up-banner");
 export const triagePrompt = document.getElementById("triage-prompt");
+export const lastUpdatedLabel = document.getElementById("last-updated-label");
 export const prepOverlay = document.getElementById("prep-overlay");
 export const prepOverlayTitle = document.getElementById("prep-overlay-title");
 export const prepOverlayMeta = document.getElementById("prep-overlay-meta");
