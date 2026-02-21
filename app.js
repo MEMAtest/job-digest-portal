@@ -1122,7 +1122,12 @@ const renderTriageCard = () => {
       </div>
     `;
     const doneBtn = triageContent.querySelector(".triage-done-btn");
-    if (doneBtn) doneBtn.addEventListener("click", () => { closeTriageMode(); renderJobs(); renderApplyHub(); });
+    if (doneBtn) doneBtn.addEventListener("click", () => {
+      safeLocalStorageSet("last_triage_date", getTodayKey());
+      closeTriageMode();
+      renderJobs();
+      renderApplyHub();
+    });
     triageProgress.textContent = "Done!";
     return;
   }
@@ -4007,7 +4012,11 @@ const checkNewJobNotifications = (jobs) => {
 // Wrap loadJobs to add notification check after load
 const loadJobsAndNotify = async () => {
   await loadJobs();
-  if (state.jobs.length) checkNewJobNotifications(state.jobs);
+  if (state.jobs.length) {
+    checkNewJobNotifications(state.jobs);
+    await checkFirestoreNotifications();
+    triggerFollowUpNotifications(state.jobs);
+  }
 };
 
 loadJobsAndNotify();
