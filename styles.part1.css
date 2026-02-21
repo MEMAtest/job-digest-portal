@@ -382,6 +382,13 @@ body {
   color: #0f172a;
 }
 
+.job-card__company {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  margin-top: 2px;
+}
+
 .job-card__meta {
   color: #64748b;
   font-size: 13px;
@@ -437,10 +444,16 @@ body {
 
 .job-card__details {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
   overflow: visible;
   padding-bottom: 0;
+}
+
+.job-card__details.detail-carousel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
 }
 
 .detail-box {

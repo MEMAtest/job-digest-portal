@@ -280,16 +280,24 @@ export const copyToClipboard = async (text) => {
   }
 };
 
+const flattenItem = (item) => {
+  if (typeof item === "object" && item !== null && !Array.isArray(item)) {
+    return Object.entries(item).map(([k, v]) => `**${k}:** ${v}`).join("\n");
+  }
+  const s = String(item).trim();
+  // Detect Python dict string: {'Key': 'value', ...}
+  const pairs = [...s.matchAll(/['"](\w[\w\s]*)['"]:\s*['"]([^'"]+)['"](?=\s*[,}])/g)];
+  if (pairs.length >= 2) return pairs.map(([, k, v]) => `**${k}:** ${v}`).join("\n");
+  return s;
+};
+
 export const normaliseList = (items) => {
   if (!items) return [];
-  if (Array.isArray(items)) return items;
+  if (Array.isArray(items)) return items.map(flattenItem);
   if (typeof items === "string") {
-    return items
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
+    return items.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   }
-  return [String(items)];
+  return [flattenItem(items)];
 };
 
 export const formatList = (items) => {

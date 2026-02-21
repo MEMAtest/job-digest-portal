@@ -21,13 +21,14 @@ import {
   escapeHtml,
   copyToClipboard,
   showToast,
+  showConfirmToast,
   formatApplicantBadge,
   quickFilterPredicate,
   uniqueCompanyOnly,
 } from "./app.core.js";
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply } from "./app.applyhub.js";
-import { getTailoredCvPlainText, buildTailoredCvHtml } from "./app.cv.js";
+import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
 
 let mobileNavObserver = null;
 
@@ -113,7 +114,29 @@ const handleBulkAction = async (action) => {
   updateBulkBar();
   renderJobs();
   if (state.handlers.renderApplyHub) state.handlers.renderApplyHub();
-  showToast(`${ids.length} job${ids.length > 1 ? "s" : ""} updated`);
+  const label = action.replace(/_/g, " ");
+  showConfirmToast(
+    `${ids.length} job${ids.length > 1 ? "s" : ""} → ${label}`,
+    "Undo",
+    async () => {
+      for (const jobId of ids) {
+        const job = state.jobs.find((j) => j.id === jobId);
+        if (!job) continue;
+        job.application_status = "saved";
+        if (db) {
+          try {
+            await updateDoc(doc(db, collectionName, job.id), {
+              application_status: "saved",
+              updated_at: new Date().toISOString(),
+            });
+          } catch (_) {}
+        }
+      }
+      renderJobs();
+      if (state.handlers.renderApplyHub) state.handlers.renderApplyHub();
+      showToast("Undone");
+    }
+  );
 };
 
 export const getFilteredJobs = () => {
@@ -228,7 +251,7 @@ export const renderJobs = () => {
     } /></label>
         <div>
           <div class="job-card__title">${escapeHtml(job.role)}</div>
-          <div class="job-card__meta">${escapeHtml(job.company)}</div>
+          <div class="job-card__company">${escapeHtml(job.company)}</div>
           <div class="job-card__meta">${escapeHtml(formatPosted(job.posted))} · ${escapeHtml(job.source)}</div>
           <div class="job-card__meta">Status: ${escapeHtml(statusValue)}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
         </div>
@@ -562,25 +585,25 @@ export const renderJobs = () => {
 
     const downloadCvBtn = card.querySelector(".download-cv-btn");
     if (downloadCvBtn) {
-      downloadCvBtn.addEventListener("click", () => {
-        if (typeof html2pdf === "undefined") {
-          showToast("PDF library failed to load. Check your connection.");
-          return;
-        }
+      downloadCvBtn.addEventListener("click", async () => {
         const target = state.jobs.find((item) => item.id === downloadCvBtn.dataset.jobId);
         if (!target) return;
         const htmlEl = buildTailoredCvHtml(target);
         const companySlug = (target.company || "Company").replace(/[^a-zA-Z0-9]/g, "");
-        html2pdf()
-          .set({
-            margin: [10, 15],
-            filename: `AdeOmosanya_CV_${companySlug}.pdf`,
-            html2canvas: { scale: 2 },
-            jsPDF: { unit: "mm", format: "a4" },
-          })
-          .from(htmlEl)
-          .save();
-        showToast("Generating PDF…");
+        const options = {
+          margin: [10, 15],
+          filename: `AdeOmosanya_CV_${companySlug}.pdf`,
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: "mm", format: "a4" },
+        };
+        try {
+          showToast("Generating PDF…");
+          await renderPdfFromElement(htmlEl, options);
+          showToast("PDF ready");
+        } catch (err) {
+          console.error(err);
+          showToast("PDF failed to generate.");
+        }
       });
     }
 

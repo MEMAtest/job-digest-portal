@@ -14,7 +14,7 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "./app.core.js";
-import { getTailoredCvPlainText, buildTailoredCvHtml } from "./app.cv.js";
+import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
 import { hasCvTailoredChanges } from "./app.applyhub.js";
 
 const loadCvHubSort = () => {
@@ -298,6 +298,7 @@ export const renderCvHub = () => {
       </div>
       <div class="cv-hub-header__right">
         <button class="btn btn-secondary cv-base-download">Download base CV</button>
+        <button class="btn btn-secondary cv-base-preview">Preview CV</button>
         <button class="btn btn-tertiary cv-base-copy">Copy base CV text</button>
       </div>
     </div>
@@ -320,6 +321,7 @@ export const renderCvHub = () => {
     <div class="cv-base-card">
       <h3>Base CV</h3>
       <p>Edit and save your master CV. Changes are used as a baseline for tailoring.</p>
+      <p class="cv-base-hint" style="font-size:12px;color:#64748b;margin:0 0 12px;padding:8px 12px;background:#f0f9ff;border-radius:8px;border:1px solid #bae6fd;">Sections above (Summary, Achievements, Vistra, Ebury) are tailored per job. Roles below Ebury are fixed across all applications.</p>
       <div class="cv-base-sections">
         ${sectionDefs
           .map((sec) => {
@@ -413,6 +415,7 @@ export const renderCvHub = () => {
         <div class="hub-card__actions">
           <button class="btn btn-primary cv-pack-download-full" data-job-id="${escapeHtml(job.id)}">Download Full Pack</button>
           <button class="btn btn-secondary cv-pack-download-cv" data-job-id="${escapeHtml(job.id)}">Download CV PDF</button>
+          <button class="btn btn-tertiary cv-pack-preview" data-job-id="${escapeHtml(job.id)}">Preview</button>
           <button class="btn btn-tertiary cv-pack-copy-cv" data-job-id="${escapeHtml(job.id)}">Copy CV Text</button>
           <button class="btn btn-tertiary cv-pack-compare" data-job-id="${escapeHtml(job.id)}">Compare vs Base</button>
         </div>
@@ -424,6 +427,17 @@ export const renderCvHub = () => {
   if (hasMore) {
     html += `<button class="btn btn-secondary cv-hub-show-more" style="width:100%;margin-top:16px;">Show more (${sortedJobs.length - cvHubShowCount} remaining)</button>`;
   }
+
+  html += `<div class="cv-preview-modal">
+    <div class="cv-preview-modal__backdrop"></div>
+    <div class="cv-preview-modal__content">
+      <div class="cv-preview-modal__header">
+        <h3>CV Preview</h3>
+        <button class="cv-preview-modal__close">&times;</button>
+      </div>
+      <div class="cv-preview-modal__body"></div>
+    </div>
+  </div>`;
 
   hub.innerHTML = html;
 
@@ -504,7 +518,7 @@ export const renderCvHub = () => {
       const cvEl = buildTailoredCvHtml({ tailored_cv_sections: {} });
       const opt = { margin: [10, 10, 10, 10], filename: "CV_Base.pdf", html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4" } };
       try {
-        await html2pdf().set(opt).from(cvEl).save();
+        await renderPdfFromElement(cvEl, opt);
         showToast("Base CV downloaded");
       } catch (err) {
         console.error(err);
@@ -519,6 +533,40 @@ export const renderCvHub = () => {
       copyToClipboard(getTailoredCvPlainText({ tailored_cv_sections: {} }));
     });
   }
+
+  const openPreviewModal = (jobOrEmpty) => {
+    const modal = hub.querySelector(".cv-preview-modal");
+    if (!modal) return;
+    const body = modal.querySelector(".cv-preview-modal__body");
+    body.innerHTML = "";
+    const cvEl = buildTailoredCvHtml(jobOrEmpty);
+    body.appendChild(cvEl);
+    modal.classList.add("cv-preview-modal--visible");
+  };
+
+  const closePreviewModal = () => {
+    const modal = hub.querySelector(".cv-preview-modal");
+    if (!modal) return;
+    modal.classList.remove("cv-preview-modal--visible");
+  };
+
+  const modal = hub.querySelector(".cv-preview-modal");
+  if (modal) {
+    modal.querySelector(".cv-preview-modal__backdrop")?.addEventListener("click", closePreviewModal);
+    modal.querySelector(".cv-preview-modal__close")?.addEventListener("click", closePreviewModal);
+  }
+
+  const basePreviewBtn = hub.querySelector(".cv-base-preview");
+  if (basePreviewBtn) {
+    basePreviewBtn.addEventListener("click", () => openPreviewModal({ tailored_cv_sections: {} }));
+  }
+
+  hub.querySelectorAll(".cv-pack-preview").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const job = state.jobs.find((j) => j.id === btn.dataset.jobId);
+      if (job) openPreviewModal(job);
+    });
+  });
 
   hub.querySelectorAll(".cv-pack-edit-section").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -588,7 +636,7 @@ export const renderCvHub = () => {
       const filename = `ApplicationPack_${job.company}_${job.role}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, "_");
       const opt = { margin: [10, 10, 10, 10], filename, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4" } };
       try {
-        await html2pdf().set(opt).from(packEl).save();
+        await renderPdfFromElement(packEl, opt);
         showToast("Application pack downloaded");
       } catch (err) {
         console.error(err);
@@ -605,7 +653,7 @@ export const renderCvHub = () => {
       const filename = `CV_${job.company}_${job.role}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, "_");
       const opt = { margin: [10, 10, 10, 10], filename, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4" } };
       try {
-        await html2pdf().set(opt).from(cvEl).save();
+        await renderPdfFromElement(cvEl, opt);
         showToast("CV downloaded");
       } catch (err) {
         console.error(err);

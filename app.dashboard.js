@@ -75,11 +75,11 @@ const buildModelAnswer = (question, prep) => {
   const example = summariseStar(normaliseList(prep.star_stories || [])[0] || "");
 
   const opener = prep.quick_pitch
-    ? `Anchor with: ${stripMarkdown(prep.quick_pitch)}`
+    ? truncateText(stripMarkdown(prep.quick_pitch), 200)
     : "Start with a crisp one-line summary of your fit.";
 
   const blocks = [
-    `<p><strong>Model answer (9/10):</strong> ${formatInlineText(opener)}</p>`,
+    `<p><strong>Open with:</strong> ${formatInlineText(opener)}</p>`,
   ];
 
   if (stats.length) {
@@ -298,12 +298,7 @@ const renderPrepDetail = () => {
     const stats = normaliseList(prep.key_stats || []);
     prepDetailTitle.textContent = "Key Stats";
     prepDetailMeta.textContent = `${stats.length} proof points.`;
-    prepDetailContent.innerHTML = `
-      <details class="prep-detail-card">
-        <summary>Key stats</summary>
-        <div class="prep-detail-card__body">${formatList(stats)}</div>
-      </details>
-    `;
+    prepDetailContent.innerHTML = renderDetailCards(stats, "Stat", "key_stats");
     return;
   }
 
@@ -311,12 +306,7 @@ const renderPrepDetail = () => {
     const strengths = normaliseList(prep.strengths || []);
     prepDetailTitle.textContent = "Strengths";
     prepDetailMeta.textContent = `${strengths.length} themes to emphasise.`;
-    prepDetailContent.innerHTML = `
-      <details class="prep-detail-card">
-        <summary>Strengths</summary>
-        <div class="prep-detail-card__body">${formatList(strengths)}</div>
-      </details>
-    `;
+    prepDetailContent.innerHTML = renderDetailCards(strengths, "Strength", "strengths");
     return;
   }
 
@@ -324,12 +314,7 @@ const renderPrepDetail = () => {
     const risks = normaliseList(prep.risk_mitigations || []);
     prepDetailTitle.textContent = "Risk Mitigations";
     prepDetailMeta.textContent = `${risks.length} mitigations ready.`;
-    prepDetailContent.innerHTML = `
-      <details class="prep-detail-card">
-        <summary>Risk mitigations</summary>
-        <div class="prep-detail-card__body">${formatList(risks)}</div>
-      </details>
-    `;
+    prepDetailContent.innerHTML = renderDetailCards(risks, "Mitigation", "risk_mitigations");
     return;
   }
 

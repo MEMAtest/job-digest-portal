@@ -2090,18 +2090,23 @@ def write_candidate_prep() -> None:
         stories = [stories]
     stories = [str(s).strip() for s in stories if str(s).strip()]
     quick_pitch = data.get("quick_pitch", "")
+    def flatten_item(item):
+        if isinstance(item, dict):
+            return " — ".join(f"{k}: {v}" for k, v in item.items())
+        return str(item).strip()
+
     strengths = data.get("strengths", [])
     if isinstance(strengths, str):
         strengths = [strengths]
-    strengths = [str(s).strip() for s in strengths if str(s).strip()]
+    strengths = [flatten_item(s) for s in strengths if flatten_item(s)]
     risk_mitigations = data.get("risk_mitigations", [])
     if isinstance(risk_mitigations, str):
         risk_mitigations = [risk_mitigations]
-    risk_mitigations = [str(s).strip() for s in risk_mitigations if str(s).strip()]
+    risk_mitigations = [flatten_item(s) for s in risk_mitigations if flatten_item(s)]
     interview_questions = data.get("interview_questions", [])
     if isinstance(interview_questions, str):
         interview_questions = [interview_questions]
-    interview_questions = [str(s).strip() for s in interview_questions if str(s).strip()]
+    interview_questions = [flatten_item(s) for s in interview_questions if flatten_item(s)]
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     payload = {

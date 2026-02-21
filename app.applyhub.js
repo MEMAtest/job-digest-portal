@@ -247,14 +247,12 @@ export const renderApplyHub = () => {
 
   const readyJobs = state.jobs.filter((j) => (j.application_status || "saved").toLowerCase() === "ready_to_apply");
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const recentlyApplied = state.jobs.filter((j) => {
-    if ((j.application_status || "saved").toLowerCase() !== "applied") return false;
-    const dt = parseDateValue(j.application_date);
-    return dt && dt >= sevenDaysAgo;
-  });
+  const appliedStatuses = ["applied", "interview", "offer"];
+  const trackedJobs = state.jobs.filter((j) =>
+    appliedStatuses.includes((j.application_status || "saved").toLowerCase())
+  );
 
-  if (!readyJobs.length && !recentlyApplied.length) {
+  if (!readyJobs.length && !trackedJobs.length) {
     hubContainer.innerHTML = `
       <div class="hub-empty">
         <h3>No jobs ready to apply</h3>
@@ -265,7 +263,7 @@ export const renderApplyHub = () => {
   }
 
   const sortedReady = sortHubJobs(readyJobs);
-  const sortedApplied = sortHubJobs(recentlyApplied);
+  const sortedApplied = sortHubJobs(trackedJobs);
 
   const sortOptions = [
     { field: "fit_score", label: "Fit" },
@@ -417,7 +415,7 @@ export const renderApplyHub = () => {
     html += sortedReady.map((j) => renderHubCard(j, false)).join("");
   }
   if (sortedApplied.length) {
-    html += `<div class="section-title" style="margin-top:24px;margin-bottom:12px;">Recently Applied (${sortedApplied.length})</div>`;
+    html += `<div class="section-title" style="margin-top:24px;margin-bottom:12px;">Application Tracker (${sortedApplied.length})</div>`;
     html += sortedApplied.map((j) => renderHubCard(j, true)).join("");
   }
 
