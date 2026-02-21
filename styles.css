@@ -59,12 +59,14 @@ body {
   opacity: 0.6;
   animation: pulseGlow 2.4s ease-in-out infinite;
   z-index: 0;
+  pointer-events: none;
 }
 
 .logo-mark {
   width: 32px;
   height: 32px;
   z-index: 1;
+  position: relative;
 }
 
 @keyframes pulseGlow {
