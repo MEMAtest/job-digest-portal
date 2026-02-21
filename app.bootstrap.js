@@ -115,6 +115,21 @@ document.querySelectorAll(".prep-tab").forEach((btn) => {
   btn.addEventListener("click", () => switchPrepTab(btn.dataset.prepTab));
 });
 
+const quickShortlisted = document.getElementById("quick-shortlisted");
+const quickDismissed = document.getElementById("quick-dismissed");
+if (quickShortlisted) {
+  quickShortlisted.addEventListener("click", () => {
+    if (statusSelect) statusSelect.value = "shortlisted";
+    renderJobs();
+  });
+}
+if (quickDismissed) {
+  quickDismissed.addEventListener("click", () => {
+    if (statusSelect) statusSelect.value = "dismissed";
+    renderJobs();
+  });
+}
+
 setActiveTab("dashboard");
 
 const loadJobs = async () => {
