@@ -216,7 +216,6 @@
   border-radius: 18px;
   padding: 20px 24px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  min-height: 420px;
 }
 
 .prep-detail__header h3 {
@@ -403,6 +402,7 @@
   .prep-board__list {
     position: static;
     max-height: none;
+    padding: 14px;
   }
 
   .prep-card-list {
@@ -410,19 +410,25 @@
     overflow-x: auto;
     overflow-y: hidden;
     max-height: none;
-    padding-bottom: 6px;
+    padding-bottom: 8px;
     scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
   }
 
   .prep-card {
-    min-width: 220px;
+    min-width: 150px;
+    max-width: 180px;
+    flex-shrink: 0;
     scroll-snap-align: start;
   }
 
+  .prep-card__preview {
+    display: none;
+  }
+
   .prep-board__detail {
-    max-height: 70vh;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    min-height: auto;
+    padding: 16px;
   }
 }
 
