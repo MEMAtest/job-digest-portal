@@ -234,7 +234,7 @@ const loadHubSort = () => {
   } catch (error) {
     // ignore
   }
-  return { field: "fit_score", asc: false };
+  return { field: "fit_score", dir: "desc" };
 };
 
 const saveHubSort = (sort) => {
@@ -1490,9 +1490,9 @@ const buildPreviewText = (html) => {
 };
 
 const sortHubJobs = (jobs) => {
-  const sort = state.hubSort || { field: "fit_score", asc: false };
+  const sort = state.hubSort || { field: "fit_score", dir: "desc" };
   const sorted = [...jobs];
-  const dir = sort.asc ? 1 : -1;
+  const dir = sort.dir === "asc" ? 1 : -1;
 
   sorted.sort((a, b) => {
     if (sort.field === "company") {
@@ -1558,7 +1558,7 @@ const renderApplyHub = () => {
     { field: "applicant_count", label: "Applicants" },
   ];
 
-  const currentSort = state.hubSort || { field: "fit_score", asc: false };
+  const currentSort = state.hubSort || { field: "fit_score", dir: "desc" };
 
   const renderHubCard = (job, isApplied) => {
     const statusValue = (job.application_status || "saved").toLowerCase();
@@ -1685,7 +1685,7 @@ const renderApplyHub = () => {
         ${sortOptions
           .map((opt) => {
             const active = currentSort.field === opt.field;
-            const arrow = active ? (currentSort.asc ? "↑" : "↓") : "";
+            const arrow = active ? (currentSort.dir === "asc" ? "↑" : "↓") : "";
             return `<button class="hub-sort__pill ${active ? "active" : ""}" data-sort="${opt.field}">${opt.label} ${arrow}</button>`;
           })
           .join("")}
@@ -1711,10 +1711,10 @@ const renderApplyHub = () => {
       const field = btn.dataset.sort;
       if (!field) return;
       if (state.hubSort.field === field) {
-        state.hubSort.asc = !state.hubSort.asc;
+        state.hubSort.dir = state.hubSort.dir === "asc" ? "desc" : "asc";
       } else {
         state.hubSort.field = field;
-        state.hubSort.asc = field === "company";
+        state.hubSort.dir = field === "company" ? "asc" : "desc";
       }
       saveHubSort(state.hubSort);
       renderApplyHub();
@@ -2171,7 +2171,7 @@ const buildSideBySideDiff = (job) => {
 
 const getCvHubJobs = () => {
   return state.jobs.filter(
-    (j) => hasCvTailoredChanges(j) || j.cover_letter || (j.key_requirements && j.key_requirements.length > 0)
+    (j) => hasCvTailoredChanges(j) || j.cover_letter
   );
 };
 
