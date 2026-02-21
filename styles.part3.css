@@ -283,6 +283,74 @@
   color: #3730a3;
 }
 
+.hub-filter-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.hub-filter__pill {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.hub-filter__pill.active {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: #3730a3;
+}
+
+.hub-card__tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.cv-base-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.cv-base-card__header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.cv-base-card__header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+.cv-base-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.hub-compare-container {
+  margin-top: 8px;
+}
+
+.cv-preview-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .hub-card__progress {
   display: flex;
   align-items: center;

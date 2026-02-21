@@ -1,4 +1,4 @@
-import { state, db, doc, getDoc, escapeHtml } from "./app.core.js";
+import { state, getDb, doc, getDoc, escapeHtml } from "./app.core.js";
 
 export const renderPdfFromElement = async (element, options) => {
   if (typeof html2pdf === "undefined") {
@@ -24,21 +24,21 @@ export const renderPdfFromElement = async (element, options) => {
 const BASE_CV_SECTIONS = {
   summary: "13+ years in financial crime product and operations management, delivering onboarding and screening platform transformations across EMEA, AMER and APAC. Independently created and deployed three live RegTech products used by compliance officers and regulated firms. Led enterprise KYC and screening platform strategy and configuration (Fenergo, Napier, Enate) for thousands of business clients globally, designing scalable 1st line controls and operating models. Proven stakeholder manager from front office to C-suite.",
   key_achievements: [
-    "55% reduction in client onboarding time (45 days → 20 days) across EMEA, AMER and APAC",
+    "55% reduction in client onboarding time (45 days \u2192 20 days) across EMEA, AMER and APAC",
     "20% operational headcount efficiency through workflow automation",
     "18+ reporting dashboards deployed, used by hundreds of users across APAC and EMEA",
     "3 live RegTech products independently created and deployed using AI-assisted development",
     "Napier screening implementation was subsequently validated by Dutch DNB effectiveness assessment",
     "12 BaFin audit points closed, mitigating multimillion-pound fine exposure",
-    "£120k ARR secured from Tier 1 global bank proof of concept",
+    "\u00a3120k ARR secured from Tier 1 global bank proof of concept",
   ],
   vistra_bullets: [
     "Led 1st line design and implementation of business onboarding and financial crime controls for corporate and fund clients, using Fenergo (KYC), Napier (screening) and Enate (orchestration) across EMEA, AMER and APAC",
-    "Defined platform feature requirements and competitor positioning; secured £400k+ business case sign-off",
+    "Defined platform feature requirements and competitor positioning; secured \u00a3400k+ business case sign-off",
     "Led vendor evaluation and pricing negotiation, balancing regulatory and commercial constraints",
-    "Defined Fenergo KYC product model across EMEA, AMER and APAC — global consistency with jurisdiction-specific CDD/EDD logic",
+    "Defined Fenergo KYC product model across EMEA, AMER and APAC \u2014 global consistency with jurisdiction-specific CDD/EDD logic",
     "Owned Napier screening design and capacity framework; validated by Dutch DNB effectiveness assessment",
-    "Created Enate orchestration layer from fragmented processes — 55% faster onboarding (45 → 20 days), thousands of clients annually",
+    "Created Enate orchestration layer from fragmented processes \u2014 55% faster onboarding (45 \u2192 20 days), thousands of clients annually",
     "Gathered requirements and built Power BI suite (screening, KYC, onboarding dashboards) through direct discovery with APAC, AMER and EMEA teams",
     "Managed 4 Business Analysts (reporting, data migration, SOPs, tech implementation); coordinated delivery across engineering, compliance, and front office",
     "Chaired SteerCo with CFO/COO; delivered QA academy for 150+ analysts across 20 countries",
@@ -47,16 +47,16 @@ const BASE_CV_SECTIONS = {
     "Built onboarding funnel analytics, identifying drop-off points; drove 20% conversion uplift across Spain, Greece and Germany",
     "Optimised screening thresholds - 38% false positive reduction, regulatory standards maintained",
     "Led Salesforce to Fenergo migration (50k+ client records): data quality strategy, vendor management, zero-downtime cutover",
-    "Designed continuous monitoring for medium/low-risk segments — 60% reduction in client review touchpoints",
+    "Designed continuous monitoring for medium/low-risk segments \u2014 60% reduction in client review touchpoints",
   ],
 };
 
 state.baseCvSections = { ...BASE_CV_SECTIONS };
 
 export const loadBaseCvFromFirestore = async () => {
-  if (!db) return;
+  if (!getDb()) return;
   try {
-    const snap = await getDoc(doc(db, "cv_settings", "base_cv"));
+    const snap = await getDoc(doc(getDb(), "cv_settings", "base_cv"));
     if (snap.exists()) {
       const data = snap.data();
       const keys = ["summary", "key_achievements", "vistra_bullets", "ebury_bullets"];
@@ -69,47 +69,102 @@ export const loadBaseCvFromFirestore = async () => {
   }
 };
 
+export const hasCvTailoredChanges = (job) => {
+  if (!state.baseCvSections) return false;
+  const tailored = job.tailored_cv_sections || {};
+  const sections = ["summary", "key_achievements", "vistra_bullets", "ebury_bullets"];
+  return sections.some((key) => {
+    const tailoredVal = tailored[key];
+    const baseVal = state.baseCvSections[key];
+    if (!tailoredVal) return false;
+    if (Array.isArray(tailoredVal)) {
+      return JSON.stringify(tailoredVal) !== JSON.stringify(baseVal || []);
+    }
+    if (typeof tailoredVal === "string") {
+      return tailoredVal.trim() !== String(baseVal || "").trim();
+    }
+    return false;
+  });
+};
+
 export const getTailoredCvPlainText = (job) => {
   const sections = job.tailored_cv_sections || {};
   const base = state.baseCvSections;
+  const bullet = (text) => `\u2022 ${text.replace(/^[\-\u2022\s]*/, "")}`;
   const lines = [];
+
+  // Header
   lines.push("ADE OMOSANYA");
-  lines.push("London, UK | ademolaomosanya@gmail.com | linkedin.com/in/adeomosanya | omosanya.com\n");
+  lines.push("London, UK | 07920497486 | ademolaomosanya@gmail.com");
+  lines.push("LinkedIn | Portfolio: FCA Fines Dashboard | Vulnerability Portal | SMCR Platform\n");
+
+  // Professional Summary
   lines.push("PROFESSIONAL SUMMARY");
   lines.push((sections.summary || base.summary) + "\n");
+
+  // Key Achievements
   lines.push("KEY ACHIEVEMENTS");
-  (sections.key_achievements || base.key_achievements).forEach((b) => lines.push(b.startsWith("- ") ? b : `- ${b}`));
+  (sections.key_achievements || base.key_achievements).forEach((b) => lines.push(bullet(b)));
+
+  // Professional Experience
   lines.push("\nPROFESSIONAL EXPERIENCE");
-  lines.push("\nVistra Corporate Services | Senior Product Manager | September 2023 - Present");
-  (sections.vistra_bullets || base.vistra_bullets).forEach((b) => lines.push(b.startsWith("- ") ? b : `- ${b}`));
-  lines.push("\nEbury Partners | Product Manager | April 2022 - September 2023");
-  (sections.ebury_bullets || base.ebury_bullets).forEach((b) => lines.push(b.startsWith("- ") ? b : `- ${b}`));
-  lines.push("\nMEMA Consultants | Founder & Director | March 2017 - Present");
-  lines.push("- Built and launched MEMA compliance analytics suite (vulnerability, FCA fines, financial promotions, FOS dashboards) using Next.js and AI tooling — 10+ enterprise clients, hundreds of monthly users");
-  lines.push("- Scaled consultancy to 25+ clients through targeted FCA register outreach, delivering audits and remediation plans");
-  lines.push("- Leveraged full product lifecycle experience to validate and scale RegTech solutions");
-  lines.push("\nElucidate | Product Manager | September 2020 - March 2022");
-  lines.push("- Secured £120k ARR over three years through successful POC with global bank");
-  lines.push("- Conducted usability studies driving platform redesign: 35% activity increase, 40% MAU boost");
-  lines.push("- Reduced client deployment timeline from 10 to 6 weeks through requirements optimisation");
-  lines.push("- Led cross-functional team of engineers, data scientists, and UX designers");
-  lines.push("\nN26 | Financial Crime Product Lead | September 2019 - 2020");
-  lines.push("- Designed control framework adopted by 100+ FC department staff");
-  lines.push("- Led FC transformation project (team of 8) achieving 12 audit point approvals");
-  lines.push("- Established EDD review team, remediated 470 PEPs backlog");
-  lines.push("\nErnst & Young | Senior Associate, Financial Crime Advisory | February 2017 - August 2019");
-  lines.push("- Implemented KYC QA framework for transformation program (Netherlands)");
-  lines.push("- Co-led Skilled Person Review of Group Risk Assessment (AML/ABC/Sanctions)");
-  lines.push("\nMazars | Assistant Manager, Financial Services Consulting | August 2015 - February 2017");
-  lines.push("\nFinancial Conduct Authority | Associate, Authorisations | February 2014 - August 2015");
-  lines.push("\nFinancial Ombudsman Service | Investment Adjudicator | April 2012 - February 2014");
+
+  // Vistra
+  lines.push("\nVISTRA | Global Corporate Services (9,000+ employees, $1.5B revenue)");
+  lines.push("Global Product & Process Owner \u2013 Onboarding, KYC & Screening | September 2023 \u2013 Present");
+  const vistraBullets = sections.vistra_bullets || base.vistra_bullets;
+  lines.push("\nProduct Strategy & Discovery");
+  vistraBullets.slice(0, 3).forEach((b) => lines.push(bullet(b)));
+  lines.push("\nPlatform Development & Delivery");
+  vistraBullets.slice(3, 6).forEach((b) => lines.push(bullet(b)));
+  lines.push("\nReporting Products & Leadership");
+  vistraBullets.slice(6, 9).forEach((b) => lines.push(bullet(b)));
+
+  // Ebury
+  lines.push("\nEBURY | B2B Foreign Exchange Platform (Series E, \u00a31.7B valuation)");
+  lines.push("Product Manager \u2013 Identity & Financial Crime | April 2022 \u2013 September 2023");
+  (sections.ebury_bullets || base.ebury_bullets).forEach((b) => lines.push(bullet(b)));
+
+  // MEMA Consultants
+  lines.push("\nMEMA CONSULTANTS | RegTech & Compliance Solutions");
+  lines.push("Founder & Director | March 2017 \u2013 Present");
+  lines.push(bullet("Built and deployed 3 live RegTech products (Next.js/React, AI-assisted) used by compliance officers and regulated SMEs:"));
+  lines.push("  FCA Fines Dashboard | Regulatory enforcement analytics");
+  lines.push("  Vulnerability Portal | Consumer Duty compliance");
+  lines.push("  SMCR Platform | Senior Managers regime mapping");
+  lines.push(bullet("Advisory: FCA authorisation, financial crime framework design, horizon scanning tooling"));
+
+  // Elucidate
+  lines.push("\nELUCIDATE | RegTech SaaS Platform");
+  lines.push("Product Manager | September 2020 \u2013 March 2022");
+  lines.push(bullet("Zero-to-one: discovery, solution design, PoC delivery \u2014 Tier 1 bank, \u00a3120k ARR"));
+  lines.push(bullet("Post-PoC: built networking feature from customer discovery; 8 firms onboarded"));
+  lines.push(bullet("Redesigned platform UX \u2014 40% MAU uplift, deployment reduced to 6 weeks"));
+
+  // N26
+  lines.push("\nN26 | Digital Banking (7M+ customers)");
+  lines.push("Financial Crime Product Lead | September 2019 \u2013 September 2020");
+  lines.push(bullet("Led remediation programme addressing BaFin regulatory concerns; defined product requirements across transaction monitoring, screening, and enhanced due diligence"));
+  lines.push(bullet("Established EDD squad; cleared 470 PEP backlog and automated 70% of review processes"));
+
+  // Previous Experience
+  lines.push("\nPrevious Experience");
+  lines.push(bullet("ERNST & YOUNG \u2013 Senior Associate, Financial Crime Advisory (2017\u20132019)"));
+  lines.push(bullet("MAZARS \u2013 Assistant Manager, Financial Services Consulting (2015\u20132017)"));
+  lines.push(bullet("FINANCIAL CONDUCT AUTHORITY \u2013 Associate, Authorisations (2014\u20132015)"));
+  lines.push(bullet("FINANCIAL OMBUDSMAN SERVICE \u2013 Investment Adjudicator (2012\u20132014)"));
+
+  // Technical & Product Capabilities
   lines.push("\nTECHNICAL & PRODUCT CAPABILITIES");
-  lines.push("Platforms: Fenergo CLM, Enate Orchestration, Napier Screening, LexisNexis Bridger, Jumio, Power BI");
-  lines.push("Product: OKR/KPI Frameworks, A/B Testing, Customer Journey Mapping, Agile/Scrum, JIRA");
-  lines.push("Regulatory: KYC/KYB Transformation, AML Program Design, Financial Crime Risk, ACAMS, ICA Fellow");
-  lines.push("\nEDUCATION & CERTIFICATIONS");
-  lines.push("LLB Law | University of Hull (2007-2010)");
-  lines.push("ACAMS Certified | ICA Fellow");
+  lines.push("\u2022 Platforms- KYC: Fenergo | Sanctions & Screening: Napier, LexisNexis Bridger | Onboarding Orchestration: Enate | ID&V: Jumio, Onfido, IDnow | CRM: Salesforce");
+  lines.push("\u2022 Technical- SQL, PostgreSQL | Power BI, Excel | Next.js/React, Vercel, Netlify, GitHub | API integration | Jira, Confluence | Figma, Miro");
+  lines.push("\u2022 Product- Zero-to-one builds, discovery, roadmap ownership, business cases, competitor analysis, capacity planning, Kanban");
+  lines.push("\u2022 Regulatory- UK FCA/MLR/JMLSG, EU- Dutch DNB, BaFin, Hong Kong SFC, Singapore MAS, OFAC/OFSI, EU AMLD");
+
+  // Education
+  lines.push("\nUniversity of Hull \u2013 LLB Law (2007\u20132010)");
+  lines.push("ACAMS Certified (2018) | ICA Fellow (2020) | APCC Member");
+
   return lines.join("\n");
 };
 
@@ -126,8 +181,8 @@ export const buildTailoredCvHtml = (job) => {
     items
       .map(
         (b) =>
-          `<div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">- ${esc(
-            b.replace(/^[-\s]*/, "")
+          `<div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 ${esc(
+            b.replace(/^[-\u2022\s]*/, "")
           )}</div>`
       )
       .join("");
@@ -135,21 +190,16 @@ export const buildTailoredCvHtml = (job) => {
   const sectionHeading = (title) =>
     `<div style="font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1.5px solid #0f172a;padding-bottom:2px;margin-bottom:4px;color:#0f172a;">${title}</div>`;
 
-  const roleHeader = (company, dates) =>
-    `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px;"><span style="font-weight:700;font-size:8.5pt;">${esc(company)}</span><span style="font-size:7.5pt;color:#475569;">${esc(dates)}</span></div>`;
-
-  const roleTitle = (title) =>
-    `<div style="font-style:italic;font-size:8pt;color:#475569;margin-bottom:2px;">${esc(title)}</div>`;
-
-  const compactRole = (company, title, dates) =>
-    `<div style="margin-bottom:3px;"><div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-weight:700;font-size:8.5pt;">${esc(company)}</span><span style="font-size:7.5pt;color:#475569;">${esc(dates)}</span></div><div style="font-style:italic;font-size:8pt;color:#475569;">${esc(title)}</div></div>`;
+  const subHeading = (title) =>
+    `<div style="font-weight:700;font-size:8pt;margin:4px 0 2px 0;color:#0f172a;">${esc(title)}</div>`;
 
   const container = document.createElement("div");
   container.innerHTML = `
     <div style="font-family:'Inter',Helvetica,Arial,sans-serif;color:#1f2937;padding:0;margin:0;width:180mm;font-size:8.5pt;line-height:1.3;">
       <div style="text-align:center;margin-bottom:6px;">
         <div style="font-size:16pt;font-weight:700;letter-spacing:0.5px;color:#0f172a;margin-bottom:3px;">ADE OMOSANYA</div>
-        <div style="font-size:7.5pt;color:#475569;">London, UK &nbsp;|&nbsp; ademolaomosanya@gmail.com &nbsp;|&nbsp; linkedin.com/in/adeomosanya &nbsp;|&nbsp; omosanya.com</div>
+        <div style="font-size:7.5pt;color:#475569;">London, UK &nbsp;|&nbsp; 07920497486 &nbsp;|&nbsp; ademolaomosanya@gmail.com</div>
+        <div style="font-size:7.5pt;color:#0d9488;">LinkedIn &nbsp;|&nbsp; Portfolio: FCA Fines Dashboard &nbsp;|&nbsp; Vulnerability Portal &nbsp;|&nbsp; SMCR Platform</div>
       </div>
 
       <div style="margin-bottom:5px;">
@@ -166,73 +216,70 @@ export const buildTailoredCvHtml = (job) => {
         ${sectionHeading("Professional Experience")}
 
         <div style="margin-bottom:5px;">
-          ${roleHeader("Vistra Corporate Services", "September 2023 - Present")}
-          ${roleTitle("Senior Product Manager")}
-          ${bulletHtml(vistraBullets)}
+          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">VISTRA</strong> <span style="font-size:8.5pt;">| Global Corporate Services (9,000+ employees, $1.5B revenue)</span></div>
+          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Global Product &amp; Process Owner \u2013 Onboarding, KYC &amp; Screening | September 2023 \u2013 Present</div>
+          ${subHeading("Product Strategy & Discovery")}
+          ${bulletHtml(vistraBullets.slice(0, 3))}
+          ${subHeading("Platform Development & Delivery")}
+          ${bulletHtml(vistraBullets.slice(3, 6))}
+          ${subHeading("Reporting Products & Leadership")}
+          ${bulletHtml(vistraBullets.slice(6, 9))}
         </div>
 
         <div style="margin-bottom:5px;">
-          ${roleHeader("Ebury Partners", "April 2022 - September 2023")}
-          ${roleTitle("Product Manager")}
+          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">EBURY</strong> <span style="font-size:8.5pt;">| B2B Foreign Exchange Platform (Series E, \u00a31.7B valuation)</span></div>
+          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Product Manager \u2013 Identity &amp; Financial Crime | April 2022 \u2013 September 2023</div>
           ${bulletHtml(eburyBullets)}
         </div>
 
         <div style="margin-bottom:5px;">
-          ${roleHeader("MEMA Consultants", "March 2017 - Present")}
-          ${roleTitle("Founder & Director")}
+          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">MEMA CONSULTANTS</strong> <span style="font-size:8.5pt;">| RegTech &amp; Compliance Solutions</span></div>
+          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Founder &amp; Director | March 2017 \u2013 Present</div>
+          <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 Built and deployed 3 live RegTech products (Next.js/React, AI-assisted) used by compliance officers and regulated SMEs:</div>
+          <div style="padding-left:20px;margin-bottom:2px;line-height:1.3;font-size:8pt;">FCA Fines Dashboard | Regulatory enforcement analytics<br>Vulnerability Portal | Consumer Duty compliance<br>SMCR Platform | Senior Managers regime mapping</div>
+          <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 Advisory: FCA authorisation, financial crime framework design, horizon scanning tooling</div>
+        </div>
+
+        <div style="margin-bottom:5px;">
+          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">ELUCIDATE</strong> <span style="font-size:8.5pt;">| RegTech SaaS Platform</span></div>
+          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Product Manager | September 2020 \u2013 March 2022</div>
           ${bulletHtml([
-            "Built and launched MEMA compliance analytics suite (vulnerability, FCA fines, financial promotions, FOS dashboards) using Next.js and AI tooling — 10+ enterprise clients, hundreds of monthly users",
-            "Scaled consultancy to 25+ clients through targeted FCA register outreach, delivering audits and remediation plans",
-            "Leveraged full product lifecycle experience to validate and scale RegTech solutions",
+            "Zero-to-one: discovery, solution design, PoC delivery \u2014 Tier 1 bank, \u00a3120k ARR",
+            "Post-PoC: built networking feature from customer discovery; 8 firms onboarded",
+            "Redesigned platform UX \u2014 40% MAU uplift, deployment reduced to 6 weeks",
           ])}
         </div>
 
         <div style="margin-bottom:5px;">
-          ${roleHeader("Elucidate", "September 2020 - March 2022")}
-          ${roleTitle("Product Manager")}
+          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">N26</strong> <span style="font-size:8.5pt;">| Digital Banking (7M+ customers)</span></div>
+          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Financial Crime Product Lead | September 2019 \u2013 September 2020</div>
           ${bulletHtml([
-            "Secured £120k ARR over three years through successful POC with global bank",
-            "Conducted usability studies driving platform redesign: 35% activity increase, 40% MAU boost",
-            "Reduced client deployment timeline from 10 to 6 weeks through requirements optimisation",
-            "Led cross-functional team of engineers, data scientists, and UX designers",
+            "Led remediation programme addressing BaFin regulatory concerns; defined product requirements across transaction monitoring, screening, and enhanced due diligence",
+            "Established EDD squad; cleared 470 PEP backlog and automated 70% of review processes",
           ])}
         </div>
 
         <div style="margin-bottom:5px;">
-          ${roleHeader("N26", "September 2019 - 2020")}
-          ${roleTitle("Financial Crime Product Lead")}
-          ${bulletHtml([
-            "Designed control framework adopted by 100+ FC department staff",
-            "Led FC transformation project (team of 8) achieving 12 audit point approvals",
-            "Established EDD review team, remediated 470 PEPs backlog",
-          ])}
+          ${subHeading("Previous Experience")}
+          <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 <strong>ERNST &amp; YOUNG</strong> \u2013 Senior Associate, Financial Crime Advisory (2017\u20132019)</div>
+          <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 <strong>MAZARS</strong> \u2013 Assistant Manager, Financial Services Consulting (2015\u20132017)</div>
+          <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 <strong>FINANCIAL CONDUCT AUTHORITY</strong> \u2013 Associate, Authorisations (2014\u20132015)</div>
+          <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 <strong>FINANCIAL OMBUDSMAN SERVICE</strong> \u2013 Investment Adjudicator (2012\u20132014)</div>
         </div>
-
-        <div style="margin-bottom:5px;">
-          ${roleHeader("Ernst & Young", "February 2017 - August 2019")}
-          ${roleTitle("Senior Associate, Financial Crime Advisory")}
-          ${bulletHtml([
-            "Implemented KYC QA framework for transformation program (Netherlands)",
-            "Co-led Skilled Person Review of Group Risk Assessment (AML/ABC/Sanctions)",
-          ])}
-        </div>
-
-        ${compactRole("Mazars", "Assistant Manager, Financial Services Consulting", "August 2015 - February 2017")}
-        ${compactRole("Financial Conduct Authority", "Associate, Authorisations", "February 2014 - August 2015")}
-        ${compactRole("Financial Ombudsman Service", "Investment Adjudicator", "April 2012 - February 2014")}
       </div>
 
       <div style="margin-bottom:5px;">
         ${sectionHeading("Technical & Product Capabilities")}
-        <div style="margin-bottom:2px;"><strong>Platforms:</strong> Fenergo CLM, Enate Orchestration, Napier Screening, LexisNexis Bridger, Jumio, Power BI</div>
-        <div style="margin-bottom:2px;"><strong>Product:</strong> OKR/KPI Frameworks, A/B Testing, Customer Journey Mapping, Agile/Scrum, JIRA</div>
-        <div><strong>Regulatory:</strong> KYC/KYB Transformation, AML Program Design, Financial Crime Risk, ACAMS, ICA Fellow</div>
+        <div style="margin-bottom:2px;"><strong>Platforms-</strong> KYC: Fenergo | Sanctions &amp; Screening: Napier, LexisNexis Bridger | Onboarding Orchestration: Enate | ID&amp;V: Jumio, Onfido, IDnow | CRM: Salesforce</div>
+        <div style="margin-bottom:2px;"><strong>Technical-</strong> SQL, PostgreSQL | Power BI, Excel | Next.js/React, Vercel, Netlify, GitHub | API integration | Jira, Confluence | Figma, Miro</div>
+        <div style="margin-bottom:2px;"><strong>Product-</strong> Zero-to-one builds, discovery, roadmap ownership, business cases, competitor analysis, capacity planning, Kanban</div>
+        <div><strong>Regulatory-</strong> UK FCA/MLR/JMLSG, EU- Dutch DNB, BaFin, Hong Kong SFC, Singapore MAS, OFAC/OFSI, EU AMLD</div>
       </div>
 
       <div>
-        ${sectionHeading("Education & Certifications")}
-        <div style="margin-bottom:2px;"><strong>LLB Law</strong> — University of Hull (2007-2010)</div>
-        <div><strong>ACAMS Certified</strong> | <strong>ICA Fellow</strong></div>
+        ${sectionHeading("Education")}
+        <div style="margin-bottom:2px;">University of Hull \u2013 LLB Law (2007\u20132010)</div>
+        <div>ACAMS Certified (2018) | ICA Fellow (2020) | APCC Member</div>
       </div>
     </div>
   `;

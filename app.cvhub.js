@@ -1,6 +1,6 @@
 import {
   state,
-  db,
+  getDb,
   collectionName,
   doc,
   updateDoc,
@@ -14,8 +14,7 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "./app.core.js";
-import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
-import { hasCvTailoredChanges } from "./app.applyhub.js";
+import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement, hasCvTailoredChanges } from "./app.cv.js";
 
 const loadCvHubSort = () => {
   try {
@@ -31,7 +30,7 @@ const saveCvHubSort = (sort) => {
 
 state.cvHubSort = loadCvHubSort();
 
-const makeEditable = (containerEl, { currentValue, isArray, onSave }) => {
+export const makeEditable = (containerEl, { currentValue, isArray, onSave }) => {
   const original = containerEl.innerHTML;
   let textValue;
   if (isArray && Array.isArray(currentValue)) {
@@ -74,17 +73,16 @@ const makeEditable = (containerEl, { currentValue, isArray, onSave }) => {
   });
 };
 
-const saveTailoredCvSection = async (job, key, value) => {
+export const saveTailoredCvSection = async (job, key, value) => {
   const existing = job.tailored_cv_sections || {};
   job.tailored_cv_sections = { ...existing, [key]: value };
-  if (db) {
+  if (getDb()) {
     try {
-      await updateDoc(doc(db, collectionName, job.id), {
+      await updateDoc(doc(getDb(), collectionName, job.id), {
         tailored_cv_sections: job.tailored_cv_sections,
         updated_at: new Date().toISOString(),
       });
       showToast("CV section updated");
-      if (state.handlers.renderApplyHub) state.handlers.renderApplyHub();
     } catch (err) {
       console.error("Save tailored CV section failed:", err);
       showToast("Save failed");
@@ -92,12 +90,12 @@ const saveTailoredCvSection = async (job, key, value) => {
   }
 };
 
-const saveBaseCvSection = async (key, value) => {
+export const saveBaseCvSection = async (key, value) => {
   state.baseCvSections[key] = value;
-  if (db) {
+  if (getDb()) {
     try {
       await setDoc(
-        doc(db, "cv_settings", "base_cv"),
+        doc(getDb(), "cv_settings", "base_cv"),
         {
           ...state.baseCvSections,
           updated_at: new Date().toISOString(),
@@ -112,11 +110,11 @@ const saveBaseCvSection = async (key, value) => {
   }
 };
 
-const saveCoverLetter = async (job, value) => {
+export const saveCoverLetter = async (job, value) => {
   job.cover_letter = value;
-  if (db) {
+  if (getDb()) {
     try {
-      await updateDoc(doc(db, collectionName, job.id), {
+      await updateDoc(doc(getDb(), collectionName, job.id), {
         cover_letter: value,
         updated_at: new Date().toISOString(),
       });
@@ -128,11 +126,11 @@ const saveCoverLetter = async (job, value) => {
   }
 };
 
-const saveTailoredSummary = async (job, value) => {
+export const saveTailoredSummary = async (job, value) => {
   job.tailored_summary = value;
-  if (db) {
+  if (getDb()) {
     try {
-      await updateDoc(doc(db, collectionName, job.id), {
+      await updateDoc(doc(getDb(), collectionName, job.id), {
         tailored_summary: value,
         updated_at: new Date().toISOString(),
       });
@@ -144,7 +142,7 @@ const saveTailoredSummary = async (job, value) => {
   }
 };
 
-const buildApplicationPackHtml = (job) => {
+export const buildApplicationPackHtml = (job) => {
   const container = document.createElement("div");
 
   const cvPage = buildTailoredCvHtml(job);
@@ -185,7 +183,7 @@ const buildApplicationPackHtml = (job) => {
   return container;
 };
 
-const buildSideBySideDiff = (job) => {
+export const buildSideBySideDiff = (job) => {
   const tailored = job.tailored_cv_sections || {};
   const sections = [
     { key: "summary", label: "Professional Summary", isArray: false },
@@ -690,4 +688,4 @@ export const renderCvHub = () => {
   state.cvHubRendered = true;
 };
 
-state.handlers.renderCvHub = renderCvHub;
+// CV Hub merged into Application Hub — handler set in app.applyhub.js

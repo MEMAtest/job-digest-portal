@@ -65,6 +65,8 @@ export const setDb = (value) => {
   db = value;
 };
 
+export const getDb = () => db;
+
 export const setCollectionNames = (config = {}) => {
   collectionName = config.collectionName || collectionName;
   statsCollection = config.statsCollection || statsCollection;
@@ -92,6 +94,7 @@ export const state = {
   cvHubSort: { field: "fit_score", dir: "desc" },
   cvHubFilter: "all",
   cvHubRendered: false,
+  hubFilter: "all",
   handlers: {
     setActiveTab: null,
     renderJobs: null,
