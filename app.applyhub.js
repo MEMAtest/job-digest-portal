@@ -16,7 +16,7 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "./app.core.js";
-import { getTailoredCvPlainText, buildTailoredCvHtml } from "./app.cv.js";
+import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
 
 const loadHubSort = () => {
   try {
@@ -506,7 +506,7 @@ export const renderApplyHub = () => {
         jsPDF: { unit: "mm", format: "a4" },
       };
       try {
-        await html2pdf().set(opt).from(cvEl).save();
+        await renderPdfFromElement(cvEl, opt);
         showToast("CV downloaded");
       } catch (err) {
         console.error(err);
