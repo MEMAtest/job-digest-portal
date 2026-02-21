@@ -1986,7 +1986,7 @@ const saveCvHubSort = (sort) => {
 
 state.cvHubSort = loadCvHubSort();
 
-const makeEditable = (containerEl, { currentValue, isArray, onSave, onCancel }) => {
+const makeEditable = (containerEl, { currentValue, isArray, onSave }) => {
   const original = containerEl.innerHTML;
   let textValue;
   if (isArray && Array.isArray(currentValue)) {
@@ -2023,7 +2023,6 @@ const makeEditable = (containerEl, { currentValue, isArray, onSave, onCancel }) 
 
   containerEl.querySelector(".cv-edit-cancel").addEventListener("click", () => {
     containerEl.innerHTML = original;
-    if (onCancel) onCancel();
   });
 };
 
@@ -2430,9 +2429,7 @@ const renderCvHub = () => {
           renderCvHub();
         },
       });
-      // Expand max-height for editing
-      const wrapper = contentEl.closest(".hub-card__content");
-      if (wrapper) wrapper.style.maxHeight = "none";
+      contentEl.style.maxHeight = "none";
     });
   });
 
@@ -2473,8 +2470,7 @@ const renderCvHub = () => {
           renderCvHub();
         },
       });
-      const wrapper = contentEl.closest(".hub-card__content");
-      if (wrapper) wrapper.style.maxHeight = "none";
+      contentEl.style.maxHeight = "none";
     });
   });
 
@@ -2494,8 +2490,7 @@ const renderCvHub = () => {
           renderCvHub();
         },
       });
-      const wrapper = contentEl.closest(".hub-card__content");
-      if (wrapper) wrapper.style.maxHeight = "none";
+      contentEl.style.maxHeight = "none";
     });
   });
 
@@ -2515,8 +2510,7 @@ const renderCvHub = () => {
           renderCvHub();
         },
       });
-      const wrapper = contentEl.closest(".hub-card__content");
-      if (wrapper) wrapper.style.maxHeight = "none";
+      contentEl.style.maxHeight = "none";
     });
   });
 
@@ -2719,10 +2713,6 @@ const renderJobs = () => {
         <div class="detail-box">
           <div class="section-title">How to apply</div>
           <div>${formatInlineText(job.apply_tips || "Apply with CV tailored to onboarding + KYC impact.")}</div>
-        </div>
-        <div class="detail-box">
-          <div class="section-title">CV edits (exact changes)</div>
-          <div>${formatInlineText(job.cv_edit_notes || "Not available yet.")}</div>
         </div>
         <div class="detail-box">
           <div class="section-title">Cover letter</div>
