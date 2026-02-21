@@ -444,16 +444,34 @@ body {
 
 .job-card__details {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
   gap: 14px;
   overflow: visible;
   padding-bottom: 0;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .job-card__details.detail-carousel {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
   gap: 14px;
+}
+
+@media (max-width: 1400px) {
+  .job-card__details,
+  .job-card__details.detail-carousel {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+    max-width: 960px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .job-card__details,
+  .job-card__details.detail-carousel {
+    grid-template-columns: 1fr;
+    max-width: 720px;
+  }
 }
 
 .detail-box {
