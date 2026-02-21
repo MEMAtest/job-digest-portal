@@ -30,11 +30,69 @@ const prepDetailContent = document.getElementById("prep-detail-content");
 
 let prepActiveSection = null;
 let prepActiveTab = "star";
+const prepExpanded = {};
 
 const truncateText = (text, len = 120) => {
   const value = String(text || "").trim();
   if (!value) return "";
   return value.length > len ? `${value.slice(0, len)}…` : value;
+};
+
+const stripMarkdown = (value) =>
+  String(value || "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/[_`]/g, "")
+    .replace(/\\n/g, " ")
+    .replace(/\r?\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const summariseStar = (value) => {
+  const cleaned = stripMarkdown(value);
+  const match = cleaned.match(/Situation\s*['"]?\s*:\s*([^\.]+)\.?/i);
+  if (match && match[1]) return match[1].trim();
+  return cleaned;
+};
+
+const parseStarStory = (value) => {
+  const cleaned = stripMarkdown(value);
+  const matches = [...cleaned.matchAll(/(Situation|Task|Action|Result)\s*['"]?\s*:/gi)];
+  if (!matches.length) return { raw: cleaned };
+
+  const parts = { situation: "", task: "", action: "", result: "", raw: cleaned };
+  matches.forEach((match, index) => {
+    const key = match[1].toLowerCase();
+    const start = match.index + match[0].length;
+    const end = matches[index + 1]?.index ?? cleaned.length;
+    parts[key] = cleaned.slice(start, end).trim();
+  });
+  return parts;
+};
+
+const buildModelAnswer = (question, prep) => {
+  const stats = normaliseList(prep.key_stats || []).slice(0, 2);
+  const strengths = normaliseList(prep.strengths || []).slice(0, 2);
+  const example = summariseStar(normaliseList(prep.star_stories || [])[0] || "");
+
+  const opener = prep.quick_pitch
+    ? `Anchor with: ${stripMarkdown(prep.quick_pitch)}`
+    : "Start with a crisp one-line summary of your fit.";
+
+  const blocks = [
+    `<p><strong>Model answer (9/10):</strong> ${formatInlineText(opener)}</p>`,
+  ];
+
+  if (stats.length) {
+    blocks.push(`<div><strong>Evidence:</strong>${formatList(stats)}</div>`);
+  }
+  if (strengths.length) {
+    blocks.push(`<div><strong>Strengths to weave in:</strong>${formatList(strengths)}</div>`);
+  }
+  if (example) {
+    blocks.push(`<p><strong>Example:</strong> ${formatInlineText(example)}</p>`);
+  }
+  blocks.push(`<p><strong>Close:</strong> Tie the impact back to this role’s outcomes.</p>`);
+  return blocks.join("");
 };
 
 const buildPrepCards = () => {
@@ -54,49 +112,49 @@ const buildPrepCards = () => {
       id: "quick_pitch",
       title: "Quick Pitch",
       meta: "Summary snapshot",
-      preview: truncateText(prep.quick_pitch || "Not available yet."),
+      preview: truncateText(stripMarkdown(prep.quick_pitch || "Not available yet.")),
     },
     {
       id: "star",
       title: "STAR Stories",
       meta: `${starStories.length} stories`,
-      preview: truncateText(starStories[0] || "Not available yet."),
+      preview: truncateText(summariseStar(starStories[0] || "Not available yet.")),
     },
     {
       id: "qa",
       title: "Interview Q&A",
       meta: `${questions.length} questions`,
-      preview: truncateText(questions[0] || "Not available yet."),
+      preview: truncateText(stripMarkdown(questions[0] || "Not available yet.")),
     },
     {
       id: "talking",
       title: "Talking Points",
       meta: `${talking.length} points`,
-      preview: truncateText(talking[0] || "Not available yet."),
+      preview: truncateText(stripMarkdown(talking[0] || "Not available yet.")),
     },
     {
       id: "key_stats",
       title: "Key Stats",
       meta: `${stats.length} items`,
-      preview: truncateText(stats[0] || "Not available yet."),
+      preview: truncateText(stripMarkdown(stats[0] || "Not available yet.")),
     },
     {
       id: "strengths",
       title: "Strengths",
       meta: `${strengths.length} items`,
-      preview: truncateText(strengths[0] || "Not available yet."),
+      preview: truncateText(stripMarkdown(strengths[0] || "Not available yet.")),
     },
     {
       id: "risk_mitigations",
       title: "Risk Mitigations",
       meta: `${risks.length} items`,
-      preview: truncateText(risks[0] || "Not available yet."),
+      preview: truncateText(stripMarkdown(risks[0] || "Not available yet.")),
     },
     {
       id: "adjacent_roles",
       title: "Adjacent Roles",
       meta: `${roles.length} roles`,
-      preview: truncateText(roles[0] || "Not available yet."),
+      preview: truncateText(stripMarkdown(roles[0] || "Not available yet.")),
     },
   ];
 };
@@ -114,24 +172,39 @@ const renderPrepDetail = () => {
   const setTabsVisible = (visible) => {
     if (!prepDetailTabs) return;
     prepDetailTabs.classList.toggle("hidden", !visible);
+    prepDetailTabs.style.display = visible ? "flex" : "none";
+    prepDetailTabs.hidden = !visible;
+    prepDetailTabs.setAttribute("aria-hidden", (!visible).toString());
   };
 
-  const renderDetailCards = (items, labelPrefix = "Item") => {
+  const renderDetailCards = (items, labelPrefix = "Item", activeKey = "", options = {}) => {
+    const isMobile = window.matchMedia("(max-width: 900px)").matches;
+    const maxItems = isMobile ? 3 : items.length;
+    const expanded = prepExpanded[activeKey];
+    const visibleItems = expanded ? items : items.slice(0, maxItems);
     if (!items.length) {
       return `<div class="prep-detail-empty">Not available yet.</div>`;
     }
-    return items
+    const renderSummary = options.renderSummary;
+    const renderBody = options.renderBody;
+    const cards = visibleItems
       .map((item, idx) => {
         const title = `${labelPrefix} ${idx + 1}`;
-        const content = formatInlineText(item);
+        const summaryHtml = renderSummary ? renderSummary(item, idx, title) : escapeHtml(title);
+        const bodyHtml = renderBody ? renderBody(item, idx, title) : formatInlineText(item);
         return `
           <details class="prep-detail-card">
-            <summary>${escapeHtml(title)}</summary>
-            <div class="prep-detail-card__body">${content}</div>
+            <summary>${summaryHtml}</summary>
+            <div class="prep-detail-card__body">${bodyHtml}</div>
           </details>
         `;
       })
       .join("");
+    if (items.length > maxItems) {
+      const label = expanded ? "Show fewer" : `Show all (${items.length})`;
+      return `${cards}<button class="btn btn-tertiary prep-detail-more" data-more="${escapeHtml(activeKey)}">${label}</button>`;
+    }
+    return cards;
   };
 
   const useTabs = ["star", "qa", "talking"].includes(prepActiveSection);
@@ -156,21 +229,56 @@ const renderPrepDetail = () => {
     const starStories = normaliseList(prep.star_stories || []);
     prepDetailTitle.textContent = "STAR Stories";
     prepDetailMeta.textContent = `${starStories.length} stories to rehearse.`;
-    prepDetailContent.innerHTML = renderDetailCards(starStories, "STAR Story");
+    prepDetailContent.innerHTML = renderDetailCards(starStories, "STAR Story", "star", {
+      renderSummary: (item, idx) => {
+        const short = truncateText(summariseStar(item), 90);
+        return `
+          <span>STAR Story ${idx + 1}</span>
+          <span class="prep-detail-summary">${escapeHtml(short || "Overview not available.")}</span>
+        `;
+      },
+      renderBody: (item) => {
+        const parsed = parseStarStory(item);
+        if (!parsed || (!parsed.situation && !parsed.task && !parsed.action && !parsed.result)) {
+          return `<div class="prep-detail-text">${formatInlineText(parsed.raw || item)}</div>`;
+        }
+        const rows = [
+          parsed.situation ? `<div class="prep-star-row"><span>Situation</span><p>${formatInlineText(parsed.situation)}</p></div>` : "",
+          parsed.task ? `<div class="prep-star-row"><span>Task</span><p>${formatInlineText(parsed.task)}</p></div>` : "",
+          parsed.action ? `<div class="prep-star-row"><span>Action</span><p>${formatInlineText(parsed.action)}</p></div>` : "",
+          parsed.result ? `<div class="prep-star-row"><span>Result</span><p>${formatInlineText(parsed.result)}</p></div>` : "",
+        ]
+          .filter(Boolean)
+          .join("");
+        return `<div class="prep-star-grid">${rows}</div>`;
+      },
+    });
     return;
   }
   if (activeKey === "qa") {
     const questions = normaliseList(prep.interview_questions || []);
     prepDetailTitle.textContent = "Interview Q&A";
     prepDetailMeta.textContent = `${questions.length} likely questions.`;
-    prepDetailContent.innerHTML = renderDetailCards(questions, "Question");
+    prepDetailContent.innerHTML = renderDetailCards(questions, "Question", "qa", {
+      renderSummary: (item, idx) => {
+        const short = truncateText(stripMarkdown(item), 90);
+        return `
+          <span>Question ${idx + 1}</span>
+          <span class="prep-detail-summary">${escapeHtml(short || "Question not available.")}</span>
+        `;
+      },
+      renderBody: (item) => `
+        <div class="prep-detail-question">${formatInlineText(item)}</div>
+        <div class="prep-detail-answer">${buildModelAnswer(item, prep)}</div>
+      `,
+    });
     return;
   }
   if (activeKey === "talking") {
     const talking = normaliseList(prep.key_talking_points || []);
     prepDetailTitle.textContent = "Talking Points";
     prepDetailMeta.textContent = `${talking.length} key points.`;
-    prepDetailContent.innerHTML = renderDetailCards(talking, "Talking Point");
+    prepDetailContent.innerHTML = renderDetailCards(talking, "Talking Point", "talking");
     return;
   }
 
@@ -178,9 +286,10 @@ const renderPrepDetail = () => {
     prepDetailTitle.textContent = "Quick Pitch";
     prepDetailMeta.textContent = "Use this as your opener.";
     prepDetailContent.innerHTML = `
-      <div class="prep-detail-card">
+      <details class="prep-detail-card">
+        <summary>Quick pitch</summary>
         <div class="prep-detail-card__body">${formatInlineText(prep.quick_pitch || "Not available yet.")}</div>
-      </div>
+      </details>
     `;
     return;
   }
@@ -190,9 +299,10 @@ const renderPrepDetail = () => {
     prepDetailTitle.textContent = "Key Stats";
     prepDetailMeta.textContent = `${stats.length} proof points.`;
     prepDetailContent.innerHTML = `
-      <div class="prep-detail-card">
+      <details class="prep-detail-card">
+        <summary>Key stats</summary>
         <div class="prep-detail-card__body">${formatList(stats)}</div>
-      </div>
+      </details>
     `;
     return;
   }
@@ -202,9 +312,10 @@ const renderPrepDetail = () => {
     prepDetailTitle.textContent = "Strengths";
     prepDetailMeta.textContent = `${strengths.length} themes to emphasise.`;
     prepDetailContent.innerHTML = `
-      <div class="prep-detail-card">
+      <details class="prep-detail-card">
+        <summary>Strengths</summary>
         <div class="prep-detail-card__body">${formatList(strengths)}</div>
-      </div>
+      </details>
     `;
     return;
   }
@@ -214,9 +325,10 @@ const renderPrepDetail = () => {
     prepDetailTitle.textContent = "Risk Mitigations";
     prepDetailMeta.textContent = `${risks.length} mitigations ready.`;
     prepDetailContent.innerHTML = `
-      <div class="prep-detail-card">
+      <details class="prep-detail-card">
+        <summary>Risk mitigations</summary>
         <div class="prep-detail-card__body">${formatList(risks)}</div>
-      </div>
+      </details>
     `;
     return;
   }
@@ -226,10 +338,11 @@ const renderPrepDetail = () => {
     prepDetailTitle.textContent = "Adjacent Roles";
     prepDetailMeta.textContent = `${roles.length} roles to consider.`;
     prepDetailContent.innerHTML = `
-      <div class="prep-detail-card">
+      <details class="prep-detail-card">
+        <summary>Roles to consider</summary>
         <div class="prep-detail-card__body">${formatList(roles)}</div>
-      </div>
-      ${suggestions.rationale ? `<div class="prep-detail-card"><div class="prep-detail-card__body">${formatInlineText(suggestions.rationale)}</div></div>` : ""}
+      </details>
+      ${suggestions.rationale ? `<details class="prep-detail-card"><summary>Why these roles</summary><div class="prep-detail-card__body">${formatInlineText(suggestions.rationale)}</div></details>` : ""}
     `;
     return;
   }
@@ -252,7 +365,7 @@ const renderPrepBoard = () => {
       <div class="prep-card ${prepActiveSection === card.id ? "prep-card--active" : ""}" data-section="${card.id}">
         <div class="prep-card__title">${escapeHtml(card.title)}</div>
         <div class="prep-card__meta">${escapeHtml(card.meta)}</div>
-        <div class="prep-card__preview">${escapeHtml(card.preview || "Not available yet.")}</div>
+        <div class="prep-card__preview">${formatInlineText(card.preview || "Not available yet.")}</div>
       </div>
     `
     )
@@ -281,6 +394,15 @@ const renderPrepBoard = () => {
   }
 
   renderPrepDetail();
+
+  const moreBtn = prepDetailContent?.querySelector?.(".prep-detail-more");
+  if (moreBtn) {
+    moreBtn.addEventListener("click", () => {
+      const key = moreBtn.dataset.more;
+      prepExpanded[key] = !prepExpanded[key];
+      renderPrepDetail();
+    });
+  }
 };
 
 export const renderSourceStats = (statsDocs) => {
