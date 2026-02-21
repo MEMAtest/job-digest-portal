@@ -863,6 +863,32 @@ body {
   color: #0f172a;
 }
 
+/* Prep Tabs */
+.prep-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+  padding: 0 24px;
+}
+
+.prep-tab {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.prep-tab--active {
+  color: #4f46e5;
+  border-bottom-color: #4f46e5;
+  font-weight: 600;
+}
+
 .prep-content {
   flex: 1;
   padding: 24px;
@@ -1265,8 +1291,11 @@ body {
   }
   .prep-overlay {
     position: static;
+    overflow: visible;
   }
-  .prep-overlay__close {
+  .prep-overlay__close,
+  .prep-tabs,
+  .cheatsheet__actions {
     display: none !important;
   }
 }

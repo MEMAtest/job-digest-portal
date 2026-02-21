@@ -909,31 +909,12 @@ const openPrepMode = (jobId) => {
     showToast("No prep data yet.");
     return;
   }
-  const items = buildStudyDeckItems(job);
-  if (!items.length) {
-    const fallbackItems = buildFallbackDeckItems(job);
-    if (!fallbackItems.length) {
-      showToast("No prep data yet.");
-      return;
-    }
-    if (prepOverlayTitle) prepOverlayTitle.textContent = job.role || "Prep Mode";
-    if (prepOverlayMeta) prepOverlayMeta.textContent = job.company || "";
-    prepOverlay.classList.remove("hidden");
-    document.body.style.overflow = "hidden";
-    state.activePrepJob = job;
-    if (prepOverlayContent) {
-      renderStudyDeck(prepOverlayContent, job, fallbackItems);
-    }
-    return;
-  }
   if (prepOverlayTitle) prepOverlayTitle.textContent = job.role || "Prep Mode";
   if (prepOverlayMeta) prepOverlayMeta.textContent = job.company || "";
   prepOverlay.classList.remove("hidden");
   document.body.style.overflow = "hidden";
   state.activePrepJob = job;
-  if (prepOverlayContent) {
-    renderStudyDeck(prepOverlayContent, job, items);
-  }
+  switchPrepTab("flashcards");
 };
 
 const closePrepMode = () => {
@@ -943,6 +924,100 @@ const closePrepMode = () => {
   state.activePrepJob = null;
   if (prepOverlayContent) {
     prepOverlayContent.innerHTML = "";
+  }
+};
+
+const renderCheatSheet = (container, job) => {
+  const prep = state.candidatePrep || {};
+
+  const section = (title, content) => {
+    if (!content) return "";
+    return `<div class="cheatsheet__section"><h3>${escapeHtml(title)}</h3><div>${content}</div></div>`;
+  };
+
+  const listSection = (title, items) => {
+    const normalized = normaliseList(items);
+    if (!normalized.length) return "";
+    return `<div class="cheatsheet__section"><h3>${escapeHtml(title)}</h3>${formatList(normalized)}</div>`;
+  };
+
+  const sections = [
+    section("Quick Pitch", formatInlineText(job.quick_pitch || prep.quick_pitch || "")),
+    section("Why You Fit This Role", formatInlineText(job.why_fit || "")),
+    listSection("Key Talking Points", job.key_talking_points || prep.key_talking_points || []),
+    listSection("Your Strengths", prep.strengths || []),
+    listSection("Risk Mitigations", prep.risk_mitigations || []),
+    section("Interview Focus", formatInlineText(job.interview_focus || "")),
+    section("Company Insights", formatInlineText(job.company_insights || "")),
+    listSection("Key Stats", prep.key_stats || []),
+    section("Potential Gaps", formatInlineText(job.cv_gap || "")),
+  ].filter(Boolean).join("");
+
+  if (!sections) {
+    container.innerHTML = `<div class="detail-box">No cheat sheet data available yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="cheatsheet">
+      ${sections}
+      <div class="cheatsheet__actions">
+        <button class="btn btn-primary copy-cheatsheet-btn">Copy all</button>
+        <button class="btn btn-secondary print-cheatsheet-btn">Print</button>
+      </div>
+    </div>
+  `;
+
+  const copyBtn = container.querySelector(".copy-cheatsheet-btn");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      const freshPrep = state.candidatePrep || {};
+      const parts = [];
+      const add = (label, value) => {
+        if (!value) return;
+        const text = typeof value === "string" ? value : normaliseList(value).join("\n");
+        if (text) parts.push(`${label}\n${text}`);
+      };
+      add("QUICK PITCH", job.quick_pitch || freshPrep.quick_pitch);
+      add("WHY YOU FIT", job.why_fit);
+      add("KEY TALKING POINTS", job.key_talking_points);
+      add("STRENGTHS", freshPrep.strengths);
+      add("RISK MITIGATIONS", freshPrep.risk_mitigations);
+      add("INTERVIEW FOCUS", job.interview_focus);
+      add("COMPANY INSIGHTS", job.company_insights);
+      add("KEY STATS", freshPrep.key_stats);
+      add("POTENTIAL GAPS", job.cv_gap);
+      copyToClipboard(parts.join("\n\n"));
+      showToast("Cheat sheet copied");
+    });
+  }
+
+  const printBtn = container.querySelector(".print-cheatsheet-btn");
+  if (printBtn) {
+    printBtn.addEventListener("click", () => window.print());
+  }
+};
+
+const switchPrepTab = (tabName) => {
+  const job = state.activePrepJob;
+  if (!job || !prepOverlayContent) return;
+
+  document.querySelectorAll(".prep-tab").forEach((btn) => {
+    btn.classList.toggle("prep-tab--active", btn.dataset.prepTab === tabName);
+  });
+
+  if (tabName === "cheatsheet") {
+    renderCheatSheet(prepOverlayContent, job);
+  } else if (tabName === "flashcards") {
+    const items = buildStudyDeckItems(job);
+    const deckItems = items.length ? items : buildFallbackDeckItems(job);
+    if (deckItems.length) {
+      renderStudyDeck(prepOverlayContent, job, deckItems);
+    } else {
+      prepOverlayContent.innerHTML = `<div class="detail-box">No prep data yet.</div>`;
+    }
+  } else {
+    console.warn(`switchPrepTab: unknown tab "${tabName}"`);
   }
 };
 
@@ -1951,6 +2026,10 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closePrepMode();
   }
+});
+
+document.querySelectorAll(".prep-tab").forEach((btn) => {
+  btn.addEventListener("click", () => switchPrepTab(btn.dataset.prepTab));
 });
 
 setActiveTab("dashboard");
