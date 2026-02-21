@@ -135,6 +135,7 @@ RUN_STATE_PATH = Path(
     os.getenv("JOB_DIGEST_RUN_STATE", str(DIGEST_DIR / "run_state.json"))
 )
 FORCE_RUN = os.getenv("JOB_DIGEST_FORCE_RUN", "false").lower() == "true"
+SUMMARY_MAX_CHARS = int(os.getenv("JOB_DIGEST_SUMMARY_MAX_CHARS", "1600"))
 
 EMAIL_ENABLED = os.getenv("JOB_DIGEST_EMAIL_ENABLED", "true").lower() == "true"
 SMTP_HOST = os.getenv("SMTP_HOST", "")
@@ -1183,6 +1184,12 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip())
 
 
+def trim_summary(text: str) -> str:
+    if not text:
+        return ""
+    return normalize_text(text)[:SUMMARY_MAX_CHARS]
+
+
 RELATIVE_DATE_REGEX = re.compile(
     r"(reposted\s+\d+\s+days?\s+ago|\d+\s+days?\s+ago|\d+\s+hours?\s+ago|\d+\s+minutes?\s+ago|yesterday|today|new)",
     re.IGNORECASE,
@@ -1624,9 +1631,10 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
             "Bullets must be short, action-led, and include metrics if possible. "
             "If the job text includes Qualifications/Requirements, extract 3-6 key requirements into "
             "key_requirements and use match_notes to compare against the candidate profile.\n\n"
-            "Role_summary must be STRICTLY based on job text and include two sections with bullet lines:\n"
-            "Role responsibilities:\n- ...\n- ...\nWhat they're looking for:\n- ...\n- ...\n"
-            "Use requirements/qualifications/skills if present. If not stated, write '- Not available in posting'.\n"
+            "Role_summary must be STRICTLY based on job text and include two sections with bullet lines (use exact headings):\n"
+            "Role responsibilities (what the job entails):\n- ...\n- ...\n"
+            "What we're looking for (requirements/qualifications):\n- ...\n- ...\n"
+            "Do not infer beyond job text. If not stated, write '- Not available in posting'.\n"
             "Tailored_summary must explicitly reference 2-3 stated job requirements and map them to the "
             "candidate's relevant experience.\n\n"
             f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
@@ -1698,9 +1706,10 @@ def enhance_records_with_gemini(records: List[JobRecord]) -> List[JobRecord]:
             "Bullets must be short, action-led, and include metrics if possible. "
             "If the job text includes Qualifications/Requirements, extract 3-6 key requirements into "
             "key_requirements and use match_notes to compare against the candidate profile.\n\n"
-            "Role_summary must be STRICTLY based on job text and include two sections with bullet lines:\n"
-            "Role responsibilities:\n- ...\n- ...\nWhat they're looking for:\n- ...\n- ...\n"
-            "Use requirements/qualifications/skills if present. If not stated, write '- Not available in posting'.\n"
+            "Role_summary must be STRICTLY based on job text and include two sections with bullet lines (use exact headings):\n"
+            "Role responsibilities (what the job entails):\n- ...\n- ...\n"
+            "What we're looking for (requirements/qualifications):\n- ...\n- ...\n"
+            "Do not infer beyond job text. If not stated, write '- Not available in posting'.\n"
             "Tailored_summary must explicitly reference 2-3 stated job requirements and map them to the "
             "candidate's relevant experience.\n\n"
             f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
@@ -2798,7 +2807,7 @@ def rss_search(session: requests.Session, url: str, source_name: str) -> List[Di
         link = entry.get("link", "") if isinstance(entry, dict) else ""
         summary = ""
         if isinstance(entry, dict) and entry.get("summary"):
-            summary = normalize_text(entry.get("summary", ""))
+            summary = trim_summary(entry.get("summary", ""))
         posted_date = parse_entry_date(entry)
 
         company = entry.get("author", "") if isinstance(entry, dict) else ""
@@ -2849,7 +2858,7 @@ def remotive_search(session: requests.Session) -> List[Dict[str, str]]:
                 "link": job.get("url", ""),
                 "posted_text": "",
                 "posted_date": job.get("publication_date", ""),
-                "summary": normalize_text(job.get("description", "")[:500]),
+                "summary": trim_summary(job.get("description", "")),
                 "source": "Remotive",
             }
         )
@@ -2885,7 +2894,7 @@ def remoteok_search(session: requests.Session) -> List[Dict[str, str]]:
                 "link": job.get("url", ""),
                 "posted_text": "",
                 "posted_date": job.get("date", ""),
-                "summary": normalize_text(job.get("description", "")[:500]),
+                "summary": trim_summary(job.get("description", "")),
                 "source": "RemoteOK",
             }
         )
@@ -2921,7 +2930,7 @@ def jobicy_search(session: requests.Session) -> List[Dict[str, str]]:
                 "link": job.get("url", "") or job.get("jobUrl", ""),
                 "posted_text": "",
                 "posted_date": job.get("pubDate", "") or job.get("postedDate", ""),
-                "summary": normalize_text(job.get("description", "")[:500]),
+                "summary": trim_summary(job.get("description", "")),
                 "source": "Jobicy",
             }
         )
@@ -2964,7 +2973,7 @@ def meetfrank_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": job.get("applyUrl", "") or job.get("url", ""),
                     "posted_text": "",
                     "posted_date": job.get("publishedAt", ""),
-                    "summary": normalize_text((job.get("description") or "")[:500]),
+                    "summary": trim_summary(job.get("description") or ""),
                     "source": "MeetFrank",
                 }
             )
@@ -3014,7 +3023,7 @@ def adzuna_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": job.get("redirect_url", ""),
                     "posted_text": "",
                     "posted_date": job.get("created", ""),
-                    "summary": normalize_text((job.get("description") or "")[:500]),
+                    "summary": trim_summary(job.get("description") or ""),
                     "source": "Adzuna",
                 }
             )
@@ -3060,7 +3069,7 @@ def jooble_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": job.get("link", "") or job.get("url", ""),
                     "posted_text": "",
                     "posted_date": job.get("updated", "") or job.get("date", ""),
-                    "summary": normalize_text((job.get("snippet") or job.get("description") or "")[:500]),
+                    "summary": trim_summary(job.get("snippet") or job.get("description") or ""),
                     "source": "Jooble",
                 }
             )
@@ -3106,7 +3115,7 @@ def reed_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": job.get("jobUrl", ""),
                     "posted_text": "",
                     "posted_date": job.get("date", ""),
-                    "summary": normalize_text((job.get("jobDescription") or "")[:500]),
+                    "summary": trim_summary(job.get("jobDescription") or ""),
                     "source": "Reed",
                 }
             )
@@ -3154,7 +3163,7 @@ def cvlibrary_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": job.get("job_url") or job.get("joburl") or job.get("url") or "",
                     "posted_text": "",
                     "posted_date": job.get("date") or job.get("posted") or job.get("date_posted") or "",
-                    "summary": normalize_text((job.get("description") or job.get("short_description") or "")[:500]),
+                    "summary": trim_summary(job.get("description") or job.get("short_description") or ""),
                     "source": "CVLibrary",
                 }
             )
@@ -3245,7 +3254,7 @@ def parse_job_detail_jsonld(html: str, fallback_title: str = "") -> Dict[str, st
                 "company": company,
                 "location": location,
                 "posted_date": posted_date,
-                "summary": normalize_text(description)[:800],
+                "summary": trim_summary(description),
             }
     return {}
 
@@ -3282,7 +3291,7 @@ def parse_job_detail_fallback(html: str) -> Dict[str, str]:
         "location": "",
         "posted_date": "",
         "posted_text": posted_text,
-        "summary": normalize_text(description)[:800],
+        "summary": trim_summary(description),
     }
 
 
@@ -3424,7 +3433,7 @@ def workday_search(session: requests.Session) -> List[Dict[str, str]]:
                         "link": link,
                         "posted_text": "",
                         "posted_date": posted_date,
-                        "summary": normalize_text(summary)[:600],
+                        "summary": trim_summary(summary),
                         "source": "Workday",
                     }
                 )
@@ -3546,7 +3555,7 @@ def efinancialcareers_api_search(session: requests.Session) -> List[Dict[str, st
             summary = ""
             for key in ("description", "jobDescription", "summary"):
                 if isinstance(node.get(key), str):
-                    summary = normalize_text(node.get(key))[:600]
+                    summary = trim_summary(node.get(key))
             location = ""
             for key in ("location", "jobLocation", "city"):
                 if isinstance(node.get(key), str):
@@ -3743,7 +3752,7 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
             if isinstance(entry, dict):
                 title = entry.get("title", "")
                 link = entry.get("link", "")
-                summary = normalize_text(entry.get("summary", "")) if entry.get("summary") else ""
+                summary = trim_summary(entry.get("summary", "")) if entry.get("summary") else ""
                 company = entry.get("author", "") or "Indeed"
             else:
                 title = ""
@@ -3822,7 +3831,7 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": link,
                     "posted_text": posted_text,
                     "posted_date": "",
-                    "summary": normalize_text(snippet_el.get_text(" ")) if snippet_el else "",
+                    "summary": trim_summary(snippet_el.get_text(" ") if snippet_el else ""),
                     "source": "IndeedUK",
                 }
         else:
