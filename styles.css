@@ -778,6 +778,23 @@ body {
   margin-top: 4px;
 }
 
+.follow-up-card__snooze {
+  margin-top: 8px;
+  background: #fff;
+  border: 1px solid #f5c87a;
+  color: #92400e;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.follow-up-card__snooze:hover {
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
 .toast {
   position: fixed;
   bottom: 24px;
@@ -846,6 +863,34 @@ body {
 
 .alert strong {
   font-weight: 700;
+}
+
+.banner {
+  margin-top: 12px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #1e1b4b;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.banner__sub {
+  display: inline-block;
+  margin-left: 8px;
+  color: #6366f1;
+  font-weight: 500;
+}
+
+.banner__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* ───────────────────────────────────────

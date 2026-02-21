@@ -3996,7 +3996,7 @@ const checkNewJobNotifications = (jobs) => {
     const knownRaw = localStorage.getItem("known_job_ids");
     const knownIds = knownRaw ? new Set(JSON.parse(knownRaw)) : new Set();
     const currentIds = jobs.map((j) => j.id);
-    const newHighFit = jobs.filter((j) => !knownIds.has(j.id) && j.fit_score >= 80);
+    const newHighFit = jobs.filter((j) => !knownIds.has(j.id) && j.fit_score >= NOTIFICATION_THRESHOLD);
     if (newHighFit.length > 0) {
       const top = newHighFit[0];
       new Notification(`${newHighFit.length} new high-fit role${newHighFit.length > 1 ? "s" : ""}`, {
