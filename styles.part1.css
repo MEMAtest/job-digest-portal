@@ -289,6 +289,8 @@ body {
 .job-grid {
   display: grid;
   gap: 18px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .stats-grid {
@@ -346,12 +348,14 @@ body {
   display: grid;
   gap: 14px;
   box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+  align-items: start;
 }
 
 .job-card__header {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  align-items: flex-start;
 }
 
 .job-card__info {
@@ -456,17 +460,15 @@ body {
 
 .job-card__details {
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
   gap: 14px;
   overflow: visible;
   padding-bottom: 0;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
 .job-card__details.detail-carousel {
   display: grid;
-  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
   gap: 14px;
 }
 
@@ -474,7 +476,6 @@ body {
   .job-card__details,
   .job-card__details.detail-carousel {
     grid-template-columns: repeat(2, minmax(240px, 1fr));
-    max-width: 960px;
   }
 }
 
@@ -482,7 +483,6 @@ body {
   .job-card__details,
   .job-card__details.detail-carousel {
     grid-template-columns: 1fr;
-    max-width: 720px;
   }
 }
 

@@ -244,7 +244,7 @@ export const renderJobs = () => {
 
     const card = document.createElement("div");
     card.className = "job-card";
-    const postedDisplay = job.posted_raw || job.posted || "";
+    const postedDisplay = job.posted_raw || job.posted || job.posted_date || "";
     const applicantDisplay = job.applicant_count ? ` · ${job.applicant_count} applicants` : "";
     const openStatus =
       job.job_status ||
@@ -492,10 +492,7 @@ export const renderJobs = () => {
           });
           job.application_status = "dismissed";
           job.dismiss_reason = "manual";
-          const metaDivs = card.querySelectorAll(".job-card__meta");
-          metaDivs.forEach((m) => {
-            if (m.textContent.startsWith("Status:")) m.textContent = "Status: dismissed · manual";
-          });
+          card.remove();
           showToast("Dismissed");
         } catch (err) {
           console.error(err);

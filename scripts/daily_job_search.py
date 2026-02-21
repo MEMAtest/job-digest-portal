@@ -74,6 +74,8 @@ class JobRecord:
     location: str
     link: str
     posted: str
+    posted_raw: str = ""
+    posted_date: str = ""
     source: str
     fit_score: int
     preference_match: str
@@ -97,6 +99,7 @@ class JobRecord:
     apply_tips: str = ""
     tailored_cv_sections: dict = field(default_factory=dict)
     applicant_count: str = ""
+    job_status: str = ""
     alternate_links: List[Dict[str, str]] = field(default_factory=list)
 
 
@@ -1862,6 +1865,8 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "location": record.location,
             "link": record.link,
             "posted": record.posted,
+            "posted_raw": record.posted_raw or record.posted,
+            "posted_date": record.posted_date,
             "source": record.source,
             "fit_score": record.fit_score,
             "preference_match": record.preference_match,
@@ -1897,6 +1902,7 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "scorecard": record.scorecard,
             "tailored_cv_sections": record.tailored_cv_sections,
             "applicant_count": record.applicant_count,
+            "job_status": record.job_status,
             "alternate_links": record.alternate_links,
         }
         for key, value in optional_fields.items():
@@ -4149,7 +4155,8 @@ def main() -> None:
             continue
 
         posted_text = posted_detail or job.get("posted_text", "")
-        if not parse_posted_within_window(posted_text, job.get("posted_date", ""), WINDOW_HOURS):
+        posted_date = job.get("posted_date", "")
+        if not parse_posted_within_window(posted_text, posted_date, WINDOW_HOURS):
             continue
 
         summary = desc_text[:500]
@@ -4170,6 +4177,8 @@ def main() -> None:
                 location=location,
                 link=job.get("link", ""),
                 posted=posted_text,
+                posted_raw=posted_text,
+                posted_date=posted_date,
                 source="LinkedIn",
                 fit_score=score,
                 preference_match=preference_match,
@@ -4212,6 +4221,8 @@ def main() -> None:
                 location=location,
                 link=job.get("link", ""),
                 posted=posted_text or posted_date,
+                posted_raw=posted_text or posted_date,
+                posted_date=posted_date,
                 source="Greenhouse",
                 fit_score=score,
                 preference_match=preference_match,
@@ -4253,6 +4264,8 @@ def main() -> None:
                 location=location,
                 link=job.get("link", ""),
                 posted=posted_text or posted_date,
+                posted_raw=posted_text or posted_date,
+                posted_date=posted_date,
                 source="Lever",
                 fit_score=score,
                 preference_match=preference_match,
@@ -4294,6 +4307,8 @@ def main() -> None:
                 location=location,
                 link=job.get("link", ""),
                 posted=posted_text or posted_date,
+                posted_raw=posted_text or posted_date,
+                posted_date=posted_date,
                 source="SmartRecruiters",
                 fit_score=score,
                 preference_match=preference_match,
@@ -4335,6 +4350,8 @@ def main() -> None:
                 location=location,
                 link=job.get("link", ""),
                 posted=posted_text or posted_date,
+                posted_raw=posted_text or posted_date,
+                posted_date=posted_date,
                 source="Ashby",
                 fit_score=score,
                 preference_match=preference_match,
@@ -4376,6 +4393,8 @@ def main() -> None:
                 location=location,
                 link=job.get("link", ""),
                 posted=posted_text or posted_date,
+                posted_raw=posted_text or posted_date,
+                posted_date=posted_date,
                 source=job.get("source", "Job board"),
                 fit_score=score,
                 preference_match=preference_match,
