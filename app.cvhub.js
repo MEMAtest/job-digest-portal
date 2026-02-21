@@ -325,13 +325,13 @@ export const renderCvHub = () => {
           .map((sec) => {
             const content = sec.isArray ? formatList(base[sec.key]) : formatInlineText(String(base[sec.key] || ""));
             return `
-              <div class="cv-base-section">
-                <div class="cv-base-section__header">
+              <details class="cv-base-section">
+                <summary class="cv-base-section__header">
                   <h4>${sec.label}</h4>
                   <button class="btn btn-tertiary cv-base-edit-btn" data-cv-key="${sec.key}">Edit</button>
-                </div>
+                </summary>
                 <div class="cv-base-content" data-cv-key="${sec.key}">${content}</div>
-              </div>
+              </details>
             `;
           })
           .join("")}
@@ -437,6 +437,16 @@ export const renderCvHub = () => {
     });
   });
 
+  hub.querySelectorAll(".cv-base-section").forEach((detailEl) => {
+    const content = detailEl.querySelector(".cv-base-content");
+    if (content) {
+      content.style.maxHeight = detailEl.open ? `${content.scrollHeight}px` : "0px";
+    }
+    detailEl.addEventListener("toggle", () => {
+      if (content) content.style.maxHeight = detailEl.open ? `${content.scrollHeight}px` : "0px";
+    });
+  });
+
   hub.querySelectorAll(".cv-hub-filter-pill").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.cvHubFilter = btn.dataset.filter;
@@ -469,7 +479,9 @@ export const renderCvHub = () => {
   }
 
   hub.querySelectorAll(".cv-base-edit-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
       const key = btn.dataset.cvKey;
       const contentEl = hub.querySelector(`.cv-base-content[data-cv-key="${key}"]`);
       if (!contentEl) return;

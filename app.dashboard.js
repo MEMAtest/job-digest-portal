@@ -271,8 +271,10 @@ const renderPrepBoard = () => {
   if (prepDetailTabs && prepDetailTabs.dataset.bound !== "true") {
     prepDetailTabs.querySelectorAll(".prep-detail-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
-        prepActiveTab = btn.dataset.prepTab;
-        renderPrepDetail();
+        const nextTab = btn.dataset.prepTab;
+        prepActiveSection = nextTab;
+        prepActiveTab = nextTab;
+        renderPrepBoard();
       });
     });
     prepDetailTabs.dataset.bound = "true";
