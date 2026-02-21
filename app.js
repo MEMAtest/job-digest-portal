@@ -50,9 +50,12 @@ const state = {
   locations: new Set(),
   candidatePrep: {},
   activePrepJob: null,
+  hubSort: null,
   triageQueue: [],
   triageIndex: 0,
   triageStats: { dismissed: 0, shortlisted: 0, apply: 0 },
+  triageLastAction: null,
+  selectedJobs: new Set(),
 };
 
 let quickFilterPredicate = null;
@@ -197,6 +200,33 @@ const safeLocalStorageSet = (key, value) => {
   } catch (error) {
     // ignore storage failures (private mode, blocked storage)
   }
+};
+
+const loadHubSort = () => {
+  try {
+    const stored = safeLocalStorageGet("hub_sort");
+    if (stored) return JSON.parse(stored);
+  } catch (error) {
+    // ignore
+  }
+  return { field: "fit_score", asc: false };
+};
+
+const saveHubSort = (sort) => {
+  try {
+    safeLocalStorageSet("hub_sort", JSON.stringify(sort));
+  } catch (error) {
+    // ignore
+  }
+};
+
+state.hubSort = loadHubSort();
+
+const parseApplicantCount = (value) => {
+  if (!value) return null;
+  const match = String(value).match(/(\d[\d,]*)/);
+  if (!match) return null;
+  return Number(match[1].replace(/,/g, ""));
 };
 
 const showToast = (message, duration = 2500) => {
@@ -469,45 +499,35 @@ const quickApply = async (job, card) => {
     window.open(job.link, "_blank", "noopener");
   }
 
+  // 2b. Mark link visited in checklist
+  await saveApplyChecklist(job, { job_link_visited: true });
+
   // 3. Confirm toast — don't auto-mark as applied
   if (shouldMarkApplied) {
     if (db) {
       showConfirmToast("CV copied & link opened", "Mark as Applied", async () => {
+        await saveApplyChecklist(job, { job_link_visited: true }, { markApplied: true });
         const today = new Date().toISOString().slice(0, 10);
         const now = new Date().toISOString();
-        const payload = {
-          application_status: "applied",
-          application_date: `${today}T00:00:00.000Z`,
-          last_touch_date: now,
-          updated_at: now,
-        };
-        try {
-          await updateDoc(doc(db, collectionName, job.id), payload);
-          job.application_status = "applied";
-          job.application_date = payload.application_date;
-          job.last_touch_date = payload.last_touch_date;
 
-          if (card) {
-            const metaDivs = card.querySelectorAll(".job-card__meta");
-            metaDivs.forEach((m) => {
-              if (m.textContent.startsWith("Status:")) m.textContent = "Status: applied";
-            });
-            const trackingSelect = card.querySelector(".tracking-status");
-            if (trackingSelect) trackingSelect.value = "applied";
-            const appliedInput = card.querySelector(".tracking-applied");
-            if (appliedInput) appliedInput.value = today;
-            const lastTouchInput = card.querySelector(".tracking-last-touch");
-            if (lastTouchInput) lastTouchInput.value = now.slice(0, 10);
-            const qaBtn = card.querySelector(".btn-quick-apply");
-            if (qaBtn) {
-              qaBtn.textContent = "Re-copy & Open";
-              qaBtn.classList.add("btn-quick-apply--done");
-            }
+        if (card) {
+          const metaDivs = card.querySelectorAll(".job-card__meta");
+          metaDivs.forEach((m) => {
+            if (m.textContent.startsWith("Status:")) m.textContent = "Status: applied";
+          });
+          const trackingSelect = card.querySelector(".tracking-status");
+          if (trackingSelect) trackingSelect.value = "applied";
+          const appliedInput = card.querySelector(".tracking-applied");
+          if (appliedInput) appliedInput.value = today;
+          const lastTouchInput = card.querySelector(".tracking-last-touch");
+          if (lastTouchInput) lastTouchInput.value = now.slice(0, 10);
+          const qaBtn = card.querySelector(".btn-quick-apply");
+          if (qaBtn) {
+            qaBtn.textContent = "Re-copy & Open";
+            qaBtn.classList.add("btn-quick-apply--done");
           }
-          showToast("Marked as applied");
-        } catch (err) {
-          console.error("quickApply Firestore update failed:", err);
         }
+        showToast("Marked as applied");
       });
     } else {
       showToast("Copied + opened link");
@@ -1067,9 +1087,10 @@ const formatApplicantBadge = (text) => {
   const match = text.match(/(\d+)/);
   if (!match) return "";
   const num = parseInt(match[1], 10);
-  if (num >= 100) return `<span class="badge badge--applicants-red">${num}+ applicants — Act fast</span>`;
-  if (num >= 50) return `<span class="badge badge--applicants-amber">${num}+ applicants</span>`;
-  if (num > 0) return `<span class="badge badge--applicants-green">${escapeHtml(text)}</span>`;
+  const tooltip = escapeHtml(text);
+  if (num >= 100) return `<span class="badge badge--applicants-red" title="${tooltip}">${num}+ applicants — Act fast</span>`;
+  if (num >= 50) return `<span class="badge badge--applicants-amber" title="${tooltip}">${num}+ applicants</span>`;
+  if (num > 0) return `<span class="badge badge--applicants-green" title="${tooltip}">${escapeHtml(text)}</span>`;
   return "";
 };
 
@@ -1095,6 +1116,7 @@ const closeTriageMode = () => {
   document.body.style.overflow = "";
   state.triageQueue = [];
   state.triageIndex = 0;
+  state.triageLastAction = null;
 };
 
 const renderTriageCard = () => {
@@ -1136,11 +1158,12 @@ const renderTriageCard = () => {
       <p class="triage-card__posted">${escapeHtml(formatPosted(job.posted))}</p>
       <div class="triage-card__summary">${formatInlineText(job.tailored_summary || job.role_summary || "")}</div>
       <div class="triage-card__fit">${formatInlineText(job.why_fit || "")}</div>
+      ${job.application_notes ? `<div class="triage-card__note">${escapeHtml(job.application_notes)}</div>` : ""}
       <div class="triage-actions">
-        <button class="triage-btn triage-btn--dismiss" data-action="dismiss">Not interested</button>
-        <button class="triage-btn triage-btn--skip" data-action="skip">Skip</button>
-        <button class="triage-btn triage-btn--maybe" data-action="shortlist">Shortlist</button>
-        <button class="triage-btn triage-btn--apply" data-action="apply">Apply</button>
+        <button class="triage-btn triage-btn--dismiss" data-action="dismiss">Not interested <span class="triage-btn__hint">\u2190</span></button>
+        <button class="triage-btn triage-btn--skip" data-action="skip">Skip <span class="triage-btn__hint">Space</span></button>
+        <button class="triage-btn triage-btn--maybe" data-action="shortlist">Shortlist <span class="triage-btn__hint">\u2192</span></button>
+        <button class="triage-btn triage-btn--apply" data-action="apply">Apply <span class="triage-btn__hint">\u2191</span></button>
       </div>
     </div>
   `;
@@ -1183,9 +1206,44 @@ const renderTriageCard = () => {
   }
 };
 
+const undoTriageAction = async () => {
+  const last = state.triageLastAction;
+  if (!last) return;
+
+  const { index, job, previousStatus, action } = last;
+
+  if (db) {
+    try {
+      await updateDoc(doc(db, collectionName, job.id), {
+        application_status: previousStatus,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("Undo triage failed:", err);
+      showToast("Undo failed — check your connection.");
+      return;
+    }
+  }
+
+  job.application_status = previousStatus;
+
+  if (action === "dismiss") state.triageStats.dismissed = Math.max(0, state.triageStats.dismissed - 1);
+  else if (action === "shortlist") state.triageStats.shortlisted = Math.max(0, state.triageStats.shortlisted - 1);
+  else if (action === "apply") state.triageStats.apply = Math.max(0, state.triageStats.apply - 1);
+
+  state.triageIndex = index;
+  state.triageLastAction = null;
+  renderTriageCard();
+};
+
+let triageActionInFlight = false;
+
 const handleTriageAction = async (action) => {
+  if (triageActionInFlight) return;
+  triageActionInFlight = true;
+
   const job = state.triageQueue[state.triageIndex];
-  if (!job) return;
+  if (!job) { triageActionInFlight = false; return; }
 
   const card = triageContent.querySelector("#triage-active-card");
 
@@ -1193,7 +1251,7 @@ const handleTriageAction = async (action) => {
     if (card) card.classList.add("triage-card--exit-up");
     state.triageStats.skipped = (state.triageStats.skipped || 0) + 1;
     state.triageIndex++;
-    setTimeout(() => renderTriageCard(), 300);
+    setTimeout(() => { triageActionInFlight = false; renderTriageCard(); }, 300);
     return;
   }
 
@@ -1204,7 +1262,10 @@ const handleTriageAction = async (action) => {
 
   const statusMap = { dismiss: "dismissed", shortlist: "shortlisted", apply: "ready_to_apply" };
   const newStatus = statusMap[action];
+  const oldStatus = job.application_status || "saved";
   const now = new Date().toISOString();
+
+  state.triageLastAction = { index: state.triageIndex, job, previousStatus: oldStatus, action };
 
   if (db) {
     try {
@@ -1222,8 +1283,11 @@ const handleTriageAction = async (action) => {
   else if (action === "shortlist") state.triageStats.shortlisted++;
   else if (action === "apply") state.triageStats.apply++;
 
+  const actionLabels = { dismiss: "Dismissed", shortlist: "Shortlisted", apply: "Ready to Apply" };
+  showConfirmToast(actionLabels[action] || "Done", "Undo", undoTriageAction, 4000);
+
   state.triageIndex++;
-  setTimeout(() => renderTriageCard(), 300);
+  setTimeout(() => { triageActionInFlight = false; renderTriageCard(); }, 300);
 };
 
 // Triage event listeners
@@ -1241,11 +1305,12 @@ if (triageOverlay) {
 const triageEntryBtn = document.getElementById("triage-btn");
 if (triageEntryBtn) {
   triageEntryBtn.addEventListener("click", () => {
-    const savedJobs = state.jobs.filter((j) => {
+    const filtered = getFilteredJobs();
+    const triageable = filtered.filter((j) => {
       const s = (j.application_status || "saved").toLowerCase();
       return s === "saved";
     });
-    openTriageMode(savedJobs);
+    openTriageMode(triageable);
   });
 }
 
@@ -1302,6 +1367,68 @@ const BASE_CV_SECTIONS = {
   ],
 };
 
+const hasCvTailoredChanges = (job) => {
+  const tailored = job.tailored_cv_sections || {};
+  const sections = ["summary", "key_achievements", "vistra_bullets", "ebury_bullets"];
+  return sections.some((key) => {
+    const tailoredVal = tailored[key];
+    const baseVal = BASE_CV_SECTIONS[key];
+    if (!tailoredVal) return false;
+    if (Array.isArray(tailoredVal)) {
+      return JSON.stringify(tailoredVal) !== JSON.stringify(baseVal || []);
+    }
+    if (typeof tailoredVal === "string") {
+      return tailoredVal.trim() !== String(baseVal || "").trim();
+    }
+    return false;
+  });
+};
+
+const resolveChecklistState = (job) => {
+  const auto = {
+    cv_tailored: hasCvTailoredChanges(job),
+    cover_letter_reviewed: Boolean(job.cover_letter),
+    requirements_matched: (job.fit_score || 0) >= 75 && Array.isArray(job.key_requirements) && job.key_requirements.length > 0,
+    job_link_visited: false,
+    application_submitted: (job.application_status || "").toLowerCase() === "applied",
+  };
+  const existing = job.apply_checklist || {};
+  const merged = { ...auto, ...existing };
+  if ((job.application_status || "").toLowerCase() === "applied") {
+    merged.application_submitted = true;
+  }
+  return merged;
+};
+
+const saveApplyChecklist = async (job, updates, options = {}) => {
+  if (!job) return;
+  const next = { ...resolveChecklistState(job), ...updates };
+  if (options.markApplied) {
+    next.application_submitted = true;
+  }
+  job.apply_checklist = next;
+
+  if (!db) return;
+  const payload = {
+    apply_checklist: next,
+    updated_at: new Date().toISOString(),
+  };
+  if (options.markApplied) {
+    const today = new Date().toISOString().slice(0, 10);
+    payload.application_status = "applied";
+    payload.application_date = `${today}T00:00:00.000Z`;
+    payload.last_touch_date = new Date().toISOString();
+    job.application_status = "applied";
+    job.application_date = payload.application_date;
+    job.last_touch_date = payload.last_touch_date;
+  }
+  try {
+    await updateDoc(doc(db, collectionName, job.id), payload);
+  } catch (error) {
+    console.error("Checklist save failed:", error);
+  }
+};
+
 const buildCvDiff = (job) => {
   const tailored = job.tailored_cv_sections || {};
   const sections = [
@@ -1344,6 +1471,40 @@ const buildCvDiff = (job) => {
   return html;
 };
 
+const buildPreviewText = (html) => {
+  const temp = document.createElement("div");
+  temp.innerHTML = html;
+  const text = (temp.textContent || "").trim();
+  if (!text) return "";
+  return text.length > 90 ? `${text.slice(0, 90)}…` : text;
+};
+
+const sortHubJobs = (jobs) => {
+  const sort = state.hubSort || { field: "fit_score", asc: false };
+  const sorted = [...jobs];
+  const dir = sort.asc ? 1 : -1;
+
+  sorted.sort((a, b) => {
+    if (sort.field === "company") {
+      return dir * String(a.company || "").localeCompare(String(b.company || ""));
+    }
+    if (sort.field === "posted") {
+      const da = parseDateValue(a.posted) || new Date(0);
+      const db2 = parseDateValue(b.posted) || new Date(0);
+      return dir * (da - db2);
+    }
+    if (sort.field === "applicant_count") {
+      const ca = parseApplicantCount(a.applicant_count) ?? Number.POSITIVE_INFINITY;
+      const cb = parseApplicantCount(b.applicant_count) ?? Number.POSITIVE_INFINITY;
+      return dir * (ca - cb);
+    }
+    // default: fit score
+    return dir * ((a.fit_score || 0) - (b.fit_score || 0));
+  });
+
+  return sorted;
+};
+
 const renderApplyHub = () => {
   const hubContainer = document.getElementById("apply-hub");
   if (!hubContainer) return;
@@ -1367,8 +1528,45 @@ const renderApplyHub = () => {
     return;
   }
 
+  const sortedReady = sortHubJobs(readyJobs);
+  const sortedApplied = sortHubJobs(recentlyApplied);
+
+  const sortOptions = [
+    { field: "fit_score", label: "Fit" },
+    { field: "posted", label: "Date" },
+    { field: "company", label: "Company" },
+    { field: "applicant_count", label: "Applicants" },
+  ];
+
+  const currentSort = state.hubSort || { field: "fit_score", asc: false };
+
   const renderHubCard = (job, isApplied) => {
     const statusValue = (job.application_status || "saved").toLowerCase();
+    const checklist = resolveChecklistState(job);
+    const checklistItems = [
+      { key: "cv_tailored", label: "CV tailored" },
+      { key: "cover_letter_reviewed", label: "Cover letter reviewed" },
+      { key: "requirements_matched", label: "Requirements matched" },
+      { key: "job_link_visited", label: "Job link visited" },
+      { key: "application_submitted", label: "Application submitted" },
+    ];
+    const readyCount = checklistItems.reduce((acc, item) => acc + (checklist[item.key] ? 1 : 0), 0);
+    const readyTotal = checklistItems.length;
+    const readyPct = Math.round((readyCount / readyTotal) * 100);
+    const allReady = readyCount === readyTotal;
+    const cvDiffHtml = buildCvDiff(job);
+    const cvDiffPreview = buildPreviewText(cvDiffHtml);
+    const summaryPreview = buildPreviewText(formatInlineText(job.tailored_summary || ""));
+    const coverPreview = buildPreviewText(formatInlineText(job.cover_letter || ""));
+    const requirementsPreview = buildPreviewText(formatList(job.key_requirements || []));
+    const noteText = job.application_notes || "";
+    const noteCount = Math.min(noteText.length, 500);
+    const actionLabel =
+      statusValue === "applied" || statusValue === "interview" || statusValue === "offer"
+        ? "Re-copy & Open"
+        : allReady
+          ? "Ready — Apply now"
+          : "Copy & View";
     return `
       <div class="hub-card${isApplied ? " hub-card--applied" : ""}" data-job-id="${escapeHtml(job.id)}">
         <div class="hub-card__header">
@@ -1379,46 +1577,171 @@ const renderApplyHub = () => {
           <span class="${formatFitBadge(job.fit_score)}">${job.fit_score}%</span>
         </div>
 
-        <div class="hub-card__section">
-          <h4>Key Requirements</h4>
-          ${formatList(job.key_requirements || [])}
+        <div class="hub-card__progress">
+          <div class="hub-progress__bar"><span style="width:${readyPct}%;"></span></div>
+          <div class="hub-progress__label">${readyCount}/${readyTotal} ready</div>
         </div>
 
-        <div class="hub-card__section">
-          <h4>What Changed in Your CV</h4>
-          <div class="cv-diff">${buildCvDiff(job)}</div>
-        </div>
-
-        <div class="hub-card__section">
-          <h4>Tailored Summary</h4>
-          <div>${formatInlineText(job.tailored_summary || "")}</div>
-        </div>
-
-        <details class="hub-card__section">
-          <summary><h4 style="display:inline;cursor:pointer;">Cover Letter</h4></summary>
-          <div class="long-text">${formatInlineText(job.cover_letter || "")}</div>
+        <details class="hub-card__section" data-section="requirements" open>
+          <summary>
+            <h4>Key Requirements</h4>
+            <span class="hub-card__preview">${escapeHtml(requirementsPreview || "No requirements yet.")}</span>
+          </summary>
+          <div class="hub-card__content">
+            ${formatList(job.key_requirements || [])}
+          </div>
         </details>
 
+        <details class="hub-card__section" data-section="cv_diff">
+          <summary>
+            <h4>What Changed in Your CV</h4>
+            <span class="hub-card__preview">${escapeHtml(cvDiffPreview || "CV diff ready once tailored.")}</span>
+          </summary>
+          <div class="hub-card__content">
+            <div class="cv-diff">${cvDiffHtml}</div>
+          </div>
+        </details>
+
+        <details class="hub-card__section" data-section="summary">
+          <summary>
+            <h4>Tailored Summary</h4>
+            <span class="hub-card__preview">${escapeHtml(summaryPreview || "Summary will appear after enrichment.")}</span>
+          </summary>
+          <div class="hub-card__content">
+            <div>${formatInlineText(job.tailored_summary || "")}</div>
+          </div>
+        </details>
+
+        <details class="hub-card__section" data-section="cover_letter">
+          <summary>
+            <h4>Cover Letter</h4>
+            <span class="hub-card__preview">${escapeHtml(coverPreview || "Cover letter not generated yet.")}</span>
+          </summary>
+          <div class="hub-card__content">
+            <div class="long-text">${formatInlineText(job.cover_letter || "")}</div>
+          </div>
+        </details>
+
+        <div class="hub-card__checklist">
+          <div class="hub-checklist__title">Apply checklist</div>
+          <div class="hub-checklist__items">
+            ${checklistItems
+              .map(
+                (item) => `
+              <label class="checklist-item">
+                <input type="checkbox" data-check="${item.key}" ${checklist[item.key] ? "checked" : ""} />
+                <span>${item.label}</span>
+                ${checklist[item.key] ? "<span class=\"checklist-tag checklist-tag--done\">Done</span>" : "<span class=\"checklist-tag checklist-tag--warn\">Review needed</span>"}
+              </label>`
+              )
+              .join("")}
+          </div>
+        </div>
+
         <div class="hub-card__actions">
-          <button class="btn btn-primary btn-quick-apply" data-job-id="${escapeHtml(job.id)}">${statusValue === "applied" ? "Re-copy & Open" : "Copy & View"}</button>
+          <button class="btn btn-primary btn-quick-apply ${allReady ? "btn-quick-apply--ready" : ""}" data-job-id="${escapeHtml(job.id)}">${actionLabel}</button>
           <button class="btn btn-secondary download-cv-btn" data-job-id="${escapeHtml(job.id)}">Download CV PDF</button>
           <button class="btn btn-tertiary copy-cv-text-btn" data-job-id="${escapeHtml(job.id)}">Copy CV text</button>
+        </div>
+
+        <div class="hub-card__notes">
+          <label for="notes-${escapeHtml(job.id)}">Application notes</label>
+          <textarea id="notes-${escapeHtml(job.id)}" class="hub-notes" data-job-id="${escapeHtml(job.id)}" maxlength="500" placeholder="Add notes — recruiter name, referral, conversation context...">${escapeHtml(noteText)}</textarea>
+          <div class="hub-notes__meta">
+            <span class="hub-notes__count">${noteCount}/500</span>
+            <span class="hub-notes__saved hidden">Saved</span>
+          </div>
         </div>
       </div>
     `;
   };
 
   let html = "";
-  if (readyJobs.length) {
-    html += `<div class="section-title" style="margin-bottom:12px;">Ready to Apply (${readyJobs.length})</div>`;
-    html += readyJobs.map((j) => renderHubCard(j, false)).join("");
+  html += `
+    <div class="hub-controls">
+      <div class="hub-sort">
+        ${sortOptions
+          .map((opt) => {
+            const active = currentSort.field === opt.field;
+            const arrow = active ? (currentSort.asc ? "↑" : "↓") : "";
+            return `<button class="hub-sort__pill ${active ? "active" : ""}" data-sort="${opt.field}">${opt.label} ${arrow}</button>`;
+          })
+          .join("")}
+      </div>
+      <button class="btn btn-secondary hub-toggle" data-toggle="expand">Expand all</button>
+    </div>
+  `;
+
+  if (sortedReady.length) {
+    html += `<div class="section-title" style="margin-bottom:12px;">Ready to Apply (${sortedReady.length})</div>`;
+    html += sortedReady.map((j) => renderHubCard(j, false)).join("");
   }
-  if (recentlyApplied.length) {
-    html += `<div class="section-title" style="margin-top:24px;margin-bottom:12px;">Recently Applied (${recentlyApplied.length})</div>`;
-    html += recentlyApplied.map((j) => renderHubCard(j, true)).join("");
+  if (sortedApplied.length) {
+    html += `<div class="section-title" style="margin-top:24px;margin-bottom:12px;">Recently Applied (${sortedApplied.length})</div>`;
+    html += sortedApplied.map((j) => renderHubCard(j, true)).join("");
   }
 
   hubContainer.innerHTML = html;
+
+  // Sort controls
+  hubContainer.querySelectorAll(".hub-sort__pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.sort;
+      if (!field) return;
+      if (state.hubSort.field === field) {
+        state.hubSort.asc = !state.hubSort.asc;
+      } else {
+        state.hubSort.field = field;
+        state.hubSort.asc = field === "company";
+      }
+      saveHubSort(state.hubSort);
+      renderApplyHub();
+    });
+  });
+
+  const hubToggleBtn = hubContainer.querySelector(".hub-toggle");
+  if (hubToggleBtn) {
+    hubToggleBtn.addEventListener("click", () => {
+      const details = hubContainer.querySelectorAll(".hub-card__section");
+      const shouldOpen = hubToggleBtn.dataset.toggle !== "collapse";
+      details.forEach((detailEl) => {
+        detailEl.open = shouldOpen;
+        const content = detailEl.querySelector(".hub-card__content");
+        if (content) {
+          content.style.maxHeight = shouldOpen ? `${content.scrollHeight}px` : "0px";
+        }
+        const jobId = detailEl.closest(".hub-card")?.dataset?.jobId;
+        if (detailEl.dataset.section && jobId) {
+          sessionStorage.setItem(`hub_section_${jobId}_${detailEl.dataset.section}`, shouldOpen ? "open" : "closed");
+        }
+      });
+      hubToggleBtn.dataset.toggle = shouldOpen ? "collapse" : "expand";
+      hubToggleBtn.textContent = shouldOpen ? "Collapse all" : "Expand all";
+    });
+  }
+
+  // Restore section expand state + smooth animation
+  hubContainer.querySelectorAll(".hub-card__section").forEach((detailEl) => {
+    const jobId = detailEl.closest(".hub-card")?.dataset?.jobId;
+    const sectionKey = detailEl.dataset.section;
+    if (jobId && sectionKey) {
+      const stored = sessionStorage.getItem(`hub_section_${jobId}_${sectionKey}`);
+      if (stored === "open") detailEl.open = true;
+      if (stored === "closed") detailEl.open = false;
+    }
+    const content = detailEl.querySelector(".hub-card__content");
+    if (content) {
+      content.style.maxHeight = detailEl.open ? `${content.scrollHeight}px` : "0px";
+    }
+    detailEl.addEventListener("toggle", () => {
+      if (content) {
+        content.style.maxHeight = detailEl.open ? `${content.scrollHeight}px` : "0px";
+      }
+      if (jobId && sectionKey) {
+        sessionStorage.setItem(`hub_section_${jobId}_${sectionKey}`, detailEl.open ? "open" : "closed");
+      }
+    });
+  });
 
   // Wire up hub card buttons
   hubContainer.querySelectorAll(".btn-quick-apply").forEach((btn) => {
@@ -1447,9 +1770,119 @@ const renderApplyHub = () => {
       showToast("CV text copied");
     });
   });
+
+  // Checklist toggle handlers
+  hubContainer.querySelectorAll(".checklist-item input[type='checkbox']").forEach((checkbox) => {
+    checkbox.addEventListener("change", async (event) => {
+      const jobId = checkbox.closest(".hub-card")?.dataset?.jobId;
+      if (!jobId) return;
+      const job = state.jobs.find((j) => j.id === jobId);
+      if (!job) return;
+      const key = checkbox.dataset.check;
+      const updates = { [key]: checkbox.checked };
+      const markApplied = key === "application_submitted" && checkbox.checked;
+      await saveApplyChecklist(job, updates, { markApplied });
+      renderApplyHub();
+    });
+  });
+
+  // Notes autosave
+  const notesTimers = {};
+  hubContainer.querySelectorAll(".hub-notes").forEach((textarea) => {
+    const jobId = textarea.dataset.jobId;
+    const counter = textarea.parentElement?.querySelector(".hub-notes__count");
+    const saved = textarea.parentElement?.querySelector(".hub-notes__saved");
+    const updateCounter = () => {
+      const len = Math.min(textarea.value.length, 500);
+      if (counter) counter.textContent = `${len}/500`;
+    };
+    textarea.addEventListener("input", updateCounter);
+    textarea.addEventListener("blur", () => {
+      if (!jobId) return;
+      if (notesTimers[jobId]) clearTimeout(notesTimers[jobId]);
+      notesTimers[jobId] = setTimeout(async () => {
+        const job = state.jobs.find((j) => j.id === jobId);
+        if (!job || !db) return;
+        try {
+          await updateDoc(doc(db, collectionName, jobId), {
+            application_notes: textarea.value.slice(0, 500),
+            updated_at: new Date().toISOString(),
+          });
+          job.application_notes = textarea.value.slice(0, 500);
+          if (saved) {
+            saved.classList.remove("hidden");
+            setTimeout(() => saved.classList.add("hidden"), 1000);
+          }
+        } catch (error) {
+          console.error("Notes save failed:", error);
+        }
+      }, 500);
+    });
+    updateCounter();
+  });
 };
 
-const renderJobs = () => {
+const updateBulkBar = () => {
+  let bar = document.querySelector(".bulk-bar");
+  const count = state.selectedJobs.size;
+  if (count === 0) {
+    if (bar) bar.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.className = "bulk-bar";
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML = `
+    <span class="bulk-bar__count">${count} selected</span>
+    <button class="btn btn-secondary bulk-bar__btn" data-bulk="dismiss">Dismiss</button>
+    <button class="btn btn-secondary bulk-bar__btn" data-bulk="shortlist">Shortlist</button>
+    <button class="btn btn-secondary bulk-bar__btn" data-bulk="ready_to_apply">Ready to Apply</button>
+    <button class="btn btn-tertiary bulk-bar__btn" data-bulk="clear">Clear</button>
+  `;
+  bar.querySelectorAll("[data-bulk]").forEach((btn) => {
+    btn.addEventListener("click", () => handleBulkAction(btn.dataset.bulk));
+  });
+};
+
+const handleBulkAction = async (action) => {
+  if (action === "clear") {
+    state.selectedJobs.clear();
+    document.querySelectorAll(".bulk-check").forEach((cb) => { cb.checked = false; });
+    const selectAll = document.querySelector(".bulk-select-all");
+    if (selectAll) selectAll.checked = false;
+    updateBulkBar();
+    return;
+  }
+
+  const ids = [...state.selectedJobs];
+  const now = new Date().toISOString();
+
+  for (const jobId of ids) {
+    const job = state.jobs.find((j) => j.id === jobId);
+    if (!job) continue;
+    job.application_status = action;
+    if (db) {
+      try {
+        await updateDoc(doc(db, collectionName, job.id), {
+          application_status: action,
+          updated_at: now,
+        });
+      } catch (err) {
+        console.error("Bulk update failed:", err);
+      }
+    }
+  }
+
+  state.selectedJobs.clear();
+  updateBulkBar();
+  renderJobs();
+  renderApplyHub();
+  showToast(`${ids.length} job${ids.length > 1 ? "s" : ""} updated`);
+};
+
+const getFilteredJobs = () => {
   const searchTerm = searchInput.value.toLowerCase();
   const minFit = Number(minFitSelect.value || 0);
   const sourceFilter = sourceSelect.value;
@@ -1497,6 +1930,12 @@ const renderJobs = () => {
     });
   }
 
+  return filtered;
+};
+
+const renderJobs = () => {
+  const filtered = getFilteredJobs();
+
   if (mobileNavObserver) {
     mobileNavObserver.disconnect();
     mobileNavObserver = null;
@@ -1504,6 +1943,35 @@ const renderJobs = () => {
 
   jobsContainer.innerHTML = "";
   const isMobile = window.matchMedia("(max-width: 900px)").matches;
+
+  // Clear stale selections not in current filtered set
+  const filteredIds = new Set(filtered.map((j) => j.id));
+  for (const id of state.selectedJobs) {
+    if (!filteredIds.has(id)) state.selectedJobs.delete(id);
+  }
+  updateBulkBar();
+
+  // Select-all bar
+  const existingSelectAll = document.querySelector(".bulk-select-all-bar");
+  if (existingSelectAll) existingSelectAll.remove();
+  if (filtered.length > 0) {
+    const selectAllBar = document.createElement("div");
+    selectAllBar.className = "bulk-select-all-bar";
+    selectAllBar.innerHTML = `<label class="toggle-label"><input type="checkbox" class="bulk-select-all" ${state.selectedJobs.size === filtered.length && filtered.length > 0 ? "checked" : ""} /> Select all (${filtered.length})</label>`;
+    jobsContainer.parentNode.insertBefore(selectAllBar, jobsContainer);
+    const selectAllCb = selectAllBar.querySelector(".bulk-select-all");
+    selectAllCb.addEventListener("change", () => {
+      if (selectAllCb.checked) {
+        filtered.forEach((j) => state.selectedJobs.add(j.id));
+      } else {
+        state.selectedJobs.clear();
+      }
+      document.querySelectorAll(".bulk-check").forEach((cb) => {
+        cb.checked = selectAllCb.checked;
+      });
+      updateBulkBar();
+    });
+  }
 
   filtered.forEach((job) => {
     const bulletList = formatList(job.tailored_cv_bullets || []);
@@ -1520,6 +1988,7 @@ const renderJobs = () => {
     card.className = "job-card";
     card.innerHTML = `
       <div class="job-card__header">
+        <label class="bulk-check-label"><input type="checkbox" class="bulk-check" data-job-id="${escapeHtml(job.id)}" ${state.selectedJobs.has(job.id) ? "checked" : ""} /></label>
         <div>
           <div class="job-card__title">${escapeHtml(job.role)}</div>
           <div class="job-card__meta">${escapeHtml(job.company)}</div>
@@ -1700,6 +2169,19 @@ const renderJobs = () => {
       </div>
     `;
     jobsContainer.appendChild(card);
+
+    // Wire up bulk select checkbox
+    const bulkCheck = card.querySelector(".bulk-check");
+    if (bulkCheck) {
+      bulkCheck.addEventListener("change", () => {
+        if (bulkCheck.checked) {
+          state.selectedJobs.add(job.id);
+        } else {
+          state.selectedJobs.delete(job.id);
+        }
+        updateBulkBar();
+      });
+    }
 
     // Wire up Quick Apply button
     const qaBtn = card.querySelector(".btn-quick-apply");
@@ -2421,6 +2903,10 @@ const setActiveTab = (tabId) => {
     const label = activeBtn ? activeBtn.textContent.trim() : tabId;
     breadcrumbLine.textContent = `Home / ${label}`;
   }
+  if (tabId !== "live") {
+    state.selectedJobs.clear();
+    updateBulkBar();
+  }
 };
 
 document.querySelectorAll(".nav-item").forEach((btn) => {
@@ -2439,6 +2925,22 @@ document.addEventListener("keydown", (event) => {
       closeTriageMode();
     } else {
       closePrepMode();
+    }
+    return;
+  }
+
+  if (triageOverlay && !triageOverlay.classList.contains("hidden")) {
+    const focusTag = (event.target.tagName || "").toUpperCase();
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(focusTag)) return;
+    if (event.key === "ArrowLeft") {
+      handleTriageAction("dismiss");
+    } else if (event.key === "ArrowRight") {
+      handleTriageAction("shortlist");
+    } else if (event.key === "ArrowUp") {
+      handleTriageAction("apply");
+    } else if (event.key === " ") {
+      event.preventDefault();
+      handleTriageAction("skip");
     }
   }
 });
