@@ -462,6 +462,8 @@ export const renderJobs = () => {
           job.application_status = "shortlisted";
           shortlistBtn.classList.add("disabled");
           shortlistBtn.textContent = "Shortlisted";
+          state.selectedJobs.delete(job.id);
+          updateBulkBar();
           const trackingSelect = card.querySelector(".tracking-status");
           if (trackingSelect) trackingSelect.value = "shortlisted";
           const metaDivs = card.querySelectorAll(".job-card__meta");
@@ -469,6 +471,7 @@ export const renderJobs = () => {
             if (m.textContent.startsWith("Status:")) m.textContent = "Status: shortlisted";
           });
           showToast("Moved to Shortlisted");
+          card.remove();
         } catch (err) {
           console.error(err);
           showToast("Shortlist failed.");
@@ -492,6 +495,8 @@ export const renderJobs = () => {
           });
           job.application_status = "dismissed";
           job.dismiss_reason = "manual";
+          state.selectedJobs.delete(job.id);
+          updateBulkBar();
           card.remove();
           showToast("Dismissed");
         } catch (err) {

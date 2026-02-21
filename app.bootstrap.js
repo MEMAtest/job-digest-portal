@@ -36,7 +36,6 @@ import {
 } from "./app.core.js";
 import { renderFilters, renderJobs } from "./app.jobs.js";
 import { renderApplyHub } from "./app.applyhub.js";
-import { renderCvHub } from "./app.cvhub.js";
 import { loadBaseCvFromFirestore } from "./app.cv.js";
 import {
   renderDashboardStats,
@@ -69,9 +68,7 @@ const setActiveTab = (tabId) => {
     state.selectedJobs.clear();
     if (state.handlers.updateBulkBar) state.handlers.updateBulkBar();
   }
-  if (tabId === "cv" && !state.cvHubRendered && state.jobs.length) {
-    renderCvHub();
-  }
+  // CV Hub merged into Application Hub — no separate lazy-load needed
 };
 
 state.handlers.setActiveTab = setActiveTab;
@@ -170,15 +167,12 @@ const loadJobs = async () => {
     renderFollowUps(jobs);
     renderFollowUpBanner(jobs);
     renderFilters();
+    if (statusSelect && !statusSelect.value) {
+      statusSelect.value = "saved";
+    }
     renderJobs();
     renderApplyHub();
     renderTriagePrompt(jobs);
-
-    state.cvHubRendered = false;
-    const cvTabActive = document
-      .querySelector('.nav-item[data-tab="cv"]')
-      ?.classList.contains("nav-item--active");
-    if (cvTabActive) renderCvHub();
 
     summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
   } catch (error) {
