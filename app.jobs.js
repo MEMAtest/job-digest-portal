@@ -270,78 +270,81 @@ export const renderJobs = () => {
             <button class="carousel-btn carousel-btn--next" aria-label="Next card">&#x203A;</button>
           </div>
         </div>
+        <div class="detail-carousel-toolbar">
+          <button class="btn btn-tertiary detail-toggle" type="button">Show all sections</button>
+        </div>
         <div class="job-card__details detail-carousel" id="carousel-${escapeHtml(job.id)}">
-        <div class="detail-box">
+        <div class="detail-box" data-section="role_summary">
           <div class="section-title">Role summary</div>
           <div>${formatInlineText(job.role_summary || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="tailored_summary">
           <div class="section-title">Tailored summary</div>
           <div>${formatInlineText(job.tailored_summary || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="tailored_bullets">
           <div class="section-title">Tailored CV bullets (ATS-ready)</div>
           ${bulletList}
           <button class="btn btn-tertiary copy-btn" data-copy-type="bullets" data-job-id="${escapeHtml(job.id)}">Copy bullets</button>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="why_fit">
           <div class="section-title">Why you fit</div>
           <div>${formatInlineText(job.why_fit || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="gaps">
           <div class="section-title">Potential gaps</div>
           <div>${formatInlineText(job.cv_gap || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="cv_edits">
           <div class="section-title">CV edits for this role</div>
           <div>${formatInlineText(job.cv_edit_notes || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="key_requirements">
           <div class="section-title">Key requirements</div>
           ${requirementsList}
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="match_notes">
           <div class="section-title">Match notes</div>
           <div>${formatInlineText(job.match_notes || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="interview_focus">
           <div class="section-title">Interview focus</div>
           <div>${formatInlineText(job.interview_focus || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="quick_pitch">
           <div class="section-title">Quick pitch</div>
           <div>${formatInlineText(job.quick_pitch || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="talking_points">
           <div class="section-title">Key talking points</div>
           ${talkingPoints}
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="star_stories">
           <div class="section-title">STAR stories (10/10)</div>
           ${starStories}
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="company_insights">
           <div class="section-title">Company insights</div>
           <div>${formatInlineText(job.company_insights || "Not available yet.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="interview_qa">
           <div class="section-title">Interview Q&amp;A (8–10/10)</div>
           ${prepQaBlocks}
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="scorecard">
           <div class="section-title">Hiring scorecard</div>
           ${scorecardList}
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="how_to_apply">
           <div class="section-title">How to apply</div>
           <div>${formatInlineText(job.apply_tips || "Apply with CV tailored to onboarding + KYC impact.")}</div>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="cover_letter">
           <div class="section-title">Cover letter</div>
           <div class="long-text">${formatInlineText(job.cover_letter || "Not available yet.")}</div>
           <button class="btn btn-tertiary copy-btn" data-copy-type="cover_letter" data-job-id="${escapeHtml(job.id)}">Copy cover letter</button>
         </div>
-        <div class="detail-box">
+        <div class="detail-box" data-section="tailored_cv">
           <div class="section-title">Tailored CV</div>
           <div class="cv-preview" style="font-size:11px;color:#475569;margin-bottom:8px;">${
             job.tailored_cv_sections?.summary
@@ -351,7 +354,7 @@ export const renderJobs = () => {
           <button class="btn btn-primary download-cv-btn" data-job-id="${escapeHtml(job.id)}">Download PDF</button>
           <button class="btn btn-tertiary copy-cv-text-btn" data-job-id="${escapeHtml(job.id)}">Copy as text</button>
         </div>
-        <div class="detail-box tracking">
+        <div class="detail-box tracking" data-section="tracking">
           <div class="section-title">Application tracking</div>
           <div class="tracking-grid">
             <label>Status</label>
@@ -403,9 +406,12 @@ export const renderJobs = () => {
       <div class="job-card__actions">
         <button class="btn btn-quick-apply${
           statusValue !== "saved" && statusValue !== "shortlisted" && statusValue !== "ready_to_apply" ? " btn-quick-apply--done" : ""
-        }">${statusValue === "applied" || statusValue === "interview" || statusValue === "offer" ? "Re-copy & Open" : "Copy & View"}</button>
+        }">${statusValue === "applied" || statusValue === "interview" || statusValue === "offer" ? "Re-open" : "Apply now"}</button>
+        <button class="btn btn-secondary btn-shortlist"${statusValue === "shortlisted" ? " disabled" : ""}>${
+          statusValue === "shortlisted" ? "Shortlisted" : "Shortlist"
+        }</button>
         <button class="btn btn-prep" data-job-id="${escapeHtml(job.id)}">Prep</button>
-        <a href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View & Apply</a>
+        <a href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View link</a>
       </div>
     `;
     jobsContainer.appendChild(card);
@@ -427,6 +433,37 @@ export const renderJobs = () => {
       qaBtn.addEventListener("click", () => quickApply(job, card));
     }
 
+    const shortlistBtn = card.querySelector(".btn-shortlist");
+    if (shortlistBtn) {
+      shortlistBtn.addEventListener("click", async () => {
+        if (shortlistBtn.classList.contains("disabled")) return;
+        if (!db) {
+          showToast("Missing Firebase config.");
+          return;
+        }
+        const now = new Date().toISOString();
+        try {
+          await updateDoc(doc(db, collectionName, job.id), {
+            application_status: "shortlisted",
+            updated_at: now,
+          });
+          job.application_status = "shortlisted";
+          shortlistBtn.classList.add("disabled");
+          shortlistBtn.textContent = "Shortlisted";
+          const trackingSelect = card.querySelector(".tracking-status");
+          if (trackingSelect) trackingSelect.value = "shortlisted";
+          const metaDivs = card.querySelectorAll(".job-card__meta");
+          metaDivs.forEach((m) => {
+            if (m.textContent.startsWith("Status:")) m.textContent = "Status: shortlisted";
+          });
+          showToast("Moved to Shortlisted");
+        } catch (err) {
+          console.error(err);
+          showToast("Shortlist failed.");
+        }
+      });
+    }
+
     const prepBtn = card.querySelector(".btn-prep");
     if (prepBtn) {
       prepBtn.addEventListener("click", () => openPrepMode(prepBtn.dataset.jobId));
@@ -436,8 +473,17 @@ export const renderJobs = () => {
     const prevBtn = card.querySelector(".carousel-btn--prev");
     const nextBtn = card.querySelector(".carousel-btn--next");
     const dotsContainer = card.querySelector(".carousel-dots");
+    const detailToggle = card.querySelector(".detail-toggle");
 
     const detailCards = carousel ? Array.from(carousel.querySelectorAll(".detail-box")) : [];
+    const essentialSections = new Set([
+      "role_summary",
+      "tailored_summary",
+      "tailored_bullets",
+      "why_fit",
+      "key_requirements",
+    ]);
+    let detailExpanded = false;
 
     if (isMobile) {
       detailCards.forEach((box) => {
@@ -492,6 +538,30 @@ export const renderJobs = () => {
         }
       });
     } else {
+      detailCards.forEach((box) => {
+        const key = box.dataset.section;
+        if (!essentialSections.has(key)) {
+          box.classList.add("detail-box--hidden");
+        }
+      });
+      if (detailToggle) {
+        detailToggle.addEventListener("click", () => {
+          detailExpanded = !detailExpanded;
+          detailCards.forEach((box) => {
+            const key = box.dataset.section;
+            if (!essentialSections.has(key)) {
+              box.classList.toggle("detail-box--hidden", !detailExpanded);
+            }
+          });
+          detailToggle.textContent = detailExpanded ? "Show key sections" : "Show all sections";
+        });
+      }
+
+      // Desktop no longer uses the carousel buttons/dots.
+      if (prevBtn) prevBtn.style.display = "none";
+      if (nextBtn) nextBtn.style.display = "none";
+      if (dotsContainer) dotsContainer.style.display = "none";
+
       const snapToIndex = (index) => {
         if (!carousel || !detailCards[index]) return;
         const target = detailCards[index];

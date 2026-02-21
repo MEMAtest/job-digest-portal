@@ -477,6 +477,21 @@ body {
   display: none;
 }
 
+.detail-carousel-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.detail-box--hidden {
+  display: none;
+}
+
+.btn-shortlist.disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .detail-carousel-hint {
   font-size: 12px;
   color: #64748b;
