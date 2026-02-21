@@ -117,6 +117,8 @@ STALE_DAYS = int(os.getenv("JOB_DIGEST_STALE_DAYS", "14"))
 AUTO_DISMISS_BELOW = int(os.getenv("JOB_DIGEST_AUTO_DISMISS_BELOW", "0"))
 NOTIFICATION_THRESHOLD = int(os.getenv("JOB_DIGEST_NOTIFICATION_THRESHOLD", "80"))
 NOTIFICATIONS_COLLECTION = os.getenv("FIREBASE_NOTIFICATIONS_COLLECTION", "notifications")
+RUN_REQUESTS_COLLECTION = os.getenv("FIREBASE_RUN_REQUESTS_COLLECTION", "run_requests")
+MANUAL_LINK_LIMIT = int(os.getenv("JOB_DIGEST_MANUAL_LINK_LIMIT", "10"))
 PREFERENCES = os.getenv(
     "JOB_DIGEST_PREFERENCES",
     "London or remote UK · Product/Platform roles · KYC/AML/Onboarding/Sanctions/Screening · Min fit 70%",
@@ -3243,6 +3245,110 @@ def parse_job_detail_jsonld(html: str, fallback_title: str = "") -> Dict[str, st
     return {}
 
 
+def parse_job_detail_fallback(html: str) -> Dict[str, str]:
+    soup = BeautifulSoup(html, "html.parser")
+    title = ""
+    og_title = soup.find("meta", property="og:title")
+    if og_title and og_title.get("content"):
+        title = og_title.get("content", "")
+    if not title and soup.title and soup.title.string:
+        title = soup.title.string.strip()
+
+    company = ""
+    og_site = soup.find("meta", property="og:site_name")
+    if og_site and og_site.get("content"):
+        company = og_site.get("content", "")
+
+    description = ""
+    og_desc = soup.find("meta", property="og:description")
+    if og_desc and og_desc.get("content"):
+        description = og_desc.get("content", "")
+    if not description:
+        meta_desc = soup.find("meta", attrs={"name": "description"})
+        if meta_desc and meta_desc.get("content"):
+            description = meta_desc.get("content", "")
+
+    text_blob = normalize_text(soup.get_text(" "))
+    posted_text = extract_relative_posted_text(text_blob)
+
+    return {
+        "title": title,
+        "company": company,
+        "location": "",
+        "posted_date": "",
+        "posted_text": posted_text,
+        "summary": normalize_text(description)[:800],
+    }
+
+
+def fetch_manual_link_requests(client: "firestore.Client") -> List[Dict[str, str]]:
+    requests: List[Dict[str, str]] = []
+    if client is None:
+        return requests
+    try:
+        docs = (
+            client.collection(RUN_REQUESTS_COLLECTION)
+            .where("type", "==", "manual_link")
+            .where("status", "==", "pending")
+            .limit(MANUAL_LINK_LIMIT)
+            .stream()
+        )
+        for doc_snap in docs:
+            data = doc_snap.to_dict() or {}
+            link = data.get("link") or ""
+            if not link:
+                continue
+            requests.append({"id": doc_snap.id, "link": link})
+    except Exception:
+        return requests
+    return requests
+
+
+def build_manual_record(session: requests.Session, link: str) -> Optional[JobRecord]:
+    try:
+        resp = session.get(link, timeout=30)
+    except Exception:
+        return None
+    if resp.status_code != 200:
+        return None
+
+    details = parse_job_detail_jsonld(resp.text)
+    if not details:
+        details = parse_job_detail_fallback(resp.text)
+
+    title = details.get("title") or ""
+    company = details.get("company") or ""
+    location = details.get("location") or ""
+    posted_date = details.get("posted_date") or ""
+    posted_text = details.get("posted_text") or ""
+    summary = details.get("summary") or ""
+    if not title:
+        return None
+
+    full_text = f"{title} {company} {summary}"
+    score, _, _ = score_fit(full_text, company)
+    why_fit = build_reasons(full_text)
+    cv_gap = build_gaps(full_text)
+    preference_match = build_preference_match(full_text, company, location)
+    posted_value = posted_text or posted_date or ""
+
+    return JobRecord(
+        role=title,
+        company=company or "Manual link",
+        location=location or "Unknown",
+        link=link,
+        posted=posted_value,
+        posted_raw=posted_value,
+        posted_date=posted_date,
+        source="Manual",
+        fit_score=score,
+        preference_match=preference_match,
+        why_fit=why_fit,
+        cv_gap=cv_gap,
+        notes=summary or full_text[:500],
+    )
+
+
 def parse_workday_entry(entry: str) -> Tuple[str, str, str, str]:
     entry = entry.strip()
     name = ""
@@ -4149,6 +4255,40 @@ def main() -> None:
     session.headers.update({"User-Agent": USER_AGENT})
 
     all_jobs: List[JobRecord] = []
+    firestore_client = init_firestore_client()
+
+    manual_requests = fetch_manual_link_requests(firestore_client)
+    if manual_requests:
+        for req in manual_requests:
+            link = req.get("link") or ""
+            req_id = req.get("id") or ""
+            record = build_manual_record(session, link) if link else None
+            if record:
+                all_jobs.append(record)
+                if firestore_client and req_id:
+                    try:
+                        firestore_client.collection(RUN_REQUESTS_COLLECTION).document(req_id).set(
+                            {
+                                "status": "processed",
+                                "processed_at": datetime.now(timezone.utc).isoformat(),
+                                "job_id": record_document_id(record),
+                            },
+                            merge=True,
+                        )
+                    except Exception:
+                        pass
+            else:
+                if firestore_client and req_id:
+                    try:
+                        firestore_client.collection(RUN_REQUESTS_COLLECTION).document(req_id).set(
+                            {
+                                "status": "failed",
+                                "processed_at": datetime.now(timezone.utc).isoformat(),
+                            },
+                            merge=True,
+                        )
+                    except Exception:
+                        pass
 
     linkedin_jobs = linkedin_search(session)
     for job in linkedin_jobs:

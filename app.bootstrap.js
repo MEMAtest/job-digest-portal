@@ -33,6 +33,7 @@ import {
   notificationsCollection,
   db,
   escapeHtml,
+  showToast,
 } from "./app.core.js";
 import { renderFilters, renderJobs } from "./app.jobs.js";
 import { renderApplyHub } from "./app.applyhub.js";
@@ -116,6 +117,9 @@ document.querySelectorAll(".prep-tab").forEach((btn) => {
   btn.addEventListener("click", () => switchPrepTab(btn.dataset.prepTab));
 });
 
+const manualLinkInput = document.getElementById("manual-link-input");
+const manualLinkSubmit = document.getElementById("manual-link-submit");
+
 const quickShortlisted = document.getElementById("quick-shortlisted");
 const quickDismissed = document.getElementById("quick-dismissed");
 if (quickShortlisted) {
@@ -128,6 +132,48 @@ if (quickDismissed) {
   quickDismissed.addEventListener("click", () => {
     if (statusSelect) statusSelect.value = "dismissed";
     renderJobs();
+  });
+}
+
+if (manualLinkSubmit) {
+  const submitManualLink = async () => {
+    const link = manualLinkInput?.value?.trim() || "";
+    if (!link) {
+      showToast("Paste a job link first.");
+      return;
+    }
+    try {
+      new URL(link);
+    } catch (_) {
+      showToast("Please paste a valid URL.");
+      return;
+    }
+    if (!db) {
+      showToast("Missing Firebase config.");
+      return;
+    }
+    const id = `manual_${Date.now()}`;
+    try {
+      await setDoc(doc(db, runRequestsCollection, id), {
+        type: "manual_link",
+        link,
+        status: "pending",
+        created_at: new Date().toISOString(),
+      });
+      if (manualLinkInput) manualLinkInput.value = "";
+      showToast("Link queued. It will appear after the next run.");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to queue link.");
+    }
+  };
+
+  manualLinkSubmit.addEventListener("click", submitManualLink);
+  manualLinkInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitManualLink();
+    }
   });
 }
 

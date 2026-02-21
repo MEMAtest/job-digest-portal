@@ -268,6 +268,24 @@ body {
   font-size: 12px;
 }
 
+.manual-link-bar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  margin: 10px 0 18px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.manual-link-bar input {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
 .filter label {
   font-size: 12px;
   color: #64748b;
