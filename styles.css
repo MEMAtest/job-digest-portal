@@ -46,6 +46,31 @@ body {
   color: #fff;
   font-weight: 700;
   flex-shrink: 0;
+  position: relative;
+  overflow: visible;
+}
+
+.brand-badge::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 16px;
+  background: radial-gradient(circle, rgba(99,102,241,0.4) 0%, rgba(15,23,42,0) 70%);
+  opacity: 0.6;
+  animation: pulseGlow 2.4s ease-in-out infinite;
+  z-index: 0;
+}
+
+.logo-mark {
+  width: 32px;
+  height: 32px;
+  z-index: 1;
+}
+
+@keyframes pulseGlow {
+  0% { transform: scale(0.96); opacity: 0.45; }
+  50% { transform: scale(1.08); opacity: 0.75; }
+  100% { transform: scale(0.96); opacity: 0.45; }
 }
 
 .brand-title {
@@ -121,6 +146,13 @@ body {
 .topbar p {
   color: #64748b;
   font-size: 14px;
+}
+
+.hero-caption {
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .topbar-actions {
