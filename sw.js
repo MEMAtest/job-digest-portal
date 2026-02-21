@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `job-digest-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -53,10 +53,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Only handle GET requests (Cache API only stores GET)
+  // Only handle GET requests over http(s) (Cache API rejects other schemes)
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
 
   // Network-only for Firebase / Firestore / Google APIs (let SDK handle caching)
   if (
