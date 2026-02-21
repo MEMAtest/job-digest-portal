@@ -2307,3 +2307,198 @@ body {
     opacity: 1;
   }
 }
+
+/* ───────────────────────────────────────
+   CV Hub
+   ─────────────────────────────────────── */
+
+.cv-hub-base {
+  margin-bottom: 24px;
+}
+
+.cv-hub-base .hub-card__header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+.cv-pack-card {
+  margin-bottom: 16px;
+}
+
+.cv-pack-card__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.cv-pack-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.cv-pack-tag--changed {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+.cv-pack-section summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cv-pack-section summary::-webkit-details-marker {
+  display: none;
+}
+
+/* Edit mode */
+.cv-edit-textarea {
+  width: 100%;
+  min-height: 80px;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.5;
+  color: #0f172a;
+  resize: vertical;
+  background: #fff;
+}
+
+.cv-edit-textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.cv-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cv-edit-actions .btn {
+  font-size: 12px;
+  padding: 6px 14px;
+}
+
+/* Compare grid */
+.cv-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+}
+
+.cv-compare-grid__heading {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.cv-compare-grid__section {
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  border-left: 3px solid #e2e8f0;
+}
+
+.cv-compare-grid__section--changed {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.cv-compare-grid__section--same {
+  border-left-color: #e2e8f0;
+  background: #fff;
+  opacity: 0.7;
+}
+
+.cv-compare-grid__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.cv-compare-grid__section--changed .cv-compare-grid__label {
+  color: #16a34a;
+}
+
+.cv-compare-grid__content {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.cv-compare-grid__content ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.cv-pack-compare-container {
+  margin-top: 0;
+}
+
+.cv-pack-compare-container:empty {
+  display: none;
+}
+
+/* ── CV Hub Mobile ── */
+@media (max-width: 900px) {
+  .cv-compare-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .cv-edit-textarea {
+    width: 100%;
+    font-size: 14px;
+  }
+
+  .cv-pack-card__summary {
+    flex-wrap: wrap;
+  }
+
+  .cv-hub-base .hub-card__actions,
+  .cv-pack-card .hub-card__actions {
+    flex-direction: column;
+  }
+
+  .cv-hub-base .hub-card__actions .btn,
+  .cv-pack-card .hub-card__actions .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .cv-pack-edit-section,
+  .cv-pack-edit-cover,
+  .cv-pack-edit-summary,
+  .cv-base-edit-btn {
+    width: 100%;
+  }
+}

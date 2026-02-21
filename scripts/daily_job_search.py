@@ -111,6 +111,9 @@ MIN_SCORE = int(os.getenv("JOB_DIGEST_MIN_SCORE", "70"))
 MAX_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MAX_EMAIL_ROLES", "12"))
 COMPANY_SEARCH_LIMIT = int(os.getenv("JOB_DIGEST_COMPANY_SEARCH_LIMIT", "60"))
 STALE_DAYS = int(os.getenv("JOB_DIGEST_STALE_DAYS", "14"))
+AUTO_DISMISS_BELOW = int(os.getenv("JOB_DIGEST_AUTO_DISMISS_BELOW", "0"))
+NOTIFICATION_THRESHOLD = int(os.getenv("JOB_DIGEST_NOTIFICATION_THRESHOLD", "80"))
+NOTIFICATIONS_COLLECTION = os.getenv("FIREBASE_NOTIFICATIONS_COLLECTION", "notifications")
 PREFERENCES = os.getenv(
     "JOB_DIGEST_PREFERENCES",
     "London or remote UK · Product/Platform roles · KYC/AML/Onboarding/Sanctions/Screening · Min fit 70%",
@@ -1871,7 +1874,12 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "created_at": created_at,
             "last_seen_at": now_iso,
         }
-        if not existing_data.get("application_status"):
+        is_new_doc = not existing_data
+        effective_threshold = min(AUTO_DISMISS_BELOW, 70) if AUTO_DISMISS_BELOW > 0 else 0
+        if is_new_doc and effective_threshold and record.fit_score < effective_threshold:
+            data["application_status"] = "dismissed"
+            data["dismiss_reason"] = f"auto_low_fit_{effective_threshold}"
+        elif not existing_data.get("application_status"):
             data["application_status"] = "saved"
         optional_fields = {
             "role_summary": record.role_summary,
@@ -1947,6 +1955,41 @@ def write_source_stats(records: List[JobRecord]) -> None:
         client.collection("job_stats").document(today).set(payload, merge=True)
     except Exception:
         return
+
+
+def write_notifications(records: List[JobRecord]) -> None:
+    client = init_firestore_client()
+    if client is None:
+        return
+    if NOTIFICATION_THRESHOLD <= 0:
+        return
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    for record in records:
+        if record.fit_score < NOTIFICATION_THRESHOLD:
+            continue
+        doc_id = record_document_id(record)
+        doc_ref = client.collection(NOTIFICATIONS_COLLECTION).document(doc_id)
+        try:
+            snap = doc_ref.get()
+            if snap.exists and (snap.to_dict() or {}).get("seen") is True:
+                continue
+        except Exception:
+            pass
+        payload = {
+            "job_id": doc_id,
+            "role": record.role,
+            "company": record.company,
+            "fit_score": record.fit_score,
+            "link": record.link,
+            "source": record.source,
+            "seen": False,
+            "created_at": now_iso,
+        }
+        try:
+            doc_ref.set(payload, merge=True)
+        except Exception:
+            continue
 
 
 def cleanup_stale_jobs() -> None:
@@ -4357,6 +4400,7 @@ def main() -> None:
 
     # Optional Firebase persistence
     write_records_to_firestore(records)
+    write_notifications(records)
     write_source_stats(records)
     write_role_suggestions()
     write_candidate_prep()

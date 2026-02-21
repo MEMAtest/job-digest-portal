@@ -10,6 +10,7 @@ import {
   updateDoc,
   setDoc,
   getDoc,
+  where,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const summaryLine = document.getElementById("summary-line");
@@ -24,6 +25,8 @@ const runStatusLine = document.getElementById("run-status-line");
 const dashboardStatsContainer = document.getElementById("dashboard-stats");
 const breadcrumbLine = document.getElementById("breadcrumb");
 const alertBanner = document.getElementById("alert-banner");
+const followUpBanner = document.getElementById("follow-up-banner");
+const triagePrompt = document.getElementById("triage-prompt");
 const prepOverlay = document.getElementById("prep-overlay");
 const prepOverlayTitle = document.getElementById("prep-overlay-title");
 const prepOverlayMeta = document.getElementById("prep-overlay-meta");
@@ -43,6 +46,7 @@ let statsCollection = "job_stats";
 let suggestionsCollection = "role_suggestions";
 let candidatePrepCollection = "candidate_prep";
 let runRequestsCollection = "run_requests";
+let notificationsCollection = "notifications";
 
 const state = {
   jobs: [],
@@ -57,7 +61,16 @@ const state = {
   triageStats: { dismissed: 0, shortlisted: 0, apply: 0 },
   triageLastAction: null,
   selectedJobs: new Set(),
+  baseCvSections: null, // populated after BASE_CV_SECTIONS is defined
+  cvHubSort: { field: "fit_score", dir: "desc" },
+  cvHubFilter: "all",
+  cvHubRendered: false,
 };
+
+const TRIAGE_PROMPT_THRESHOLD = 10;
+const NOTIFICATION_THRESHOLD = 80;
+
+const getTodayKey = () => new Date().toISOString().slice(0, 10);
 
 let quickFilterPredicate = null;
 let quickFilterLabel = "";
@@ -68,6 +81,17 @@ const formatFitBadge = (score) => {
   if (score >= 80) return "badge badge--green";
   if (score >= 72) return "badge badge--blue";
   return "badge badge--amber";
+};
+
+const formatDismissReason = (reason) => {
+  if (!reason) return "";
+  if (reason === "auto_stale") return "Auto-dismissed (stale)";
+  if (reason.startsWith("auto_low_fit")) {
+    const parts = reason.split("_");
+    const threshold = parts[parts.length - 1];
+    return `Auto-dismissed (fit below ${threshold}%)`;
+  }
+  return "Dismissed";
 };
 
 const getLocationBadgeClass = (location) => {
@@ -283,38 +307,19 @@ const copyToClipboard = async (text) => {
 
 const getTailoredCvPlainText = (job) => {
   const sections = job.tailored_cv_sections || {};
+  const base = state.baseCvSections;
   const lines = [];
   lines.push("ADE OMOSANYA");
   lines.push("London, UK | ade@omosanya.com | linkedin.com/in/adeomosanya | omosanya.com\n");
   lines.push("PROFESSIONAL SUMMARY");
-  lines.push(sections.summary || "Senior Product Manager with 8+ years across financial services, regtech and fintech. Specialist in onboarding, KYC/AML, and platform product strategy.\n");
+  lines.push((sections.summary || base.summary) + "\n");
   lines.push("KEY ACHIEVEMENTS");
-  (sections.key_achievements || [
-    "- Led digital onboarding transformation serving 3M+ customers, reducing drop-off by 35%",
-    "- Delivered KYC remediation platform processing 500K+ cases across 6 jurisdictions",
-    "- Drove API-first integration strategy connecting 15+ downstream systems",
-    "- Shipped sanctions screening product reducing false positives by 40%",
-    "- Built product analytics framework improving feature adoption by 25%",
-  ]).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
+  (sections.key_achievements || base.key_achievements).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
   lines.push("\nPROFESSIONAL EXPERIENCE");
   lines.push("\nVistra Corporate Services | Senior Product Manager | 2022 - Present");
-  (sections.vistra_bullets || [
-    "- Own end-to-end onboarding and KYC product suite across 6 EMEA jurisdictions",
-    "- Led platform migration reducing onboarding time from 21 to 7 days",
-    "- Managed cross-functional team of 12 engineers and 3 designers",
-    "- Delivered API integration layer connecting to 15+ compliance data providers",
-    "- Shipped automated risk scoring reducing manual review by 60%",
-    "- Drove product discovery and roadmap prioritisation using RICE framework",
-    "- Established product analytics with Mixpanel tracking 50+ key events",
-    "- Led regulatory change programme for EU AML 6th Directive compliance",
-  ]).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
+  (sections.vistra_bullets || base.vistra_bullets).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
   lines.push("\nEbury Partners | Product Manager | 2020 - 2022");
-  (sections.ebury_bullets || [
-    "- Owned client onboarding and KYB product for FX/payments platform",
-    "- Reduced onboarding cycle time by 45% through workflow automation",
-    "- Shipped API-first partner integration used by 200+ intermediaries",
-    "- Led cross-border payments compliance product across 20+ currencies",
-  ]).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
+  (sections.ebury_bullets || base.ebury_bullets).forEach(b => lines.push(b.startsWith("- ") ? b : `- ${b}`));
   lines.push("\nMEMA Consulting | Product Lead | 2018 - 2020");
   lines.push("- Led delivery of regtech SaaS platform for AML compliance");
   lines.push("- Managed product backlog and sprint planning for team of 8");
@@ -339,30 +344,11 @@ const getTailoredCvPlainText = (job) => {
 
 const buildTailoredCvHtml = (job) => {
   const s = job.tailored_cv_sections || {};
-  const summary = s.summary || "Senior Product Manager with 8+ years across financial services, regtech and fintech. Specialist in onboarding, KYC/AML, and platform product strategy. Proven track record of delivering complex regulatory products at scale.";
-  const achievements = s.key_achievements || [
-    "Led digital onboarding transformation serving 3M+ customers, reducing drop-off by 35%",
-    "Delivered KYC remediation platform processing 500K+ cases across 6 jurisdictions",
-    "Drove API-first integration strategy connecting 15+ downstream systems",
-    "Shipped sanctions screening product reducing false positives by 40%",
-    "Built product analytics framework improving feature adoption by 25%",
-  ];
-  const vistraBullets = s.vistra_bullets || [
-    "Own end-to-end onboarding and KYC product suite across 6 EMEA jurisdictions",
-    "Led platform migration reducing onboarding time from 21 to 7 days",
-    "Managed cross-functional team of 12 engineers and 3 designers",
-    "Delivered API integration layer connecting to 15+ compliance data providers",
-    "Shipped automated risk scoring reducing manual review by 60%",
-    "Drove product discovery and roadmap prioritisation using RICE framework",
-    "Established product analytics with Mixpanel tracking 50+ key events",
-    "Led regulatory change programme for EU AML 6th Directive compliance",
-  ];
-  const eburyBullets = s.ebury_bullets || [
-    "Owned client onboarding and KYB product for FX/payments platform",
-    "Reduced onboarding cycle time by 45% through workflow automation",
-    "Shipped API-first partner integration used by 200+ intermediaries",
-    "Led cross-border payments compliance product across 20+ currencies",
-  ];
+  const base = state.baseCvSections;
+  const summary = s.summary || base.summary;
+  const achievements = s.key_achievements || base.key_achievements;
+  const vistraBullets = s.vistra_bullets || base.vistra_bullets;
+  const eburyBullets = s.ebury_bullets || base.ebury_bullets;
 
   const esc = (t) => escapeHtml(String(t));
   const bulletHtml = (items) => items.map(b => `<div style="margin:0 0 3px 0;padding-left:14px;text-indent:-14px;line-height:1.35;">- ${esc(b.replace(/^-\s*/, ""))}</div>`).join("");
@@ -1368,12 +1354,30 @@ const BASE_CV_SECTIONS = {
   ],
 };
 
+state.baseCvSections = { ...BASE_CV_SECTIONS };
+
+const loadBaseCvFromFirestore = async () => {
+  if (!db) return;
+  try {
+    const snap = await getDoc(doc(db, "cv_settings", "base_cv"));
+    if (snap.exists()) {
+      const data = snap.data();
+      const keys = ["summary", "key_achievements", "vistra_bullets", "ebury_bullets"];
+      for (const key of keys) {
+        if (data[key] !== undefined) state.baseCvSections[key] = data[key];
+      }
+    }
+  } catch (err) {
+    console.error("Failed to load base CV from Firestore:", err);
+  }
+};
+
 const hasCvTailoredChanges = (job) => {
   const tailored = job.tailored_cv_sections || {};
   const sections = ["summary", "key_achievements", "vistra_bullets", "ebury_bullets"];
   return sections.some((key) => {
     const tailoredVal = tailored[key];
-    const baseVal = BASE_CV_SECTIONS[key];
+    const baseVal = state.baseCvSections[key];
     if (!tailoredVal) return false;
     if (Array.isArray(tailoredVal)) {
       return JSON.stringify(tailoredVal) !== JSON.stringify(baseVal || []);
@@ -1442,7 +1446,7 @@ const buildCvDiff = (job) => {
   let html = "";
   for (const sec of sections) {
     const tailoredVal = tailored[sec.key];
-    const baseVal = BASE_CV_SECTIONS[sec.key];
+    const baseVal = state.baseCvSections[sec.key];
     const hasTailored = tailoredVal && (sec.isArray ? Array.isArray(tailoredVal) && tailoredVal.length > 0 : typeof tailoredVal === "string" && tailoredVal.trim() !== "");
     const isChanged = hasTailored && JSON.stringify(tailoredVal) !== JSON.stringify(baseVal);
 
@@ -1961,6 +1965,610 @@ const getFilteredJobs = () => {
   return filtered;
 };
 
+// ── CV Hub ──────────────────────────────────────────────────────────────
+
+const loadCvHubSort = () => {
+  try {
+    const stored = safeLocalStorageGet("cv_hub_sort");
+    if (stored) return JSON.parse(stored);
+  } catch (_) {}
+  return { field: "fit_score", dir: "desc" };
+};
+
+const saveCvHubSort = (sort) => {
+  safeLocalStorageSet("cv_hub_sort", JSON.stringify(sort));
+};
+
+state.cvHubSort = loadCvHubSort();
+
+const makeEditable = (containerEl, { currentValue, isArray, onSave, onCancel }) => {
+  const original = containerEl.innerHTML;
+  let textValue;
+  if (isArray && Array.isArray(currentValue)) {
+    textValue = currentValue.map((item) => String(item).replace(/^-\s*/, "")).join("\n");
+  } else {
+    textValue = String(currentValue || "");
+  }
+
+  containerEl.innerHTML = `
+    <textarea class="cv-edit-textarea">${escapeHtml(textValue)}</textarea>
+    <div class="cv-edit-actions">
+      <button class="btn btn-primary cv-edit-save">Save</button>
+      <button class="btn btn-secondary cv-edit-cancel">Cancel</button>
+    </div>
+  `;
+
+  const textarea = containerEl.querySelector(".cv-edit-textarea");
+  textarea.focus();
+  textarea.style.height = `${Math.max(textarea.scrollHeight, 80)}px`;
+  textarea.addEventListener("input", () => {
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  });
+
+  containerEl.querySelector(".cv-edit-save").addEventListener("click", () => {
+    let parsed;
+    if (isArray) {
+      parsed = textarea.value.split("\n").map((line) => line.replace(/^-\s*/, "").trim()).filter(Boolean);
+    } else {
+      parsed = textarea.value.trim();
+    }
+    onSave(parsed);
+  });
+
+  containerEl.querySelector(".cv-edit-cancel").addEventListener("click", () => {
+    containerEl.innerHTML = original;
+    if (onCancel) onCancel();
+  });
+};
+
+const saveTailoredCvSection = async (job, key, value) => {
+  const existing = job.tailored_cv_sections || {};
+  job.tailored_cv_sections = { ...existing, [key]: value };
+  if (db) {
+    try {
+      await updateDoc(doc(db, collectionName, job.id), {
+        tailored_cv_sections: job.tailored_cv_sections,
+        updated_at: new Date().toISOString(),
+      });
+      showToast("CV section updated");
+      renderApplyHub();
+    } catch (err) {
+      console.error("Save tailored CV section failed:", err);
+      showToast("Save failed");
+    }
+  }
+};
+
+const saveBaseCvSection = async (key, value) => {
+  state.baseCvSections[key] = value;
+  if (db) {
+    try {
+      await setDoc(doc(db, "cv_settings", "base_cv"), {
+        ...state.baseCvSections,
+        updated_at: new Date().toISOString(),
+      }, { merge: true });
+      showToast("Base CV updated");
+    } catch (err) {
+      console.error("Save base CV section failed:", err);
+      showToast("Save failed");
+    }
+  }
+};
+
+const saveCoverLetter = async (job, value) => {
+  job.cover_letter = value;
+  if (db) {
+    try {
+      await updateDoc(doc(db, collectionName, job.id), {
+        cover_letter: value,
+        updated_at: new Date().toISOString(),
+      });
+      showToast("Cover letter updated");
+    } catch (err) {
+      console.error("Save cover letter failed:", err);
+      showToast("Save failed");
+    }
+  }
+};
+
+const saveTailoredSummary = async (job, value) => {
+  job.tailored_summary = value;
+  if (db) {
+    try {
+      await updateDoc(doc(db, collectionName, job.id), {
+        tailored_summary: value,
+        updated_at: new Date().toISOString(),
+      });
+      showToast("Summary updated");
+    } catch (err) {
+      console.error("Save tailored summary failed:", err);
+      showToast("Save failed");
+    }
+  }
+};
+
+const buildApplicationPackHtml = (job) => {
+  const container = document.createElement("div");
+
+  // Page 1: Tailored CV
+  const cvPage = buildTailoredCvHtml(job);
+  container.appendChild(cvPage);
+
+  // Page 2: Cover letter
+  if (job.cover_letter) {
+    const clPage = document.createElement("div");
+    clPage.style.cssText = "page-break-before:always;font-family:'Inter',Helvetica,Arial,sans-serif;color:#1f2937;padding:0;margin:0;width:180mm;font-size:10pt;line-height:1.6;";
+    clPage.innerHTML = `
+      <div style="font-size:14pt;font-weight:700;margin-bottom:16px;color:#0f172a;">Cover Letter</div>
+      <div style="white-space:pre-wrap;">${escapeHtml(job.cover_letter)}</div>
+    `;
+    container.appendChild(clPage);
+  }
+
+  // Page 3: Key requirements + tailored summary
+  const hasReqs = job.key_requirements && job.key_requirements.length > 0;
+  const hasSummary = job.tailored_summary;
+  if (hasReqs || hasSummary) {
+    const extPage = document.createElement("div");
+    extPage.style.cssText = "page-break-before:always;font-family:'Inter',Helvetica,Arial,sans-serif;color:#1f2937;padding:0;margin:0;width:180mm;font-size:10pt;line-height:1.6;";
+    let extHtml = "";
+    if (hasReqs) {
+      extHtml += `<div style="font-size:14pt;font-weight:700;margin-bottom:12px;color:#0f172a;">Key Requirements Match</div>`;
+      extHtml += `<ul style="padding-left:20px;margin-bottom:24px;">${job.key_requirements.map((r) => `<li style="margin-bottom:4px;">${escapeHtml(String(r))}</li>`).join("")}</ul>`;
+    }
+    if (hasSummary) {
+      extHtml += `<div style="font-size:14pt;font-weight:700;margin-bottom:12px;color:#0f172a;">Tailored Summary</div>`;
+      extHtml += `<div style="white-space:pre-wrap;">${escapeHtml(job.tailored_summary)}</div>`;
+    }
+    extPage.innerHTML = extHtml;
+    container.appendChild(extPage);
+  }
+
+  return container;
+};
+
+const buildSideBySideDiff = (job) => {
+  const tailored = job.tailored_cv_sections || {};
+  const sections = [
+    { key: "summary", label: "Professional Summary", isArray: false },
+    { key: "key_achievements", label: "Key Achievements", isArray: true },
+    { key: "vistra_bullets", label: "Vistra Experience", isArray: true },
+    { key: "ebury_bullets", label: "Ebury Experience", isArray: true },
+  ];
+
+  let html = '<div class="cv-compare-grid">';
+  html += '<div class="cv-compare-grid__col"><div class="cv-compare-grid__heading">Base CV</div>';
+  for (const sec of sections) {
+    const baseVal = state.baseCvSections[sec.key];
+    const tailoredVal = tailored[sec.key];
+    const isChanged = tailoredVal && JSON.stringify(tailoredVal) !== JSON.stringify(baseVal);
+    const cls = isChanged ? "cv-compare-grid__section--changed" : "cv-compare-grid__section--same";
+    const content = sec.isArray ? formatList(baseVal) : formatInlineText(String(baseVal || ""));
+    html += `<div class="cv-compare-grid__section ${cls}"><div class="cv-compare-grid__label">${sec.label}</div><div class="cv-compare-grid__content">${content}</div></div>`;
+  }
+  html += "</div>";
+
+  html += '<div class="cv-compare-grid__col"><div class="cv-compare-grid__heading">Tailored CV</div>';
+  for (const sec of sections) {
+    const baseVal = state.baseCvSections[sec.key];
+    const tailoredVal = tailored[sec.key];
+    const hasTailored = tailoredVal && (sec.isArray ? Array.isArray(tailoredVal) && tailoredVal.length > 0 : typeof tailoredVal === "string" && tailoredVal.trim() !== "");
+    const isChanged = hasTailored && JSON.stringify(tailoredVal) !== JSON.stringify(baseVal);
+    const cls = isChanged ? "cv-compare-grid__section--changed" : "cv-compare-grid__section--same";
+    const displayVal = hasTailored ? tailoredVal : baseVal;
+    const content = sec.isArray ? formatList(displayVal) : formatInlineText(String(displayVal || ""));
+    html += `<div class="cv-compare-grid__section ${cls}"><div class="cv-compare-grid__label">${sec.label}${isChanged ? " — Tailored" : ""}</div><div class="cv-compare-grid__content">${content}</div></div>`;
+  }
+  html += "</div></div>";
+
+  return html;
+};
+
+const getCvHubJobs = () => {
+  return state.jobs.filter(
+    (j) => hasCvTailoredChanges(j) || j.cover_letter || (j.key_requirements && j.key_requirements.length > 0)
+  );
+};
+
+const sortCvHubJobs = (jobs) => {
+  const sort = state.cvHubSort;
+  const dir = sort.dir === "asc" ? 1 : -1;
+  const sorted = [...jobs];
+  sorted.sort((a, b) => {
+    if (sort.field === "company") return dir * String(a.company || "").localeCompare(String(b.company || ""));
+    if (sort.field === "posted") {
+      const da = parseDateValue(a.posted) || new Date(0);
+      const db2 = parseDateValue(b.posted) || new Date(0);
+      return dir * (da - db2);
+    }
+    return dir * ((a.fit_score || 0) - (b.fit_score || 0));
+  });
+  return sorted;
+};
+
+const filterCvHubJobs = (jobs) => {
+  if (state.cvHubFilter === "tailored") return jobs.filter((j) => hasCvTailoredChanges(j));
+  if (state.cvHubFilter === "cover_letter") return jobs.filter((j) => j.cover_letter);
+  return jobs;
+};
+
+let cvHubShowCount = 10;
+
+const renderCvHub = () => {
+  const hub = document.getElementById("cv-hub");
+  if (!hub) return;
+
+  const allCvJobs = getCvHubJobs();
+  const tailoredCount = state.jobs.filter((j) => hasCvTailoredChanges(j)).length;
+  const coverLetterCount = state.jobs.filter((j) => j.cover_letter).length;
+
+  const filteredJobs = filterCvHubJobs(allCvJobs);
+  const sortedJobs = sortCvHubJobs(filteredJobs);
+  const displayJobs = sortedJobs.slice(0, cvHubShowCount);
+  const hasMore = sortedJobs.length > cvHubShowCount;
+
+  const base = state.baseCvSections;
+  const sectionDefs = [
+    { key: "summary", label: "Summary", isArray: false },
+    { key: "key_achievements", label: "Key Achievements", isArray: true },
+    { key: "vistra_bullets", label: "Vistra Experience", isArray: true },
+    { key: "ebury_bullets", label: "Ebury Experience", isArray: true },
+  ];
+
+  const currentSort = state.cvHubSort;
+  const filterPills = [
+    { value: "all", label: "All" },
+    { value: "tailored", label: "Tailored Only" },
+    { value: "cover_letter", label: "With Cover Letter" },
+  ];
+  const sortPills = [
+    { field: "fit_score", label: "Fit Score" },
+    { field: "company", label: "Company" },
+    { field: "posted", label: "Date" },
+  ];
+
+  let html = "";
+
+  // Stats bar
+  html += `
+    <div class="stats-grid" style="margin-bottom:24px;">
+      <div class="stat-card"><div class="stat-card__label">Base CV</div><div class="stat-card__value">1</div></div>
+      <div class="stat-card"><div class="stat-card__label">Tailored Versions</div><div class="stat-card__value">${tailoredCount}</div></div>
+      <div class="stat-card"><div class="stat-card__label">With Cover Letter</div><div class="stat-card__value">${coverLetterCount}</div></div>
+    </div>
+  `;
+
+  // Base CV card
+  html += `<div class="cv-hub-base hub-card"><div class="hub-card__header"><div><h3>Base CV</h3><p>Your master CV — edits here apply as the default for all new tailored versions.</p></div></div>`;
+  for (const sec of sectionDefs) {
+    const val = base[sec.key];
+    const content = sec.isArray ? formatList(val) : formatInlineText(String(val || ""));
+    html += `
+      <details class="hub-card__section cv-base-section" data-cv-key="${sec.key}">
+        <summary><h4>${sec.label}</h4><span class="hub-card__preview">${escapeHtml(buildPreviewText(content))}</span></summary>
+        <div class="hub-card__content">
+          <div class="cv-base-content" data-cv-key="${sec.key}">${content}</div>
+          <button class="btn btn-tertiary cv-base-edit-btn" data-cv-key="${sec.key}">Edit</button>
+        </div>
+      </details>
+    `;
+  }
+  html += `
+    <div class="hub-card__actions">
+      <button class="btn btn-secondary cv-base-download">Download Base PDF</button>
+      <button class="btn btn-tertiary cv-base-copy">Copy Base Text</button>
+    </div>
+  </div>`;
+
+  // Filter & sort controls
+  html += `
+    <div class="section-title" style="margin-top:32px;margin-bottom:12px;">Job CV Versions (${sortedJobs.length})</div>
+    <div class="hub-controls">
+      <div class="hub-sort">
+        ${filterPills.map((p) => `<button class="hub-sort__pill cv-hub-filter-pill ${state.cvHubFilter === p.value ? "active" : ""}" data-filter="${p.value}">${p.label}</button>`).join("")}
+        <span style="width:1px;background:#e2e8f0;margin:0 4px;"></span>
+        ${sortPills.map((p) => {
+          const active = currentSort.field === p.field;
+          const arrow = active ? (currentSort.dir === "asc" ? " \u2191" : " \u2193") : "";
+          return `<button class="hub-sort__pill cv-hub-sort-pill ${active ? "active" : ""}" data-sort="${p.field}">${p.label}${arrow}</button>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+
+  // Job pack cards
+  if (!displayJobs.length) {
+    html += `<div class="hub-empty"><h3>No CV versions yet</h3><p>Tailored CVs and cover letters appear here once jobs are enriched.</p></div>`;
+  }
+
+  for (const job of displayJobs) {
+    const hasTailored = hasCvTailoredChanges(job);
+    const tailoredSections = job.tailored_cv_sections || {};
+    const changedCount = ["summary", "key_achievements", "vistra_bullets", "ebury_bullets"].filter((k) => {
+      const tv = tailoredSections[k];
+      if (!tv) return false;
+      return JSON.stringify(tv) !== JSON.stringify(state.baseCvSections[k]);
+    }).length;
+    const hasCover = Boolean(job.cover_letter);
+    const hasReqs = job.key_requirements && job.key_requirements.length > 0;
+
+    const cvDiffHtml = buildCvDiff(job);
+
+    html += `
+      <div class="cv-pack-card hub-card" data-job-id="${escapeHtml(job.id)}">
+        <div class="hub-card__header">
+          <div>
+            <h3>${escapeHtml(job.role)}</h3>
+            <p>${escapeHtml(job.company)} · ${escapeHtml(job.location)}</p>
+          </div>
+          <span class="${formatFitBadge(job.fit_score)}">${job.fit_score}%</span>
+        </div>
+        <div class="cv-pack-card__summary">
+          ${hasTailored ? `<span class="cv-pack-tag cv-pack-tag--changed">${changedCount} section${changedCount !== 1 ? "s" : ""} tailored</span>` : ""}
+          ${hasCover ? '<span class="cv-pack-tag cv-pack-tag--changed">Cover letter ready</span>' : ""}
+          ${hasReqs ? `<span class="cv-pack-tag">${job.key_requirements.length} requirements</span>` : ""}
+        </div>
+
+        <details class="hub-card__section cv-pack-section" data-section="cv_diff">
+          <summary><h4>Tailored CV Changes</h4></summary>
+          <div class="hub-card__content">
+            <div class="cv-diff">${cvDiffHtml}</div>
+            ${hasTailored ? sectionDefs.map((sec) => {
+              const tv = tailoredSections[sec.key];
+              if (!tv || JSON.stringify(tv) === JSON.stringify(state.baseCvSections[sec.key])) return "";
+              return `<button class="btn btn-tertiary cv-pack-edit-section" data-job-id="${escapeHtml(job.id)}" data-cv-key="${sec.key}" data-is-array="${sec.isArray}">Edit ${sec.label}</button>`;
+            }).join("") : ""}
+          </div>
+        </details>
+
+        ${hasCover ? `
+        <details class="hub-card__section cv-pack-section" data-section="cover_letter">
+          <summary><h4>Cover Letter</h4></summary>
+          <div class="hub-card__content">
+            <div class="cv-pack-cover-letter long-text">${formatInlineText(job.cover_letter)}</div>
+            <button class="btn btn-tertiary cv-pack-edit-cover" data-job-id="${escapeHtml(job.id)}">Edit</button>
+          </div>
+        </details>` : ""}
+
+        ${hasReqs ? `
+        <details class="hub-card__section cv-pack-section" data-section="requirements">
+          <summary><h4>Key Requirements Match</h4></summary>
+          <div class="hub-card__content">${formatList(job.key_requirements)}</div>
+        </details>` : ""}
+
+        ${job.tailored_summary ? `
+        <details class="hub-card__section cv-pack-section" data-section="tailored_summary">
+          <summary><h4>Tailored Summary</h4></summary>
+          <div class="hub-card__content">
+            <div class="cv-pack-summary">${formatInlineText(job.tailored_summary)}</div>
+            <button class="btn btn-tertiary cv-pack-edit-summary" data-job-id="${escapeHtml(job.id)}">Edit</button>
+          </div>
+        </details>` : ""}
+
+        <div class="hub-card__actions">
+          <button class="btn btn-primary cv-pack-download-full" data-job-id="${escapeHtml(job.id)}">Download Full Pack</button>
+          <button class="btn btn-secondary cv-pack-download-cv" data-job-id="${escapeHtml(job.id)}">Download CV PDF</button>
+          <button class="btn btn-tertiary cv-pack-copy-cv" data-job-id="${escapeHtml(job.id)}">Copy CV Text</button>
+          <button class="btn btn-tertiary cv-pack-compare" data-job-id="${escapeHtml(job.id)}">Compare vs Base</button>
+        </div>
+        <div class="cv-pack-compare-container" data-job-id="${escapeHtml(job.id)}"></div>
+      </div>
+    `;
+  }
+
+  if (hasMore) {
+    html += `<button class="btn btn-secondary cv-hub-show-more" style="width:100%;margin-top:16px;">Show more (${sortedJobs.length - cvHubShowCount} remaining)</button>`;
+  }
+
+  hub.innerHTML = html;
+
+  // ── Wire event listeners ──
+
+  // Section expand/collapse animation
+  hub.querySelectorAll(".hub-card__section").forEach((detailEl) => {
+    const content = detailEl.querySelector(".hub-card__content");
+    if (content) {
+      content.style.maxHeight = detailEl.open ? `${content.scrollHeight}px` : "0px";
+    }
+    detailEl.addEventListener("toggle", () => {
+      if (content) content.style.maxHeight = detailEl.open ? `${content.scrollHeight}px` : "0px";
+    });
+  });
+
+  // Filter pills
+  hub.querySelectorAll(".cv-hub-filter-pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.cvHubFilter = btn.dataset.filter;
+      cvHubShowCount = 10;
+      renderCvHub();
+    });
+  });
+
+  // Sort pills
+  hub.querySelectorAll(".cv-hub-sort-pill").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.sort;
+      if (state.cvHubSort.field === field) {
+        state.cvHubSort.dir = state.cvHubSort.dir === "asc" ? "desc" : "asc";
+      } else {
+        state.cvHubSort.field = field;
+        state.cvHubSort.dir = field === "company" ? "asc" : "desc";
+      }
+      saveCvHubSort(state.cvHubSort);
+      cvHubShowCount = 10;
+      renderCvHub();
+    });
+  });
+
+  // Show more
+  const showMoreBtn = hub.querySelector(".cv-hub-show-more");
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener("click", () => {
+      cvHubShowCount += 10;
+      renderCvHub();
+    });
+  }
+
+  // Base CV edit buttons
+  hub.querySelectorAll(".cv-base-edit-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.cvKey;
+      const contentEl = hub.querySelector(`.cv-base-content[data-cv-key="${key}"]`);
+      if (!contentEl) return;
+      const isArray = Array.isArray(state.baseCvSections[key]);
+      makeEditable(contentEl, {
+        currentValue: state.baseCvSections[key],
+        isArray,
+        onSave: async (val) => {
+          await saveBaseCvSection(key, val);
+          renderCvHub();
+        },
+      });
+      // Expand max-height for editing
+      const wrapper = contentEl.closest(".hub-card__content");
+      if (wrapper) wrapper.style.maxHeight = "none";
+    });
+  });
+
+  // Base CV download
+  const baseDownloadBtn = hub.querySelector(".cv-base-download");
+  if (baseDownloadBtn) {
+    baseDownloadBtn.addEventListener("click", async () => {
+      const cvEl = buildTailoredCvHtml({ tailored_cv_sections: {} });
+      const opt = { margin: [10, 10, 10, 10], filename: "CV_Base.pdf", html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4" } };
+      try { await html2pdf().set(opt).from(cvEl).save(); showToast("Base CV downloaded"); } catch (err) { console.error(err); showToast("Download failed"); }
+    });
+  }
+
+  // Base CV copy
+  const baseCopyBtn = hub.querySelector(".cv-base-copy");
+  if (baseCopyBtn) {
+    baseCopyBtn.addEventListener("click", () => {
+      copyToClipboard(getTailoredCvPlainText({ tailored_cv_sections: {} }));
+    });
+  }
+
+  // Pack card: edit tailored CV section
+  hub.querySelectorAll(".cv-pack-edit-section").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const jobId = btn.dataset.jobId;
+      const key = btn.dataset.cvKey;
+      const isArray = btn.dataset.isArray === "true";
+      const job = state.jobs.find((j) => j.id === jobId);
+      if (!job) return;
+      const tailored = job.tailored_cv_sections || {};
+      const contentEl = btn.closest(".hub-card__content");
+      if (!contentEl) return;
+      makeEditable(contentEl, {
+        currentValue: tailored[key] || state.baseCvSections[key],
+        isArray,
+        onSave: async (val) => {
+          await saveTailoredCvSection(job, key, val);
+          renderCvHub();
+        },
+      });
+      const wrapper = contentEl.closest(".hub-card__content");
+      if (wrapper) wrapper.style.maxHeight = "none";
+    });
+  });
+
+  // Pack card: edit cover letter
+  hub.querySelectorAll(".cv-pack-edit-cover").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const jobId = btn.dataset.jobId;
+      const job = state.jobs.find((j) => j.id === jobId);
+      if (!job) return;
+      const contentEl = btn.closest(".hub-card__content");
+      if (!contentEl) return;
+      makeEditable(contentEl, {
+        currentValue: job.cover_letter || "",
+        isArray: false,
+        onSave: async (val) => {
+          await saveCoverLetter(job, val);
+          renderCvHub();
+        },
+      });
+      const wrapper = contentEl.closest(".hub-card__content");
+      if (wrapper) wrapper.style.maxHeight = "none";
+    });
+  });
+
+  // Pack card: edit tailored summary
+  hub.querySelectorAll(".cv-pack-edit-summary").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const jobId = btn.dataset.jobId;
+      const job = state.jobs.find((j) => j.id === jobId);
+      if (!job) return;
+      const contentEl = btn.closest(".hub-card__content");
+      if (!contentEl) return;
+      makeEditable(contentEl, {
+        currentValue: job.tailored_summary || "",
+        isArray: false,
+        onSave: async (val) => {
+          await saveTailoredSummary(job, val);
+          renderCvHub();
+        },
+      });
+      const wrapper = contentEl.closest(".hub-card__content");
+      if (wrapper) wrapper.style.maxHeight = "none";
+    });
+  });
+
+  // Pack card: download full pack
+  hub.querySelectorAll(".cv-pack-download-full").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const job = state.jobs.find((j) => j.id === btn.dataset.jobId);
+      if (!job) return;
+      const packEl = buildApplicationPackHtml(job);
+      const filename = `ApplicationPack_${job.company}_${job.role}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, "_");
+      const opt = { margin: [10, 10, 10, 10], filename, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4" } };
+      try { await html2pdf().set(opt).from(packEl).save(); showToast("Application pack downloaded"); } catch (err) { console.error(err); showToast("Download failed"); }
+    });
+  });
+
+  // Pack card: download CV PDF
+  hub.querySelectorAll(".cv-pack-download-cv").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const job = state.jobs.find((j) => j.id === btn.dataset.jobId);
+      if (!job) return;
+      const cvEl = buildTailoredCvHtml(job);
+      const filename = `CV_${job.company}_${job.role}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, "_");
+      const opt = { margin: [10, 10, 10, 10], filename, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4" } };
+      try { await html2pdf().set(opt).from(cvEl).save(); showToast("CV downloaded"); } catch (err) { console.error(err); showToast("Download failed"); }
+    });
+  });
+
+  // Pack card: copy CV text
+  hub.querySelectorAll(".cv-pack-copy-cv").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const job = state.jobs.find((j) => j.id === btn.dataset.jobId);
+      if (!job) return;
+      copyToClipboard(getTailoredCvPlainText(job));
+    });
+  });
+
+  // Pack card: compare vs base
+  hub.querySelectorAll(".cv-pack-compare").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const jobId = btn.dataset.jobId;
+      const job = state.jobs.find((j) => j.id === jobId);
+      if (!job) return;
+      const container = hub.querySelector(`.cv-pack-compare-container[data-job-id="${jobId}"]`);
+      if (!container) return;
+      if (container.innerHTML.trim()) {
+        container.innerHTML = "";
+        btn.textContent = "Compare vs Base";
+      } else {
+        container.innerHTML = buildSideBySideDiff(job);
+        btn.textContent = "Hide Compare";
+      }
+    });
+  });
+
+  state.cvHubRendered = true;
+};
+
 const renderJobs = () => {
   const filtered = getFilteredJobs();
 
@@ -2011,6 +2619,7 @@ const renderJobs = () => {
     const statusValue = (job.application_status || "saved").toLowerCase();
     const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
     const lastTouchDate = job.last_touch_date ? job.last_touch_date.slice(0, 10) : "";
+    const dismissNote = statusValue === "dismissed" ? formatDismissReason(job.dismiss_reason) : "";
 
     const card = document.createElement("div");
     card.className = "job-card";
@@ -2021,7 +2630,7 @@ const renderJobs = () => {
           <div class="job-card__title">${escapeHtml(job.role)}</div>
           <div class="job-card__meta">${escapeHtml(job.company)}</div>
           <div class="job-card__meta">${escapeHtml(formatPosted(job.posted))} · ${escapeHtml(job.source)}</div>
-          <div class="job-card__meta">Status: ${escapeHtml(statusValue)}</div>
+          <div class="job-card__meta">Status: ${escapeHtml(statusValue)}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
         </div>
         <div class="job-card__badges">
           <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
@@ -2901,6 +3510,7 @@ const renderFollowUps = (jobs) => {
             <div class="follow-up-card__role">${escapeHtml(job.role)}</div>
             <div class="follow-up-card__company">${escapeHtml(job.company)}</div>
             <div class="follow-up-card__overdue">${label}</div>
+            <button class="follow-up-card__snooze" data-job-id="${escapeHtml(job.id)}">Snooze 1 day</button>
           </div>`;
         })
         .join("")}
@@ -2917,6 +3527,186 @@ const renderFollowUps = (jobs) => {
       }, 100);
     });
   });
+
+  container.querySelectorAll(".follow-up-card__snooze").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const jobId = btn.dataset.jobId;
+      const job = state.jobs.find((j) => j.id === jobId);
+      if (!job) return;
+      const current = parseDateValue(job.follow_up_date) || new Date();
+      const next = new Date(current.getTime() + 24 * 60 * 60 * 1000);
+      const nextIso = `${next.toISOString().slice(0, 10)}T00:00:00.000Z`;
+      try {
+        if (db) {
+          await updateDoc(doc(db, collectionName, jobId), {
+            follow_up_date: nextIso,
+            updated_at: new Date().toISOString(),
+          });
+        }
+        job.follow_up_date = nextIso;
+        renderFollowUps(state.jobs);
+        renderFollowUpBanner(state.jobs);
+        showToast("Follow-up snoozed");
+      } catch (error) {
+        console.error("Snooze failed:", error);
+        showToast("Snooze failed");
+      }
+    });
+  });
+};
+
+const renderFollowUpBanner = (jobs) => {
+  if (!followUpBanner) return;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdue = jobs.filter((job) => {
+    const status = (job.application_status || "saved").toLowerCase();
+    if (status === "rejected" || status === "offer") return false;
+    const dt = parseDateValue(job.follow_up_date);
+    return dt && dt <= today;
+  });
+
+  if (!overdue.length) {
+    followUpBanner.classList.add("hidden");
+    followUpBanner.innerHTML = "";
+    return;
+  }
+
+  followUpBanner.classList.remove("hidden");
+  followUpBanner.innerHTML = `
+    <div>
+      <strong>${overdue.length} follow-up${overdue.length > 1 ? "s" : ""} due</strong>
+      <span class="banner__sub">Keep momentum on active applications.</span>
+    </div>
+    <div class="banner__actions">
+      <button class="btn btn-secondary banner-view-followups">View</button>
+    </div>
+  `;
+
+  const viewBtn = followUpBanner.querySelector(".banner-view-followups");
+  if (viewBtn) {
+    viewBtn.addEventListener("click", () => {
+      applyQuickFilter({
+        label: "Follow-ups due",
+        predicate: (job) => {
+          const status = (job.application_status || "saved").toLowerCase();
+          if (status === "rejected" || status === "offer") return false;
+          const dt = parseDateValue(job.follow_up_date);
+          return dt && dt <= today;
+        },
+      });
+      setActiveTab("live");
+    });
+  }
+};
+
+const triggerFollowUpNotifications = (jobs) => {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  const todayKey = getTodayKey();
+  const notifiedRaw = safeLocalStorageGet("followup_notified") || "{}";
+  let notified = {};
+  try {
+    notified = JSON.parse(notifiedRaw) || {};
+  } catch (error) {
+    notified = {};
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  jobs.forEach((job) => {
+    const status = (job.application_status || "saved").toLowerCase();
+    if (status === "rejected" || status === "offer") return;
+    const dt = parseDateValue(job.follow_up_date);
+    if (!dt || dt > today) return;
+    const key = `${job.id}-${todayKey}`;
+    if (notified[key]) return;
+    new Notification(`Follow up: ${job.company}`, {
+      body: `${job.role} — due now`,
+    });
+    notified[key] = true;
+  });
+  safeLocalStorageSet("followup_notified", JSON.stringify(notified));
+};
+
+const renderTriagePrompt = (jobs) => {
+  if (!triagePrompt) return;
+  const savedCount = jobs.filter((job) => (job.application_status || "saved").toLowerCase() === "saved").length;
+  const todayKey = getTodayKey();
+  const lastTriage = safeLocalStorageGet("last_triage_date") || "";
+
+  if (savedCount <= TRIAGE_PROMPT_THRESHOLD || lastTriage === todayKey) {
+    triagePrompt.classList.add("hidden");
+    triagePrompt.innerHTML = "";
+    return;
+  }
+
+  triagePrompt.classList.remove("hidden");
+  triagePrompt.innerHTML = `
+    <div>
+      <strong>${savedCount} untriaged roles</strong>
+      <span class="banner__sub">Triage now? Takes ~5 minutes.</span>
+    </div>
+    <div class="banner__actions">
+      <button class="btn btn-primary banner-triage-start">Start triaging</button>
+      <button class="btn btn-tertiary banner-triage-later">Remind me later</button>
+    </div>
+  `;
+
+  const startBtn = triagePrompt.querySelector(".banner-triage-start");
+  const laterBtn = triagePrompt.querySelector(".banner-triage-later");
+  if (startBtn) {
+    startBtn.addEventListener("click", () => {
+      const triageable = jobs.filter((j) => (j.application_status || "saved").toLowerCase() === "saved");
+      safeLocalStorageSet("last_triage_date", todayKey);
+      openTriageMode(triageable);
+      triagePrompt.classList.add("hidden");
+    });
+  }
+  if (laterBtn) {
+    laterBtn.addEventListener("click", () => {
+      safeLocalStorageSet("last_triage_date", todayKey);
+      triagePrompt.classList.add("hidden");
+    });
+  }
+};
+
+const checkFirestoreNotifications = async () => {
+  if (!db || !("Notification" in window) || Notification.permission !== "granted") return;
+  try {
+    const notifRef = collection(db, notificationsCollection);
+    const notifQuery = query(
+      notifRef,
+      where("seen", "==", false),
+      orderBy("created_at", "desc"),
+      limit(5)
+    );
+    const snap = await getDocs(notifQuery);
+    if (snap.empty) return;
+    const notices = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+    notices.forEach((notice) => {
+      const title = `New ${notice.fit_score || ""}% match`;
+      const body = `${notice.role} at ${notice.company}`;
+      const notif = new Notification(title.trim(), { body });
+      notif.onclick = () => {
+        const jobId = notice.job_id || notice.id;
+        applyQuickFilter({
+          label: "New notification",
+          predicate: (job) => job.id === jobId,
+        });
+        setActiveTab("live");
+      };
+    });
+    await Promise.allSettled(
+      notices.map((notice) =>
+        updateDoc(doc(db, notificationsCollection, notice.id), {
+          seen: true,
+          seen_at: new Date().toISOString(),
+        })
+      )
+    );
+  } catch (error) {
+    console.error("Notification fetch failed:", error);
+  }
 };
 
 const setActiveTab = (tabId) => {
@@ -2934,6 +3724,9 @@ const setActiveTab = (tabId) => {
   if (tabId !== "live") {
     state.selectedJobs.clear();
     updateBulkBar();
+  }
+  if (tabId === "cv" && !state.cvHubRendered && state.jobs.length) {
+    renderCvHub();
   }
 };
 
@@ -3004,6 +3797,7 @@ const loadJobs = async () => {
     suggestionsCollection = window.FIREBASE_SUGGESTIONS_COLLECTION || "role_suggestions";
     candidatePrepCollection = window.FIREBASE_CANDIDATE_PREP_COLLECTION || "candidate_prep";
     runRequestsCollection = window.FIREBASE_RUN_REQUESTS_COLLECTION || "run_requests";
+    notificationsCollection = window.FIREBASE_NOTIFICATIONS_COLLECTION || "notifications";
 
     const jobsRef = collection(db, collectionName);
     const jobsQuery = query(jobsRef, orderBy("fit_score", "desc"), limit(200));
@@ -3019,12 +3813,21 @@ const loadJobs = async () => {
     state.sources = new Set(jobs.map((job) => job.source).filter(Boolean));
     state.locations = new Set(jobs.map((job) => job.location).filter(Boolean));
 
+    await loadBaseCvFromFirestore();
+
     renderDashboardStats(jobs);
     renderPipelineView(jobs);
     renderFollowUps(jobs);
+    renderFollowUpBanner(jobs);
     renderFilters();
     renderJobs();
     renderApplyHub();
+    renderTriagePrompt(jobs);
+
+    // Re-render CV Hub if it's the active tab, or reset flag for lazy render
+    state.cvHubRendered = false;
+    const cvTabActive = document.querySelector('.nav-item[data-tab="cv"]')?.classList.contains("nav-item--active");
+    if (cvTabActive) renderCvHub();
 
     summaryLine.textContent = `${jobs.length} roles loaded · Last update ${new Date().toLocaleString()}`;
   } catch (error) {
