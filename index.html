@@ -146,8 +146,29 @@
         </section>
 
         <section class="tab-section hidden" data-tab="prep">
-          <section id="role-suggestions" class="detail-box hidden"></section>
-          <section id="candidate-prep" class="detail-box hidden"></section>
+          <section class="prep-board">
+            <div class="prep-board__list">
+              <div class="prep-board__list-header">
+                <h2>Preparation Hub</h2>
+                <p>Pick a section to review. Your STAR stories and talking points live here.</p>
+              </div>
+              <div id="prep-card-list" class="prep-card-list"></div>
+            </div>
+            <div class="prep-board__detail">
+              <div class="prep-detail__header">
+                <h3 id="prep-detail-title">Select a section</h3>
+                <p id="prep-detail-meta">Choose a card on the left to begin.</p>
+              </div>
+              <div id="prep-detail-tabs" class="prep-detail-tabs hidden">
+                <button class="prep-detail-tab prep-detail-tab--active" data-prep-tab="star">STAR</button>
+                <button class="prep-detail-tab" data-prep-tab="qa">Q&amp;A</button>
+                <button class="prep-detail-tab" data-prep-tab="talking">Talking Points</button>
+              </div>
+              <div id="prep-detail-content" class="prep-detail-content">
+                <div class="prep-detail-empty">Select a card to view details.</div>
+              </div>
+            </div>
+          </section>
         </section>
       </main>
 

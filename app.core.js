@@ -32,8 +32,6 @@ export const summaryLine = document.getElementById("summary-line");
 export const jobsContainer = document.getElementById("jobs");
 export const topPickContainer = document.getElementById("top-pick");
 export const sourceStatsContainer = document.getElementById("source-stats");
-export const roleSuggestionsContainer = document.getElementById("role-suggestions");
-export const candidatePrepContainer = document.getElementById("candidate-prep");
 export const refreshBtn = document.getElementById("refresh-btn");
 export const runNowBtn = document.getElementById("run-now-btn");
 export const runStatusLine = document.getElementById("run-status-line");
@@ -81,6 +79,7 @@ export const state = {
   sources: new Set(),
   locations: new Set(),
   candidatePrep: {},
+  roleSuggestions: null,
   activePrepJob: null,
   hubSort: null,
   hubNotesTimers: {},
