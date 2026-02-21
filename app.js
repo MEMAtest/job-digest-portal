@@ -1105,6 +1105,7 @@ const renderTriageCard = () => {
         <h3>Triage complete</h3>
         <div class="triage-summary__stats">
           <div class="triage-summary__stat"><span class="triage-summary__num">${stats.dismissed}</span> Dismissed</div>
+          <div class="triage-summary__stat"><span class="triage-summary__num">${stats.skipped || 0}</span> Skipped</div>
           <div class="triage-summary__stat"><span class="triage-summary__num">${stats.shortlisted}</span> Shortlisted</div>
           <div class="triage-summary__stat"><span class="triage-summary__num">${stats.apply}</span> Ready to Apply</div>
         </div>
@@ -1137,6 +1138,7 @@ const renderTriageCard = () => {
       <div class="triage-card__fit">${formatInlineText(job.why_fit || "")}</div>
       <div class="triage-actions">
         <button class="triage-btn triage-btn--dismiss" data-action="dismiss">Not interested</button>
+        <button class="triage-btn triage-btn--skip" data-action="skip">Skip</button>
         <button class="triage-btn triage-btn--maybe" data-action="shortlist">Shortlist</button>
         <button class="triage-btn triage-btn--apply" data-action="apply">Apply</button>
       </div>
@@ -1186,6 +1188,15 @@ const handleTriageAction = async (action) => {
   if (!job) return;
 
   const card = triageContent.querySelector("#triage-active-card");
+
+  if (action === "skip") {
+    if (card) card.classList.add("triage-card--exit-up");
+    state.triageStats.skipped = (state.triageStats.skipped || 0) + 1;
+    state.triageIndex++;
+    setTimeout(() => renderTriageCard(), 300);
+    return;
+  }
+
   const exitClass = action === "dismiss" ? "triage-card--exit-left" :
                     action === "shortlist" ? "triage-card--exit-right" :
                     "triage-card--exit-up";

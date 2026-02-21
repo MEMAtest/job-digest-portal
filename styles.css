@@ -1764,6 +1764,11 @@ body {
   color: #dc2626;
   border: 1px solid #fecaca;
 }
+.triage-btn--skip {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
 .triage-btn--maybe {
   background: #fffbeb;
   color: #d97706;
