@@ -5,17 +5,19 @@ export const renderPdfFromElement = async (element, options) => {
     throw new Error("PDF library failed to load.");
   }
   const host = document.createElement("div");
-  host.style.position = "fixed";
-  host.style.left = "0";
-  host.style.top = "0";
-  host.style.width = "210mm";
-  host.style.background = "#ffffff";
-  host.style.pointerEvents = "none";
-  host.style.zIndex = "9999";
+  host.style.cssText =
+    "position:absolute;left:0;top:0;width:210mm;background:#fff;z-index:9999;overflow:visible;";
+  element.style.background = "#ffffff";
   host.appendChild(element);
   document.body.appendChild(host);
+  // Allow fonts and layout to settle before capturing
+  await new Promise((resolve) => setTimeout(resolve, 300));
   try {
-    await html2pdf().set(options).from(element).save();
+    const merged = {
+      ...options,
+      html2canvas: { scale: 2, useCORS: true, logging: false, ...(options.html2canvas || {}) },
+    };
+    await html2pdf().set(merged).from(element).save();
   } finally {
     host.remove();
   }

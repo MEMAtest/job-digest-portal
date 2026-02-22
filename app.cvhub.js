@@ -364,21 +364,30 @@ export const renderCvHub = () => {
           </div>
         </div>
 
-        <details class="hub-card__section cv-pack-section" data-section="cv_diff">
-          <summary><h4>CV Differences</h4></summary>
-          <div class="hub-card__content">
-            <div class="cv-diff">${buildSideBySideDiff(job)}</div>
-            ${hasTailored
-              ? sectionDefs
-                  .map((sec) => {
-                    const tv = tailoredSections[sec.key];
-                    if (!tv || JSON.stringify(tv) === JSON.stringify(state.baseCvSections[sec.key])) return "";
-                    return `<button class="btn btn-tertiary cv-pack-edit-section" data-job-id="${escapeHtml(job.id)}" data-cv-key="${sec.key}" data-is-array="${sec.isArray}">Edit ${sec.label}</button>`;
-                  })
-                  .join("")
-              : ""}
-          </div>
-        </details>
+        <div class="cv-pack-sections">
+          ${sectionDefs
+            .map((sec) => {
+              const tv = tailoredSections[sec.key];
+              const baseVal = state.baseCvSections[sec.key];
+              const isChanged = tv && JSON.stringify(tv) !== JSON.stringify(baseVal);
+              const displayVal = isChanged ? tv : baseVal;
+              const tag = isChanged
+                ? '<span class="cv-section-tag cv-section-tag--tailored">Tailored</span>'
+                : '<span class="cv-section-tag cv-section-tag--base">Base</span>';
+              const content = sec.isArray
+                ? (Array.isArray(displayVal) ? displayVal : []).map((b) => `<div class="cv-section-bullet">\u2022 ${escapeHtml(String(b).replace(/^[-\u2022\s]*/, ""))}</div>`).join("")
+                : `<div class="cv-section-text">${escapeHtml(String(displayVal || ""))}</div>`;
+              return `
+                <div class="cv-pack-section-item ${isChanged ? "cv-pack-section-item--changed" : ""}">
+                  <div class="cv-pack-section-item__header">
+                    <strong>${sec.label}</strong> ${tag}
+                    ${isChanged ? `<button class="btn btn-tertiary cv-pack-edit-section" data-job-id="${escapeHtml(job.id)}" data-cv-key="${sec.key}" data-is-array="${sec.isArray}" style="margin-left:auto;font-size:11px;">Edit</button>` : ""}
+                  </div>
+                  <div class="cv-pack-section-item__body">${content}</div>
+                </div>`;
+            })
+            .join("")}
+        </div>
 
         ${hasCover
           ? `
@@ -574,7 +583,9 @@ export const renderCvHub = () => {
       const job = state.jobs.find((j) => j.id === jobId);
       if (!job) return;
       const tailored = job.tailored_cv_sections || {};
-      const contentEl = btn.closest(".hub-card__content");
+      const sectionItem = btn.closest(".cv-pack-section-item");
+      if (!sectionItem) return;
+      const contentEl = sectionItem.querySelector(".cv-pack-section-item__body");
       if (!contentEl) return;
       makeEditable(contentEl, {
         currentValue: tailored[key] || state.baseCvSections[key],
@@ -584,7 +595,6 @@ export const renderCvHub = () => {
           renderCvHub();
         },
       });
-      contentEl.style.maxHeight = "none";
     });
   });
 
