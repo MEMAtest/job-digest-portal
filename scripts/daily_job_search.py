@@ -6,6 +6,7 @@ Sources: LinkedIn guest endpoints, Greenhouse boards (optional).
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import base64
 import csv
 import difflib
@@ -148,6 +149,7 @@ TO_EMAIL = os.getenv("TO_EMAIL", "ademolaomosanya@gmail.com")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("JOB_DIGEST_GEMINI_KEY", "")
 GEMINI_MODEL = os.getenv("JOB_DIGEST_GEMINI_MODEL", "gemini-1.5-flash")
 GEMINI_MAX_JOBS = int(os.getenv("JOB_DIGEST_GEMINI_MAX_JOBS", "20"))
+GEMINI_TIMEOUT_SECONDS = int(os.getenv("JOB_DIGEST_GEMINI_TIMEOUT", "45"))
 GEMINI_FALLBACK_MODELS = [
     model.strip()
     for model in os.getenv(
@@ -1569,6 +1571,17 @@ def generate_gemini_text(prompt: str) -> Optional[str]:
     return None
 
 
+def generate_gemini_text_with_timeout(prompt: str, timeout_seconds: int) -> Optional[str]:
+    if timeout_seconds <= 0:
+        return generate_gemini_text(prompt)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(generate_gemini_text, prompt)
+        try:
+            return future.result(timeout=timeout_seconds)
+        except FutureTimeout:
+            return None
+
+
 def generate_groq_text(prompt: str, usage: Optional[Dict[str, int]] = None) -> Optional[str]:
     if not GROQ_API_KEY or GroqClient is None:
         return None
@@ -1648,7 +1661,7 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
         )
         text = generate_groq_text(prompt, usage=usage) if allow_groq else None
         if not text and GEMINI_API_KEY and genai is not None:
-            text = generate_gemini_text(prompt)
+            text = generate_gemini_text_with_timeout(prompt, GEMINI_TIMEOUT_SECONDS)
         data = parse_gemini_payload(text or "")
         if not data:
             continue
@@ -1721,7 +1734,7 @@ def enhance_records_with_gemini(records: List[JobRecord]) -> List[JobRecord]:
             f"Posted: {record.posted}\n"
             f"Summary: {record.notes}\n"
         )
-        text = generate_gemini_text(prompt)
+        text = generate_gemini_text_with_timeout(prompt, GEMINI_TIMEOUT_SECONDS)
         data = parse_gemini_payload(text or "")
         if not data:
             continue
