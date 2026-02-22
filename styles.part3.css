@@ -1103,3 +1103,12 @@
   padding: 20px;
   flex: 1;
 }
+
+.cv-tab-preview {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+  max-height: 600px;
+  overflow-y: auto;
+}

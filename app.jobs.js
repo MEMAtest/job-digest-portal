@@ -28,7 +28,7 @@ import {
 } from "./app.core.js";
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply } from "./app.applyhub.js";
-import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
+import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement, hasCvTailoredChanges } from "./app.cv.js";
 
 let mobileNavObserver = null;
 
@@ -351,6 +351,7 @@ const renderJobDetail = (job, detailEl) => {
       <div class="job-detail-tabs">
         <button class="detail-tab detail-tab--active" data-tab="summary">Summary</button>
         <button class="detail-tab" data-tab="fit">Fit</button>
+        <button class="detail-tab" data-tab="cv">CV</button>
         <button class="detail-tab" data-tab="ats">ATS</button>
         <button class="detail-tab" data-tab="prep">Prep</button>
         <button class="detail-tab" data-tab="apply">Apply</button>
@@ -385,6 +386,17 @@ const renderJobDetail = (job, detailEl) => {
         <div class="detail-box">
           <div class="section-title">Hiring scorecard</div>
           ${scorecardList}
+        </div>
+      </div>
+      <div class="detail-tab-panel" data-tab="cv">
+        <div class="detail-box">
+          <div class="section-title">Tailored CV${hasCvTailoredChanges(job) ? ' <span style="color:#059669;font-size:11px;font-weight:500;margin-left:6px;">Tailored</span>' : ""}</div>
+          <div class="cv-tab-preview" id="cv-tab-render"></div>
+          <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
+            <button class="btn btn-primary cv-tab-download" data-job-id="${escapeHtml(job.id)}">Download PDF</button>
+            <button class="btn btn-secondary cv-tab-copy" data-job-id="${escapeHtml(job.id)}">Copy as text</button>
+            <button class="btn btn-tertiary cv-tab-modal" data-job-id="${escapeHtml(job.id)}">Open full preview</button>
+          </div>
         </div>
       </div>
       <div class="detail-tab-panel" data-tab="ats">
@@ -501,6 +513,13 @@ const renderJobDetail = (job, detailEl) => {
       tab.classList.add("detail-tab--active");
       const panel = detailEl.querySelector(`.detail-tab-panel[data-tab="${tab.dataset.tab}"]`);
       if (panel) panel.classList.add("is-active");
+      // Lazy-render CV preview when CV tab is first opened
+      if (tab.dataset.tab === "cv") {
+        const container = detailEl.querySelector("#cv-tab-render");
+        if (container && !container.hasChildNodes()) {
+          container.appendChild(buildTailoredCvHtml(job));
+        }
+      }
     });
   });
 
@@ -612,6 +631,46 @@ const renderJobDetail = (job, detailEl) => {
       const target = state.jobs.find((item) => item.id === copyCvTextBtn.dataset.jobId);
       if (!target) return;
       copyToClipboard(getTailoredCvPlainText(target));
+    });
+  }
+
+  // CV tab buttons
+  const cvTabDownload = detailEl.querySelector(".cv-tab-download");
+  if (cvTabDownload) {
+    cvTabDownload.addEventListener("click", async () => {
+      const target = state.jobs.find((item) => item.id === cvTabDownload.dataset.jobId);
+      if (!target) return;
+      const htmlEl = buildTailoredCvHtml(target);
+      const companySlug = (target.company || "Company").replace(/[^a-zA-Z0-9]/g, "");
+      try {
+        showToast("Generating PDF…");
+        await renderPdfFromElement(htmlEl, {
+          margin: [10, 15],
+          filename: `AdeOmosanya_CV_${companySlug}.pdf`,
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: "mm", format: "a4" },
+        });
+        showToast("PDF ready");
+      } catch (err) {
+        console.error(err);
+        showToast("PDF failed to generate.");
+      }
+    });
+  }
+  const cvTabCopy = detailEl.querySelector(".cv-tab-copy");
+  if (cvTabCopy) {
+    cvTabCopy.addEventListener("click", () => {
+      const target = state.jobs.find((item) => item.id === cvTabCopy.dataset.jobId);
+      if (!target) return;
+      copyToClipboard(getTailoredCvPlainText(target));
+    });
+  }
+  const cvTabModal = detailEl.querySelector(".cv-tab-modal");
+  if (cvTabModal) {
+    cvTabModal.addEventListener("click", () => {
+      const target = state.jobs.find((item) => item.id === cvTabModal.dataset.jobId);
+      if (!target) return;
+      openJobsCvModal(target);
     });
   }
 
@@ -784,6 +843,7 @@ export const renderJobs = () => {
       document.querySelectorAll(".job-list-item").forEach((el) => el.classList.remove("is-active"));
       item.classList.add("is-active");
       renderJobDetail(job, detailEl);
+      detailEl.scrollIntoView({ behavior: "smooth", block: "start" });
     });
 
     listEl.appendChild(item);
@@ -792,6 +852,22 @@ export const renderJobs = () => {
   const selectedJob = filtered.find((j) => j.id === state.selectedJobId) || filtered[0];
   renderJobDetail(selectedJob, detailEl);
 };
+
+// Back to top floating button
+if (!document.getElementById("back-to-top-btn")) {
+  const btn = document.createElement("button");
+  btn.id = "back-to-top-btn";
+  btn.textContent = "\u2191 Top";
+  btn.style.cssText =
+    "position:fixed;bottom:24px;right:24px;z-index:900;display:none;padding:10px 16px;" +
+    "border-radius:8px;border:1px solid #cbd5e1;background:#0f172a;color:#fff;font-size:13px;" +
+    "font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.15);transition:opacity 0.2s;";
+  btn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  document.body.appendChild(btn);
+  window.addEventListener("scroll", () => {
+    btn.style.display = window.scrollY > 400 ? "block" : "none";
+  });
+}
 
 state.handlers.renderJobs = renderJobs;
 state.handlers.getFilteredJobs = getFilteredJobs;
