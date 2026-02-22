@@ -1584,7 +1584,7 @@ def generate_gemini_text_with_timeout(prompt: str, timeout_seconds: int) -> Opti
 
 def generate_groq_text(prompt: str, usage: Optional[Dict[str, int]] = None) -> Optional[str]:
     if not GROQ_API_KEY or GroqClient is None:
-    return None
+        return None
 
 
 def build_enhancement_prompt(record: JobRecord) -> str:
