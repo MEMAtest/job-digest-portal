@@ -5,17 +5,29 @@ export const renderPdfFromElement = async (element, options) => {
     throw new Error("PDF library failed to load.");
   }
   const host = document.createElement("div");
+  // position:fixed avoids scroll-offset issues with html2canvas
   host.style.cssText =
-    "position:absolute;left:0;top:0;width:210mm;background:#fff;z-index:9999;overflow:visible;";
+    "position:fixed;left:0;top:0;width:760px;background:#fff;z-index:99999;overflow:visible;pointer-events:none;";
   element.style.background = "#ffffff";
   host.appendChild(element);
   document.body.appendChild(host);
-  // Allow fonts and layout to settle before capturing
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  // Wait for web fonts, then force layout recalculation
+  if (document.fonts && document.fonts.ready) {
+    await document.fonts.ready;
+  }
+  void host.offsetHeight;
+  await new Promise((resolve) => setTimeout(resolve, 200));
   try {
     const merged = {
       ...options,
-      html2canvas: { scale: 2, useCORS: true, logging: false, ...(options.html2canvas || {}) },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        scrollX: 0,
+        scrollY: 0,
+        ...(options.html2canvas || {}),
+      },
     };
     await html2pdf().set(merged).from(element).save();
   } finally {
@@ -185,23 +197,23 @@ export const buildTailoredCvHtml = (job) => {
       .join("");
 
   const sectionHeading = (title) =>
-    `<div style="font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1.5px solid #0f172a;padding-bottom:2px;margin-bottom:4px;color:#0f172a;">${title}</div>`;
+    `<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;border-bottom:1.5px solid #0f172a;padding-bottom:2px;margin-bottom:4px;color:#0f172a;">${title}</div>`;
 
   const subHeading = (title) =>
-    `<div style="font-weight:700;font-size:8pt;margin:4px 0 2px 0;color:#0f172a;">${esc(title)}</div>`;
+    `<div style="font-weight:700;font-size:11px;margin:4px 0 2px 0;color:#0f172a;">${esc(title)}</div>`;
 
   const container = document.createElement("div");
   container.innerHTML = `
-    <div style="font-family:'Inter',Helvetica,Arial,sans-serif;color:#1f2937;padding:0;margin:0;width:180mm;font-size:8.5pt;line-height:1.3;">
+    <div style="font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:0 20px;margin:0;width:680px;box-sizing:border-box;font-size:11px;line-height:1.3;">
       <div style="text-align:center;margin-bottom:6px;">
-        <div style="font-size:16pt;font-weight:700;letter-spacing:0.5px;color:#0f172a;margin-bottom:3px;">ADE OMOSANYA</div>
-        <div style="font-size:7.5pt;color:#475569;">London, UK &nbsp;|&nbsp; 07920497486 &nbsp;|&nbsp; ademolaomosanya@gmail.com</div>
-        <div style="font-size:7.5pt;color:#0d9488;">LinkedIn &nbsp;|&nbsp; Portfolio: FCA Fines Dashboard &nbsp;|&nbsp; Vulnerability Portal &nbsp;|&nbsp; SMCR Platform</div>
+        <div style="font-size:21px;font-weight:700;letter-spacing:0.5px;color:#0f172a;margin-bottom:3px;">ADE OMOSANYA</div>
+        <div style="font-size:10px;color:#475569;">London, UK &nbsp;|&nbsp; 07920497486 &nbsp;|&nbsp; ademolaomosanya@gmail.com</div>
+        <div style="font-size:10px;color:#0d9488;">LinkedIn &nbsp;|&nbsp; Portfolio: FCA Fines Dashboard &nbsp;|&nbsp; Vulnerability Portal &nbsp;|&nbsp; SMCR Platform</div>
       </div>
 
       <div style="margin-bottom:5px;">
         ${sectionHeading("Professional Summary")}
-        <div style="font-size:8.5pt;line-height:1.35;">${esc(summary)}</div>
+        <div style="font-size:11px;line-height:1.35;">${esc(summary)}</div>
       </div>
 
       <div style="margin-bottom:5px;">
@@ -213,28 +225,28 @@ export const buildTailoredCvHtml = (job) => {
         ${sectionHeading("Professional Experience")}
 
         <div style="margin-bottom:5px;">
-          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">VISTRA</strong> <span style="font-size:8.5pt;">| Global Corporate Services</span></div>
-          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Global Product &amp; Process Owner \u2013 Onboarding, KYC &amp; Screening | September 2023 \u2013 Present</div>
+          <div style="margin-bottom:1px;"><strong style="font-size:11px;">VISTRA</strong> <span style="font-size:11px;">| Global Corporate Services</span></div>
+          <div style="font-size:11px;color:#475569;margin-bottom:3px;">Global Product &amp; Process Owner \u2013 Onboarding, KYC &amp; Screening | September 2023 \u2013 Present</div>
           ${bulletHtml(vistraBullets)}
         </div>
 
         <div style="margin-bottom:5px;">
-          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">EBURY</strong> <span style="font-size:8.5pt;">| B2B Foreign Exchange Platform (Series E, \u00a31.7B valuation)</span></div>
-          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Product Manager \u2013 Identity &amp; Financial Crime | April 2022 \u2013 September 2023</div>
+          <div style="margin-bottom:1px;"><strong style="font-size:11px;">EBURY</strong> <span style="font-size:11px;">| B2B Foreign Exchange Platform (Series E, \u00a31.7B valuation)</span></div>
+          <div style="font-size:11px;color:#475569;margin-bottom:3px;">Product Manager \u2013 Identity &amp; Financial Crime | April 2022 \u2013 September 2023</div>
           ${bulletHtml(eburyBullets)}
         </div>
 
-        <div style="margin-bottom:5px;">
-          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">MEMA CONSULTANTS</strong> <span style="font-size:8.5pt;">| RegTech &amp; Compliance Solutions</span></div>
-          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Founder &amp; Director | March 2017 \u2013 Present</div>
+        <div style="margin-bottom:5px;page-break-inside:avoid;break-inside:avoid;">
+          <div style="margin-bottom:1px;"><strong style="font-size:11px;">MEMA CONSULTANTS</strong> <span style="font-size:11px;">| RegTech &amp; Compliance Solutions</span></div>
+          <div style="font-size:11px;color:#475569;margin-bottom:3px;">Founder &amp; Director | March 2017 \u2013 Present</div>
           <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 Built and deployed 3 live RegTech products (Next.js/React, AI-assisted) used by compliance officers and regulated SMEs:</div>
-          <div style="padding-left:20px;margin-bottom:2px;line-height:1.3;font-size:8pt;">FCA Fines Dashboard | Regulatory enforcement analytics<br>Vulnerability Portal | Consumer Duty compliance<br>SMCR Platform | Senior Managers regime mapping</div>
+          <div style="padding-left:20px;margin-bottom:2px;line-height:1.3;font-size:11px;">FCA Fines Dashboard | Regulatory enforcement analytics<br>Vulnerability Portal | Consumer Duty compliance<br>SMCR Platform | Senior Managers regime mapping</div>
           <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 Advisory: FCA authorisation, financial crime framework design, horizon scanning tooling</div>
         </div>
 
-        <div style="margin-bottom:5px;">
-          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">ELUCIDATE</strong> <span style="font-size:8.5pt;">| RegTech SaaS Platform</span></div>
-          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Product Manager | September 2020 \u2013 March 2022</div>
+        <div style="margin-bottom:5px;page-break-inside:avoid;break-inside:avoid;">
+          <div style="margin-bottom:1px;"><strong style="font-size:11px;">ELUCIDATE</strong> <span style="font-size:11px;">| RegTech SaaS Platform</span></div>
+          <div style="font-size:11px;color:#475569;margin-bottom:3px;">Product Manager | September 2020 \u2013 March 2022</div>
           ${bulletHtml([
             "Zero-to-one: discovery, solution design, PoC delivery; Tier 1 bank, \u00a3120k ARR",
             "Post-PoC: built networking feature from customer discovery; 8 firms onboarded",
@@ -242,16 +254,16 @@ export const buildTailoredCvHtml = (job) => {
           ])}
         </div>
 
-        <div style="margin-bottom:5px;">
-          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">N26</strong> <span style="font-size:8.5pt;">| Digital Banking (7M+ customers)</span></div>
-          <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Financial Crime Product Lead | September 2019 \u2013 September 2020</div>
+        <div style="margin-bottom:5px;page-break-inside:avoid;break-inside:avoid;">
+          <div style="margin-bottom:1px;"><strong style="font-size:11px;">N26</strong> <span style="font-size:11px;">| Digital Banking (7M+ customers)</span></div>
+          <div style="font-size:11px;color:#475569;margin-bottom:3px;">Financial Crime Product Lead | September 2019 \u2013 September 2020</div>
           ${bulletHtml([
             "Led remediation programme addressing BaFin regulatory concerns; defined product requirements across transaction monitoring, screening, and enhanced due diligence",
             "Established EDD squad; cleared 470 PEP backlog and automated 70% of review processes",
           ])}
         </div>
 
-        <div style="margin-bottom:5px;">
+        <div style="margin-bottom:5px;page-break-inside:avoid;break-inside:avoid;">
           ${subHeading("Previous Experience")}
           <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 <strong>ERNST &amp; YOUNG</strong> \u2013 Senior Associate, Financial Crime Advisory (2017\u20132019)</div>
           <div style="margin:0 0 2px 0;padding-left:14px;text-indent:-14px;line-height:1.3;">\u2022 <strong>MAZARS</strong> \u2013 Assistant Manager, Financial Services Consulting (2015\u20132017)</div>
@@ -260,7 +272,7 @@ export const buildTailoredCvHtml = (job) => {
         </div>
       </div>
 
-      <div style="margin-bottom:5px;">
+      <div style="margin-bottom:5px;page-break-inside:avoid;break-inside:avoid;">
         ${sectionHeading("Technical & Product Capabilities")}
         <div style="margin-bottom:2px;"><strong>Platforms-</strong> KYC: Fenergo | Sanctions &amp; Screening: Napier, LexisNexis Bridger | Onboarding Orchestration: Enate | ID&amp;V: Jumio, Onfido, IDnow | CRM: Salesforce</div>
         <div style="margin-bottom:2px;"><strong>Technical-</strong> SQL, PostgreSQL | Power BI, Excel | Next.js/React, Vercel, Netlify, GitHub | API integration | Jira, Confluence | Figma, Miro</div>
@@ -268,7 +280,7 @@ export const buildTailoredCvHtml = (job) => {
         <div><strong>Regulatory-</strong> UK FCA/MLR/JMLSG, EU- Dutch DNB, BaFin, Hong Kong SFC, Singapore MAS, OFAC/OFSI, EU AMLD</div>
       </div>
 
-      <div>
+      <div style="page-break-inside:avoid;break-inside:avoid;">
         ${sectionHeading("Education")}
         <div style="margin-bottom:2px;">University of Hull \u2013 LLB Law (2007\u20132010)</div>
         <div>ACAMS Certified (2018) | ICA Fellow (2020) | APCC Member</div>

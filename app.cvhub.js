@@ -151,9 +151,9 @@ export const buildApplicationPackHtml = (job) => {
   if (job.cover_letter) {
     const clPage = document.createElement("div");
     clPage.style.cssText =
-      "page-break-before:always;font-family:'Inter',Helvetica,Arial,sans-serif;color:#1f2937;padding:0;margin:0;width:180mm;font-size:10pt;line-height:1.6;";
+      "page-break-before:always;font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:0 20px;margin:0;width:680px;box-sizing:border-box;font-size:13px;line-height:1.6;";
     clPage.innerHTML = `
-      <div style="font-size:14pt;font-weight:700;margin-bottom:16px;color:#0f172a;">Cover Letter</div>
+      <div style="font-size:19px;font-weight:700;margin-bottom:16px;color:#0f172a;">Cover Letter</div>
       <div style="white-space:pre-wrap;">${escapeHtml(job.cover_letter)}</div>
     `;
     container.appendChild(clPage);
@@ -164,16 +164,16 @@ export const buildApplicationPackHtml = (job) => {
   if (hasReqs || hasSummary) {
     const extPage = document.createElement("div");
     extPage.style.cssText =
-      "page-break-before:always;font-family:'Inter',Helvetica,Arial,sans-serif;color:#1f2937;padding:0;margin:0;width:180mm;font-size:10pt;line-height:1.6;";
+      "page-break-before:always;font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:0 20px;margin:0;width:680px;box-sizing:border-box;font-size:13px;line-height:1.6;";
     let extHtml = "";
     if (hasReqs) {
-      extHtml += `<div style="font-size:14pt;font-weight:700;margin-bottom:12px;color:#0f172a;">Key Requirements Match</div>`;
+      extHtml += `<div style="font-size:19px;font-weight:700;margin-bottom:12px;color:#0f172a;">Key Requirements Match</div>`;
       extHtml += `<ul style="padding-left:20px;margin-bottom:24px;">${job.key_requirements
         .map((r) => `<li style="margin-bottom:4px;">${escapeHtml(String(r))}</li>`)
         .join("")}</ul>`;
     }
     if (hasSummary) {
-      extHtml += `<div style="font-size:14pt;font-weight:700;margin-bottom:12px;color:#0f172a;">Tailored Summary</div>`;
+      extHtml += `<div style="font-size:19px;font-weight:700;margin-bottom:12px;color:#0f172a;">Tailored Summary</div>`;
       extHtml += `<div style="white-space:pre-wrap;">${escapeHtml(job.tailored_summary)}</div>`;
     }
     extPage.innerHTML = extHtml;
