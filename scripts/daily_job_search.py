@@ -74,14 +74,14 @@ class JobRecord:
     location: str
     link: str
     posted: str
-    posted_raw: str = ""
-    posted_date: str = ""
     source: str
     fit_score: int
     preference_match: str
     why_fit: str
     cv_gap: str
     notes: str
+    posted_raw: str = ""
+    posted_date: str = ""
     role_summary: str = ""
     tailored_summary: str = ""
     tailored_cv_bullets: List[str] = field(default_factory=list)
