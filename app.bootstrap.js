@@ -72,7 +72,7 @@ const setActiveTab = (tabId) => {
     state.selectedJobs.clear();
     if (state.handlers.updateBulkBar) state.handlers.updateBulkBar();
   }
-  // CV Hub merged into Application Hub — no separate lazy-load needed
+  // CV Hub rendered eagerly on load; the cvpage tab reveals it
 };
 
 state.handlers.setActiveTab = setActiveTab;

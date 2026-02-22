@@ -28,7 +28,7 @@ import {
 } from "./app.core.js";
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply } from "./app.applyhub.js";
-import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement, hasCvTailoredChanges } from "./app.cv.js";
+import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
 
 let mobileNavObserver = null;
 
@@ -321,6 +321,7 @@ const renderJobDetail = (job, detailEl) => {
   const manualBadge = isManual ? `<span class="badge badge--manual">Pasted</span>` : "";
 
   detailEl.innerHTML = `
+    <button class="btn btn-tertiary btn-back-to-list">\u2190 Back to all roles</button>
     <div class="job-detail-card">
       <div class="job-detail-header">
         <div>
@@ -351,7 +352,6 @@ const renderJobDetail = (job, detailEl) => {
       <div class="job-detail-tabs">
         <button class="detail-tab detail-tab--active" data-tab="summary">Summary</button>
         <button class="detail-tab" data-tab="fit">Fit</button>
-        <button class="detail-tab" data-tab="cv">CV</button>
         <button class="detail-tab" data-tab="ats">ATS</button>
         <button class="detail-tab" data-tab="prep">Prep</button>
         <button class="detail-tab" data-tab="apply">Apply</button>
@@ -386,17 +386,6 @@ const renderJobDetail = (job, detailEl) => {
         <div class="detail-box">
           <div class="section-title">Hiring scorecard</div>
           ${scorecardList}
-        </div>
-      </div>
-      <div class="detail-tab-panel" data-tab="cv">
-        <div class="detail-box">
-          <div class="section-title">Tailored CV${hasCvTailoredChanges(job) ? ' <span style="color:#059669;font-size:11px;font-weight:500;margin-left:6px;">Tailored</span>' : ""}</div>
-          <div class="cv-tab-preview" id="cv-tab-render"></div>
-          <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">
-            <button class="btn btn-primary cv-tab-download" data-job-id="${escapeHtml(job.id)}">Download PDF</button>
-            <button class="btn btn-secondary cv-tab-copy" data-job-id="${escapeHtml(job.id)}">Copy as text</button>
-            <button class="btn btn-tertiary cv-tab-modal" data-job-id="${escapeHtml(job.id)}">Open full preview</button>
-          </div>
         </div>
       </div>
       <div class="detail-tab-panel" data-tab="ats">
@@ -513,15 +502,20 @@ const renderJobDetail = (job, detailEl) => {
       tab.classList.add("detail-tab--active");
       const panel = detailEl.querySelector(`.detail-tab-panel[data-tab="${tab.dataset.tab}"]`);
       if (panel) panel.classList.add("is-active");
-      // Lazy-render CV preview when CV tab is first opened
-      if (tab.dataset.tab === "cv") {
-        const container = detailEl.querySelector("#cv-tab-render");
-        if (container && !container.hasChildNodes()) {
-          container.appendChild(buildTailoredCvHtml(job));
-        }
-      }
     });
   });
+
+  const backBtn = detailEl.querySelector(".btn-back-to-list");
+  if (backBtn) {
+    backBtn.addEventListener("click", () => {
+      const jobsList = document.getElementById("job-list");
+      if (jobsList) {
+        jobsList.classList.remove("job-list--collapsed");
+        const activeItem = jobsList.querySelector(".job-list-item.is-active");
+        if (activeItem) activeItem.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  }
 
   const qaBtn = detailEl.querySelector(".btn-quick-apply");
   if (qaBtn) {
@@ -634,46 +628,6 @@ const renderJobDetail = (job, detailEl) => {
     });
   }
 
-  // CV tab buttons
-  const cvTabDownload = detailEl.querySelector(".cv-tab-download");
-  if (cvTabDownload) {
-    cvTabDownload.addEventListener("click", async () => {
-      const target = state.jobs.find((item) => item.id === cvTabDownload.dataset.jobId);
-      if (!target) return;
-      const htmlEl = buildTailoredCvHtml(target);
-      const companySlug = (target.company || "Company").replace(/[^a-zA-Z0-9]/g, "");
-      try {
-        showToast("Generating PDF…");
-        await renderPdfFromElement(htmlEl, {
-          margin: [10, 15],
-          filename: `AdeOmosanya_CV_${companySlug}.pdf`,
-          html2canvas: { scale: 2 },
-          jsPDF: { unit: "mm", format: "a4" },
-        });
-        showToast("PDF ready");
-      } catch (err) {
-        console.error(err);
-        showToast("PDF failed to generate.");
-      }
-    });
-  }
-  const cvTabCopy = detailEl.querySelector(".cv-tab-copy");
-  if (cvTabCopy) {
-    cvTabCopy.addEventListener("click", () => {
-      const target = state.jobs.find((item) => item.id === cvTabCopy.dataset.jobId);
-      if (!target) return;
-      copyToClipboard(getTailoredCvPlainText(target));
-    });
-  }
-  const cvTabModal = detailEl.querySelector(".cv-tab-modal");
-  if (cvTabModal) {
-    cvTabModal.addEventListener("click", () => {
-      const target = state.jobs.find((item) => item.id === cvTabModal.dataset.jobId);
-      if (!target) return;
-      openJobsCvModal(target);
-    });
-  }
-
   const saveBtn = detailEl.querySelector(".save-tracking");
   const statusEl = detailEl.querySelector(".tracking-status");
   const appliedEl = detailEl.querySelector(".tracking-applied");
@@ -782,6 +736,7 @@ export const renderJobs = () => {
     return;
   }
 
+  if (listEl) listEl.classList.remove("job-list--collapsed");
   listEl.innerHTML = "";
   detailEl.innerHTML = "";
 
@@ -843,7 +798,12 @@ export const renderJobs = () => {
       document.querySelectorAll(".job-list-item").forEach((el) => el.classList.remove("is-active"));
       item.classList.add("is-active");
       renderJobDetail(job, detailEl);
-      detailEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      // On mobile/stacked layout: collapse list to show only selected role + detail
+      const jobsList = document.getElementById("job-list");
+      if (jobsList && window.innerWidth <= 1100) {
+        jobsList.classList.add("job-list--collapsed");
+        detailEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
 
     listEl.appendChild(item);

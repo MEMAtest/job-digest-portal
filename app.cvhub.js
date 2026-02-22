@@ -688,4 +688,4 @@ export const renderCvHub = () => {
   state.cvHubRendered = true;
 };
 
-// CV Hub merged into Application Hub — handler set in app.applyhub.js
+// Rendered eagerly on load via app.bootstrap.js; displayed under the CV nav tab
