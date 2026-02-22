@@ -1584,7 +1584,41 @@ def generate_gemini_text_with_timeout(prompt: str, timeout_seconds: int) -> Opti
 
 def generate_groq_text(prompt: str, usage: Optional[Dict[str, int]] = None) -> Optional[str]:
     if not GROQ_API_KEY or GroqClient is None:
-        return None
+    return None
+
+
+def build_enhancement_prompt(record: JobRecord) -> str:
+    return (
+        "You are a senior UK fintech product recruiter and ATS optimisation specialist. "
+        "Given the candidate profile and job summary, score fit 0-100 and produce ATS-ready outputs. "
+        "Make interview prep deeper and role-specific, grounded in the candidate's actual work. "
+        "Return JSON ONLY with keys: fit_score (int), why_fit (string), cv_gap (string), "
+        "prep_questions (array of 8-12 strings), prep_answers (array of 8-12 concise answer outlines "
+        "matching prep_questions), scorecard (array of 5-7 criteria with what good looks like), "
+        "apply_tips (string), role_summary (string), tailored_summary (string), "
+        "tailored_cv_bullets (array of 4-6 bullet strings), key_requirements (array of strings), "
+        "match_notes (string), company_insights (string), cover_letter (string), "
+        "key_talking_points (array of 6-10 strings), star_stories (array of 6-8 STAR summaries with "
+        "Situation/Task/Action/Result + metrics), quick_pitch (string), interview_focus (string).\n\n"
+        "ATS rules: plain text, no tables, no columns, no icons, no bullet symbols other than '- '. "
+        "Bullets must be short, action-led, and include metrics if possible. "
+        "If the job text includes Qualifications/Requirements, extract 3-6 key requirements into "
+        "key_requirements and use match_notes to compare against the candidate profile.\n\n"
+        "Role_summary must be STRICTLY based on job text and include two sections with bullet lines (use exact headings):\n"
+        "Role responsibilities (what the job entails):\n- ...\n- ...\n"
+        "What we're looking for (requirements/qualifications):\n- ...\n- ...\n"
+        "Do not infer beyond job text. If not stated, write '- Not available in posting'.\n"
+        "Tailored_summary must explicitly reference 2-3 stated job requirements and map them to the "
+        "candidate's relevant experience.\n\n"
+        f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
+        f"Preferences: {PREFERENCES}\n\n"
+        "Job:\n"
+        f"Title: {record.role}\n"
+        f"Company: {record.company}\n"
+        f"Location: {record.location}\n"
+        f"Posted: {record.posted}\n"
+        f"Summary: {record.notes}\n"
+    )
     client = GroqClient(api_key=GROQ_API_KEY)
     backoffs = [2, 4, 8]
     attempts = len(backoffs) + 1
@@ -1628,37 +1662,7 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
         if allow_groq and warn_threshold and usage.get("tokens", 0) >= warn_threshold:
             print("Groq token usage nearing daily limit; falling back to Gemini for remaining jobs.")
             allow_groq = False
-        prompt = (
-            "You are a senior UK fintech product recruiter and ATS optimisation specialist. "
-            "Given the candidate profile and job summary, score fit 0-100 and produce ATS-ready outputs. "
-            "Make interview prep deeper and role-specific, grounded in the candidate's actual work. "
-            "Return JSON ONLY with keys: fit_score (int), why_fit (string), cv_gap (string), "
-            "prep_questions (array of 8-12 strings), prep_answers (array of 8-12 concise answer outlines "
-            "matching prep_questions), scorecard (array of 5-7 criteria with what good looks like), "
-            "apply_tips (string), role_summary (string), tailored_summary (string), "
-            "tailored_cv_bullets (array of 4-6 bullet strings), key_requirements (array of strings), "
-            "match_notes (string), company_insights (string), cover_letter (string), "
-            "key_talking_points (array of 6-10 strings), star_stories (array of 6-8 STAR summaries with "
-            "Situation/Task/Action/Result + metrics), quick_pitch (string), interview_focus (string).\n\n"
-            "ATS rules: plain text, no tables, no columns, no icons, no bullet symbols other than '- '. "
-            "Bullets must be short, action-led, and include metrics if possible. "
-            "If the job text includes Qualifications/Requirements, extract 3-6 key requirements into "
-            "key_requirements and use match_notes to compare against the candidate profile.\n\n"
-            "Role_summary must be STRICTLY based on job text and include two sections with bullet lines (use exact headings):\n"
-            "Role responsibilities (what the job entails):\n- ...\n- ...\n"
-            "What we're looking for (requirements/qualifications):\n- ...\n- ...\n"
-            "Do not infer beyond job text. If not stated, write '- Not available in posting'.\n"
-            "Tailored_summary must explicitly reference 2-3 stated job requirements and map them to the "
-            "candidate's relevant experience.\n\n"
-            f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
-            f"Preferences: {PREFERENCES}\n\n"
-            "Job:\n"
-            f"Title: {record.role}\n"
-            f"Company: {record.company}\n"
-            f"Location: {record.location}\n"
-            f"Posted: {record.posted}\n"
-            f"Summary: {record.notes}\n"
-        )
+        prompt = build_enhancement_prompt(record)
         text = generate_groq_text(prompt, usage=usage) if allow_groq else None
         if not text and GEMINI_API_KEY and genai is not None:
             text = generate_gemini_text_with_timeout(prompt, GEMINI_TIMEOUT_SECONDS)
@@ -1703,37 +1707,7 @@ def enhance_records_with_gemini(records: List[JobRecord]) -> List[JobRecord]:
 
     limit = min(GEMINI_MAX_JOBS, len(records))
     for record in records[:limit]:
-        prompt = (
-            "You are a senior UK fintech product recruiter and ATS optimisation specialist. "
-            "Given the candidate profile and job summary, score fit 0-100 and produce ATS-ready outputs. "
-            "Make interview prep deeper and role-specific, grounded in the candidate's actual work. "
-            "Return JSON ONLY with keys: fit_score (int), why_fit (string), cv_gap (string), "
-            "prep_questions (array of 8-12 strings), prep_answers (array of 8-12 concise answer outlines "
-            "matching prep_questions), scorecard (array of 5-7 criteria with what good looks like), "
-            "apply_tips (string), role_summary (string), tailored_summary (string), "
-            "tailored_cv_bullets (array of 4-6 bullet strings), key_requirements (array of strings), "
-            "match_notes (string), company_insights (string), cover_letter (string), "
-            "key_talking_points (array of 6-10 strings), star_stories (array of 6-8 STAR summaries with "
-            "Situation/Task/Action/Result + metrics), quick_pitch (string), interview_focus (string).\n\n"
-            "ATS rules: plain text, no tables, no columns, no icons, no bullet symbols other than '- '. "
-            "Bullets must be short, action-led, and include metrics if possible. "
-            "If the job text includes Qualifications/Requirements, extract 3-6 key requirements into "
-            "key_requirements and use match_notes to compare against the candidate profile.\n\n"
-            "Role_summary must be STRICTLY based on job text and include two sections with bullet lines (use exact headings):\n"
-            "Role responsibilities (what the job entails):\n- ...\n- ...\n"
-            "What we're looking for (requirements/qualifications):\n- ...\n- ...\n"
-            "Do not infer beyond job text. If not stated, write '- Not available in posting'.\n"
-            "Tailored_summary must explicitly reference 2-3 stated job requirements and map them to the "
-            "candidate's relevant experience.\n\n"
-            f"Candidate profile: {JOB_DIGEST_PROFILE_TEXT}\n"
-            f"Preferences: {PREFERENCES}\n\n"
-            "Job:\n"
-            f"Title: {record.role}\n"
-            f"Company: {record.company}\n"
-            f"Location: {record.location}\n"
-            f"Posted: {record.posted}\n"
-            f"Summary: {record.notes}\n"
-        )
+        prompt = build_enhancement_prompt(record)
         text = generate_gemini_text_with_timeout(prompt, GEMINI_TIMEOUT_SECONDS)
         data = parse_gemini_payload(text or "")
         if not data:
@@ -2152,31 +2126,86 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
     total = len(records)
     print(f"Backfill loaded {total} jobs.")
 
-    if GROQ_API_KEY and GroqClient is not None:
-        records = enhance_records_with_groq(records)
-    elif GEMINI_API_KEY and genai is not None:
-        records = enhance_records_with_gemini(records)
-    else:
+    updated = 0
+    errors = 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if not (GROQ_API_KEY and GroqClient is not None) and not (GEMINI_API_KEY and genai is not None):
         print("Backfill skipped: no LLM keys configured.")
         return
 
-    updated = 0
-    now_iso = datetime.now(timezone.utc).isoformat()
     for idx, (doc_id, record) in enumerate(zip(doc_ids, records), start=1):
-        if not record.role_summary:
+        print(f"Backfill job {idx}/{total}: {record.company} — {record.role}")
+        prompt = build_enhancement_prompt(record)
+        text: Optional[str] = None
+        try:
+            if GEMINI_API_KEY and genai is not None:
+                text = generate_gemini_text_with_timeout(prompt, GEMINI_TIMEOUT_SECONDS)
+            elif GROQ_API_KEY and GroqClient is not None:
+                text = generate_groq_text(prompt)
+        except Exception as exc:
+            errors += 1
+            print(f"Backfill error: LLM call failed ({type(exc).__name__}: {exc})")
             continue
+
+        if not text:
+            errors += 1
+            print("Backfill error: empty response.")
+            continue
+
+        data = parse_gemini_payload(text)
+        if not data or not data.get("role_summary"):
+            errors += 1
+            print("Backfill error: missing role_summary in response.")
+            continue
+
         try:
             client.collection(FIREBASE_COLLECTION).document(doc_id).set(
-                {"role_summary": record.role_summary, "updated_at": now_iso},
+                {"role_summary": data.get("role_summary"), "updated_at": now_iso},
                 merge=True,
             )
             updated += 1
-            if idx % 25 == 0 or idx == total:
-                print(f"Backfill progress: {idx}/{total} processed, {updated} updated.")
-        except Exception:
+        except Exception as exc:
+            errors += 1
+            print(f"Backfill error: Firestore write failed ({type(exc).__name__}: {exc})")
             continue
 
-    print(f"Backfill complete: updated {updated} role summaries.")
+        if idx % 5 == 0 or idx == total:
+            print(f"Backfill progress: {idx}/{total} processed, {updated} updated, {errors} errors.")
+
+    print(f"Backfill complete: updated {updated} role summaries, {errors} errors.")
+
+
+def diagnose_backfill() -> None:
+    print("Backfill diagnose:")
+    print(f"- Firestore credentials present: {'yes' if (FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_B64) else 'no'}")
+    print(f"- Gemini key present: {'yes' if GEMINI_API_KEY else 'no'}")
+    client = init_firestore_client()
+    if client is None:
+        print("- Firestore: NOT available")
+        return
+    print("- Firestore: OK")
+    try:
+        docs = client.collection(FIREBASE_COLLECTION).limit(1).stream()
+        sample = next(docs, None)
+        if not sample:
+            print("- Sample job: none found")
+        else:
+            data = sample.to_dict() or {}
+            role = data.get("role") or ""
+            company = data.get("company") or ""
+            notes_len = len(data.get("notes") or "")
+            print(f"- Sample job: {company} — {role} (notes {notes_len} chars)")
+    except Exception as exc:
+        print(f"- Sample job read failed: {type(exc).__name__}: {exc}")
+        return
+
+    if GEMINI_API_KEY and genai is not None:
+        try:
+            text = generate_gemini_text_with_timeout('Return JSON: {"ok": true}', 20)
+            data = parse_gemini_payload(text or "")
+            print(f"- Gemini test: {'ok' if data else 'failed'}")
+        except Exception as exc:
+            print(f"- Gemini test failed: {type(exc).__name__}: {exc}")
 
 
 def write_candidate_prep() -> None:
@@ -4854,10 +4883,17 @@ if __name__ == "__main__":
         default=0,
         help="Limit number of jobs to backfill (0 = all)",
     )
+    parser.add_argument(
+        "--backfill-diagnose",
+        action="store_true",
+        help="Run diagnostics for backfill connectivity and model access",
+    )
     args = parser.parse_args()
 
     if args.smoke_test:
         run_smoke_test()
+    elif args.backfill_diagnose:
+        diagnose_backfill()
     elif args.backfill_role_summary:
         backfill_role_summaries(limit=args.backfill_limit or None)
     else:
