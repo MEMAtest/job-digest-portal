@@ -22,32 +22,32 @@ export const renderPdfFromElement = async (element, options) => {
 };
 
 const BASE_CV_SECTIONS = {
-  summary: "13+ years in financial crime product and operations management, delivering onboarding and screening platform transformations across EMEA, AMER and APAC. Independently created and deployed three live RegTech products used by compliance officers and regulated firms. Led enterprise KYC and screening platform strategy and configuration (Fenergo, Napier, Enate) for thousands of business clients globally, designing scalable 1st line controls and operating models. Proven stakeholder manager from front office to C-suite.",
+  summary: "Onboarding, KYC and screening product leader specialising in platform configuration, workflow orchestration and MI for regulated financial services. Built and shipped enterprise controls using Fenergo, Napier and Enate across EMEA, AMER and APAC, serving thousands of corporate and fund clients. Independently created and deployed three live RegTech products used by compliance officers and regulated firms. Known for writing SteerCo-ready packs, running deep-dive root cause sessions, and turning them into delivery plans with owners and dates.",
   key_achievements: [
-    "55% reduction in client onboarding time (45 days \u2192 20 days) across EMEA, AMER and APAC",
-    "20% operational headcount efficiency through workflow automation",
-    "18+ reporting dashboards deployed, used by hundreds of users across APAC and EMEA",
-    "3 live RegTech products independently created and deployed using AI-assisted development",
-    "Napier screening implementation was subsequently validated by Dutch DNB effectiveness assessment",
-    "12 BaFin audit points closed, mitigating multimillion-pound fine exposure",
-    "\u00a3120k ARR secured from Tier 1 global bank proof of concept",
+    "Reduced client onboarding cycle time by 55% (45 to 20 days) across EMEA, AMER and APAC",
+    "Drove 20% operational headcount efficiency through workflow automation and orchestration",
+    "Deployed 18+ reporting dashboards used by hundreds of users across APAC and EMEA",
+    "Built and shipped 3 live RegTech products (Next.js/React, AI-assisted) used by compliance officers and regulated SMEs",
+    "Designed Napier screening framework subsequently validated by Dutch DNB effectiveness assessment",
+    "Closed 12 BaFin audit points, mitigating multimillion-pound fine exposure",
+    "Secured \u00a3120k ARR from Tier 1 global bank proof of concept",
   ],
   vistra_bullets: [
-    "Led 1st line design and implementation of business onboarding and financial crime controls for corporate and fund clients, using Fenergo (KYC), Napier (screening) and Enate (orchestration) across EMEA, AMER and APAC",
+    "Led 1st line design and implementation of onboarding and financial crime controls for corporate and fund clients, using Fenergo (KYC), Napier (screening) and Enate (orchestration) across EMEA, AMER and APAC",
     "Defined platform feature requirements and competitor positioning; secured \u00a3400k+ business case sign-off",
     "Led vendor evaluation and pricing negotiation, balancing regulatory and commercial constraints",
-    "Defined Fenergo KYC product model across EMEA, AMER and APAC \u2014 global consistency with jurisdiction-specific CDD/EDD logic",
-    "Owned Napier screening design and capacity framework; validated by Dutch DNB effectiveness assessment",
-    "Created Enate orchestration layer from fragmented processes \u2014 55% faster onboarding (45 \u2192 20 days), thousands of clients annually",
-    "Gathered requirements and built Power BI suite (screening, KYC, onboarding dashboards) through direct discovery with APAC, AMER and EMEA teams",
+    "Defined Fenergo KYC product model across three regions, delivering global consistency with jurisdiction-specific CDD/EDD logic",
+    "Owned Napier screening design and capacity framework; configuration validated by Dutch DNB effectiveness assessment",
+    "Created Enate orchestration layer from fragmented processes, eliminating the primary bottleneck in onboarding cycle time for thousands of clients annually",
+    "Gathered requirements and built Power BI reporting suite across screening, KYC and onboarding through direct discovery with APAC, AMER and EMEA teams",
     "Managed 4 Business Analysts (reporting, data migration, SOPs, tech implementation); coordinated delivery across engineering, compliance, and front office",
     "Chaired SteerCo with CFO/COO; delivered QA academy for 150+ analysts across 20 countries",
   ],
   ebury_bullets: [
-    "Built onboarding funnel analytics, identifying drop-off points; drove 20% conversion uplift across Spain, Greece and Germany",
-    "Optimised screening thresholds - 38% false positive reduction, regulatory standards maintained",
+    "Built onboarding funnel analytics, identifying drop-off points; drove conversion uplift across Spain, Greece and Germany",
+    "Optimised screening thresholds to cut false positives by 38%, maintaining regulatory standards",
     "Led Salesforce to Fenergo migration (50k+ client records): data quality strategy, vendor management, zero-downtime cutover",
-    "Designed continuous monitoring for medium/low-risk segments \u2014 60% reduction in client review touchpoints",
+    "Designed continuous monitoring for medium/low-risk segments, reducing client review touchpoints by 60%",
   ],
 };
 
@@ -110,15 +110,10 @@ export const getTailoredCvPlainText = (job) => {
   lines.push("\nPROFESSIONAL EXPERIENCE");
 
   // Vistra
-  lines.push("\nVISTRA | Global Corporate Services (9,000+ employees, $1.5B revenue)");
+  lines.push("\nVISTRA | Global Corporate Services");
   lines.push("Global Product & Process Owner \u2013 Onboarding, KYC & Screening | September 2023 \u2013 Present");
   const vistraBullets = sections.vistra_bullets || base.vistra_bullets;
-  lines.push("\nProduct Strategy & Discovery");
-  vistraBullets.slice(0, 3).forEach((b) => lines.push(bullet(b)));
-  lines.push("\nPlatform Development & Delivery");
-  vistraBullets.slice(3, 6).forEach((b) => lines.push(bullet(b)));
-  lines.push("\nReporting Products & Leadership");
-  vistraBullets.slice(6, 9).forEach((b) => lines.push(bullet(b)));
+  vistraBullets.forEach((b) => lines.push(bullet(b)));
 
   // Ebury
   lines.push("\nEBURY | B2B Foreign Exchange Platform (Series E, \u00a31.7B valuation)");
@@ -137,9 +132,9 @@ export const getTailoredCvPlainText = (job) => {
   // Elucidate
   lines.push("\nELUCIDATE | RegTech SaaS Platform");
   lines.push("Product Manager | September 2020 \u2013 March 2022");
-  lines.push(bullet("Zero-to-one: discovery, solution design, PoC delivery \u2014 Tier 1 bank, \u00a3120k ARR"));
+  lines.push(bullet("Zero-to-one: discovery, solution design, PoC delivery; Tier 1 bank, \u00a3120k ARR"));
   lines.push(bullet("Post-PoC: built networking feature from customer discovery; 8 firms onboarded"));
-  lines.push(bullet("Redesigned platform UX \u2014 40% MAU uplift, deployment reduced to 6 weeks"));
+  lines.push(bullet("Redesigned platform UX; 40% MAU uplift, deployment reduced to 6 weeks"));
 
   // N26
   lines.push("\nN26 | Digital Banking (7M+ customers)");
@@ -216,14 +211,9 @@ export const buildTailoredCvHtml = (job) => {
         ${sectionHeading("Professional Experience")}
 
         <div style="margin-bottom:5px;">
-          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">VISTRA</strong> <span style="font-size:8.5pt;">| Global Corporate Services (9,000+ employees, $1.5B revenue)</span></div>
+          <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">VISTRA</strong> <span style="font-size:8.5pt;">| Global Corporate Services</span></div>
           <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Global Product &amp; Process Owner \u2013 Onboarding, KYC &amp; Screening | September 2023 \u2013 Present</div>
-          ${subHeading("Product Strategy & Discovery")}
-          ${bulletHtml(vistraBullets.slice(0, 3))}
-          ${subHeading("Platform Development & Delivery")}
-          ${bulletHtml(vistraBullets.slice(3, 6))}
-          ${subHeading("Reporting Products & Leadership")}
-          ${bulletHtml(vistraBullets.slice(6, 9))}
+          ${bulletHtml(vistraBullets)}
         </div>
 
         <div style="margin-bottom:5px;">
@@ -244,9 +234,9 @@ export const buildTailoredCvHtml = (job) => {
           <div style="margin-bottom:1px;"><strong style="font-size:8.5pt;">ELUCIDATE</strong> <span style="font-size:8.5pt;">| RegTech SaaS Platform</span></div>
           <div style="font-size:8pt;color:#475569;margin-bottom:3px;">Product Manager | September 2020 \u2013 March 2022</div>
           ${bulletHtml([
-            "Zero-to-one: discovery, solution design, PoC delivery \u2014 Tier 1 bank, \u00a3120k ARR",
+            "Zero-to-one: discovery, solution design, PoC delivery; Tier 1 bank, \u00a3120k ARR",
             "Post-PoC: built networking feature from customer discovery; 8 firms onboarded",
-            "Redesigned platform UX \u2014 40% MAU uplift, deployment reduced to 6 weeks",
+            "Redesigned platform UX; 40% MAU uplift, deployment reduced to 6 weeks",
           ])}
         </div>
 
