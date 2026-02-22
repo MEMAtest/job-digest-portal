@@ -2136,6 +2136,9 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
         print("Backfill skipped: no jobs found.")
         return
 
+    total = len(records)
+    print(f"Backfill loaded {total} jobs.")
+
     if GROQ_API_KEY and GroqClient is not None:
         records = enhance_records_with_groq(records)
     elif GEMINI_API_KEY and genai is not None:
@@ -2146,7 +2149,7 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
 
     updated = 0
     now_iso = datetime.now(timezone.utc).isoformat()
-    for doc_id, record in zip(doc_ids, records):
+    for idx, (doc_id, record) in enumerate(zip(doc_ids, records), start=1):
         if not record.role_summary:
             continue
         try:
@@ -2155,6 +2158,8 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
                 merge=True,
             )
             updated += 1
+            if idx % 25 == 0 or idx == total:
+                print(f"Backfill progress: {idx}/{total} processed, {updated} updated.")
         except Exception:
             continue
 
