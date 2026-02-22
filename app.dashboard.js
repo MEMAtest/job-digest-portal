@@ -27,6 +27,7 @@ const prepDetailTitle = document.getElementById("prep-detail-title");
 const prepDetailMeta = document.getElementById("prep-detail-meta");
 const prepDetailTabs = document.getElementById("prep-detail-tabs");
 const prepDetailContent = document.getElementById("prep-detail-content");
+const contractCalculator = document.getElementById("contract-calculator");
 
 let prepActiveSection = null;
 let prepActiveTab = "star";
@@ -36,6 +37,113 @@ const truncateText = (text, len = 120) => {
   const value = String(text || "").trim();
   if (!value) return "";
   return value.length > len ? `${value.slice(0, len)}…` : value;
+};
+
+const CONTRACT_STORAGE_KEY = "contract_calc_v1";
+const CONTRACT_DEFAULTS = {
+  minRate: 650,
+  maxRate: 825,
+  daysPerWeek: 5,
+  weeksPerYear: 46,
+};
+
+const readContractSettings = () => {
+  try {
+    const stored = safeLocalStorageGet(CONTRACT_STORAGE_KEY);
+    if (stored) return { ...CONTRACT_DEFAULTS, ...JSON.parse(stored) };
+  } catch (error) {
+    // ignore
+  }
+  return { ...CONTRACT_DEFAULTS };
+};
+
+const saveContractSettings = (settings) => {
+  try {
+    safeLocalStorageSet(CONTRACT_STORAGE_KEY, JSON.stringify(settings));
+  } catch (error) {
+    // ignore
+  }
+};
+
+const renderContractCalculator = () => {
+  if (!contractCalculator) return;
+  const current = readContractSettings();
+
+  contractCalculator.innerHTML = `
+    <div class="contract-card__header">
+      <div>
+        <h3>Contract rate calculator</h3>
+        <p>Estimate gross earnings from day rates (no tax applied).</p>
+      </div>
+    </div>
+    <div class="contract-grid">
+      <div class="contract-field">
+        <label>Day rate (min)</label>
+        <input type="number" class="contract-input" data-field="minRate" min="0" value="${current.minRate}" />
+      </div>
+      <div class="contract-field">
+        <label>Day rate (max)</label>
+        <input type="number" class="contract-input" data-field="maxRate" min="0" value="${current.maxRate}" />
+      </div>
+      <div class="contract-field">
+        <label>Days per week</label>
+        <input type="number" class="contract-input" data-field="daysPerWeek" min="1" max="7" value="${current.daysPerWeek}" />
+      </div>
+      <div class="contract-field">
+        <label>Weeks per year</label>
+        <input type="number" class="contract-input" data-field="weeksPerYear" min="1" max="52" value="${current.weeksPerYear}" />
+      </div>
+    </div>
+    <div class="contract-results">
+      <div class="contract-result" data-result="min">
+        <span class="contract-result__label">Min rate estimate</span>
+        <span class="contract-result__value">—</span>
+      </div>
+      <div class="contract-result" data-result="max">
+        <span class="contract-result__label">Max rate estimate</span>
+        <span class="contract-result__value">—</span>
+      </div>
+    </div>
+  `;
+
+  const formatter = new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  });
+
+  const updateResults = () => {
+    const inputs = contractCalculator.querySelectorAll(".contract-input");
+    const settings = { ...CONTRACT_DEFAULTS };
+    inputs.forEach((input) => {
+      const key = input.dataset.field;
+      const raw = Number(input.value);
+      settings[key] = Number.isFinite(raw) && raw > 0 ? raw : CONTRACT_DEFAULTS[key];
+    });
+    if (settings.maxRate < settings.minRate) settings.maxRate = settings.minRate;
+
+    const minAnnual = settings.minRate * settings.daysPerWeek * settings.weeksPerYear;
+    const maxAnnual = settings.maxRate * settings.daysPerWeek * settings.weeksPerYear;
+    const minMonthly = minAnnual / 12;
+    const maxMonthly = maxAnnual / 12;
+
+    const minEl = contractCalculator.querySelector('[data-result="min"] .contract-result__value');
+    const maxEl = contractCalculator.querySelector('[data-result="max"] .contract-result__value');
+    if (minEl) {
+      minEl.textContent = `${formatter.format(minAnnual)} / year · ${formatter.format(minMonthly)} / month`;
+    }
+    if (maxEl) {
+      maxEl.textContent = `${formatter.format(maxAnnual)} / year · ${formatter.format(maxMonthly)} / month`;
+    }
+
+    saveContractSettings(settings);
+  };
+
+  contractCalculator.querySelectorAll(".contract-input").forEach((input) => {
+    input.addEventListener("input", updateResults);
+  });
+
+  updateResults();
 };
 
 const stripMarkdown = (value) =>
@@ -609,6 +717,8 @@ export const renderDashboardStats = (jobs) => {
       }
     });
   });
+
+  renderContractCalculator();
 };
 
 export const renderPipelineView = (jobs) => {

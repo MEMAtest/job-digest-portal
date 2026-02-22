@@ -25,6 +25,7 @@ import {
   formatApplicantBadge,
   quickFilterPredicate,
   uniqueCompanyOnly,
+  applyQuickFilter,
 } from "./app.core.js";
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply } from "./app.applyhub.js";
@@ -518,11 +519,7 @@ const renderJobDetail = (job, detailEl) => {
 
   detailEl.querySelectorAll(".detail-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
-      detailEl.querySelectorAll(".detail-tab").forEach((btn) => btn.classList.remove("detail-tab--active"));
-      detailEl.querySelectorAll(".detail-tab-panel").forEach((panel) => panel.classList.remove("is-active"));
-      tab.classList.add("detail-tab--active");
-      const panel = detailEl.querySelector(`.detail-tab-panel[data-tab="${tab.dataset.tab}"]`);
-      if (panel) panel.classList.add("is-active");
+      activateDetailTab(detailEl, tab.dataset.tab);
     });
   });
 
@@ -543,6 +540,34 @@ const renderJobDetail = (job, detailEl) => {
     qaBtn.addEventListener("click", () => quickApply(job));
   }
 
+  const markAppliedBtn = detailEl.querySelector(".btn-mark-applied");
+  if (markAppliedBtn) {
+    markAppliedBtn.addEventListener("click", async () => {
+      if (!db) {
+        showToast("Missing Firebase config.");
+        return;
+      }
+      const today = new Date().toISOString();
+      const todayDate = today.slice(0, 10);
+      try {
+        await updateDoc(doc(db, collectionName, job.id), {
+          application_status: "applied",
+          application_date: `${todayDate}T00:00:00.000Z`,
+          last_touch_date: `${todayDate}T00:00:00.000Z`,
+          updated_at: today,
+        });
+        job.application_status = "applied";
+        job.application_date = `${todayDate}T00:00:00.000Z`;
+        job.last_touch_date = `${todayDate}T00:00:00.000Z`;
+        showToast("Marked as applied");
+        refreshJobViews(job, { tab: "apply" });
+      } catch (err) {
+        console.error(err);
+        showToast("Failed to mark applied.");
+      }
+    });
+  }
+
   const shortlistBtn = detailEl.querySelector(".btn-shortlist");
   if (shortlistBtn) {
     shortlistBtn.addEventListener("click", async () => {
@@ -561,7 +586,7 @@ const renderJobDetail = (job, detailEl) => {
         state.selectedJobs.delete(job.id);
         updateBulkBar();
         showToast("Moved to Shortlisted");
-        renderJobs();
+        applyQuickFilter({ label: "Shortlisted roles", status: "shortlisted" });
       } catch (err) {
         console.error(err);
         showToast("Shortlist failed.");
@@ -588,7 +613,7 @@ const renderJobDetail = (job, detailEl) => {
         state.selectedJobs.delete(job.id);
         updateBulkBar();
         showToast("Dismissed");
-        renderJobs();
+        refreshJobViews(job);
       } catch (err) {
         console.error(err);
         showToast("Dismiss failed.");
@@ -708,8 +733,13 @@ const renderJobDetail = (job, detailEl) => {
       try {
         await updateDoc(doc(db, collectionName, job.id), payload);
         Object.assign(job, payload);
-        statusMsg.textContent = "Updated.";
-        renderJobs();
+        refreshJobViews(job, {
+          tab: "apply",
+          onComplete: (el) => {
+            const msg = el.querySelector(".tracking-status-msg");
+            if (msg) msg.textContent = "Updated.";
+          },
+        });
       } catch (error) {
         console.error(error);
         statusMsg.textContent = "Save failed.";
@@ -726,27 +756,73 @@ const renderJobDetail = (job, detailEl) => {
       const subject = confirmSubjectEl?.value?.trim() || "";
       const dateValue = confirmDateEl?.value || new Date().toISOString().slice(0, 10);
       const isoDate = `${dateValue}T00:00:00.000Z`;
+      const hasAppliedDate = Boolean(job.application_date);
+      const payload = {
+        confirmation_subject: subject,
+        confirmation_received_at: isoDate,
+        application_status: "applied",
+        last_touch_date: isoDate,
+        updated_at: new Date().toISOString(),
+      };
+      if (!hasAppliedDate) {
+        payload.application_date = isoDate;
+      }
       try {
-        await updateDoc(doc(db, collectionName, job.id), {
-          confirmation_subject: subject,
-          confirmation_received_at: isoDate,
-          application_status: "applied",
-          application_date: isoDate,
-          last_touch_date: isoDate,
-          updated_at: new Date().toISOString(),
-        });
+        await updateDoc(doc(db, collectionName, job.id), payload);
         job.confirmation_subject = subject;
         job.confirmation_received_at = isoDate;
         job.application_status = "applied";
-        job.application_date = isoDate;
+        if (!hasAppliedDate) job.application_date = isoDate;
         job.last_touch_date = isoDate;
-        if (confirmStatusMsg) confirmStatusMsg.textContent = "Confirmation saved. Marked as applied.";
-        renderJobs();
+        refreshJobViews(job, {
+          tab: "apply",
+          onComplete: (el) => {
+            const msg = el.querySelector(".confirmation-status-msg");
+            if (msg) msg.textContent = "Confirmation saved. Marked as applied.";
+          },
+        });
       } catch (error) {
         console.error(error);
         if (confirmStatusMsg) confirmStatusMsg.textContent = "Save failed.";
       }
     });
+  }
+};
+
+const updateJobListItem = (job) => {
+  const item = document.querySelector(`.job-list-item[data-job-id="${job.id}"]`);
+  if (!item) return;
+  const metaLines = item.querySelectorAll(".job-list-meta");
+  if (metaLines[1]) {
+    metaLines[1].textContent = buildStatusLine(job);
+  }
+};
+
+const getActiveDetailTab = (detailEl) => detailEl?.querySelector(".detail-tab--active")?.dataset?.tab || "";
+
+const activateDetailTab = (detailEl, tabName) => {
+  if (!detailEl || !tabName) return;
+  detailEl.querySelectorAll(".detail-tab").forEach((btn) => btn.classList.remove("detail-tab--active"));
+  detailEl.querySelectorAll(".detail-tab-panel").forEach((panel) => panel.classList.remove("is-active"));
+  const tab = detailEl.querySelector(`.detail-tab[data-tab="${tabName}"]`);
+  const panel = detailEl.querySelector(`.detail-tab-panel[data-tab="${tabName}"]`);
+  if (tab) tab.classList.add("detail-tab--active");
+  if (panel) panel.classList.add("is-active");
+};
+
+const refreshJobViews = (job, options = {}) => {
+  const detailEl = document.getElementById("job-detail");
+  const activeTab = options.tab || getActiveDetailTab(detailEl);
+  const visible = getFilteredJobs().some((j) => j.id === job.id);
+  if (!visible) {
+    renderJobs();
+    return;
+  }
+  updateJobListItem(job);
+  if (detailEl) {
+    renderJobDetail(job, detailEl);
+    if (activeTab) activateDetailTab(detailEl, activeTab);
+    if (typeof options.onComplete === "function") options.onComplete(detailEl);
   }
 };
 
@@ -891,30 +967,3 @@ if (!document.getElementById("back-to-top-btn")) {
 state.handlers.renderJobs = renderJobs;
 state.handlers.getFilteredJobs = getFilteredJobs;
 state.handlers.updateBulkBar = updateBulkBar;
-  const markAppliedBtn = detailEl.querySelector(".btn-mark-applied");
-  if (markAppliedBtn) {
-    markAppliedBtn.addEventListener("click", async () => {
-      if (!db) {
-        showToast("Missing Firebase config.");
-        return;
-      }
-      const today = new Date().toISOString();
-      const todayDate = today.slice(0, 10);
-      try {
-        await updateDoc(doc(db, collectionName, job.id), {
-          application_status: "applied",
-          application_date: `${todayDate}T00:00:00.000Z`,
-          last_touch_date: `${todayDate}T00:00:00.000Z`,
-          updated_at: today,
-        });
-        job.application_status = "applied";
-        job.application_date = `${todayDate}T00:00:00.000Z`;
-        job.last_touch_date = `${todayDate}T00:00:00.000Z`;
-        showToast("Marked as applied");
-        renderJobs();
-      } catch (err) {
-        console.error(err);
-        showToast("Failed to mark applied.");
-      }
-    });
-  }
