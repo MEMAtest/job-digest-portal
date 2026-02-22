@@ -225,6 +225,14 @@ const formatStatusLabel = (statusValue) => {
   return statusValue.replace(/_/g, " ");
 };
 
+const buildStatusLine = (job) => {
+  const statusValue = (job.application_status || "saved").toLowerCase();
+  const statusLabel = formatStatusLabel(statusValue);
+  const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
+  const dateSuffix = statusValue === "applied" && appliedDate ? ` · ${appliedDate}` : "";
+  return `Status: ${statusLabel}${dateSuffix}`;
+};
+
 const ensureJobsCvModal = () => {
   if (document.getElementById("jobs-cv-modal")) return;
   const modal = document.createElement("div");
@@ -328,7 +336,7 @@ const renderJobDetail = (job, detailEl) => {
           <div class="job-detail-title">${escapeHtml(job.role)}</div>
           <div class="job-detail-company">${escapeHtml(job.company || "Company not listed")}</div>
           <div class="job-detail-meta">${escapeHtml(metaLine || "")}</div>
-          <div class="job-detail-meta">Status: ${escapeHtml(statusLabel)}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
+          <div class="job-detail-meta">${escapeHtml(buildStatusLine(job))}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
         </div>
         <div class="job-detail-badges">
           <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
@@ -342,6 +350,7 @@ const renderJobDetail = (job, detailEl) => {
         <button class="btn btn-quick-apply${
           statusValue !== "saved" && statusValue !== "shortlisted" && statusValue !== "ready_to_apply" ? " btn-quick-apply--done" : ""
         }">${statusValue === "applied" || statusValue === "interview" || statusValue === "offer" ? "Re-copy & Open" : "Apply now"}</button>
+        ${statusValue === "applied" ? "" : '<button class="btn btn-secondary btn-mark-applied">Mark applied today</button>'}
         <button class="btn btn-secondary btn-shortlist"${statusValue === "shortlisted" ? " disabled" : ""}>${
           statusValue === "shortlisted" ? "Shortlisted" : "Shortlist"
         }</button>
@@ -684,6 +693,7 @@ const renderJobDetail = (job, detailEl) => {
         await updateDoc(doc(db, collectionName, job.id), payload);
         Object.assign(job, payload);
         statusMsg.textContent = "Updated.";
+        renderJobs();
       } catch (error) {
         console.error(error);
         statusMsg.textContent = "Save failed.";
@@ -764,6 +774,7 @@ export const renderJobs = () => {
 
     const item = document.createElement("div");
     item.className = `job-list-item${job.id === state.selectedJobId ? " is-active" : ""}`;
+    item.dataset.jobId = job.id;
     item.innerHTML = `
       <label class="bulk-check-label"><input type="checkbox" class="bulk-check" data-job-id="${escapeHtml(job.id)}" ${
       state.selectedJobs.has(job.id) ? "checked" : ""
@@ -772,7 +783,7 @@ export const renderJobs = () => {
         <div class="job-list-title">${escapeHtml(job.role)}</div>
         <div class="job-list-company">${escapeHtml(job.company || "Company not listed")}</div>
         <div class="job-list-meta">${escapeHtml(formatPosted(postedDisplay))} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
-        <div class="job-list-meta">Status: ${escapeHtml(statusLabel)}</div>
+        <div class="job-list-meta">${escapeHtml(buildStatusLine(job))}</div>
       </div>
       <div class="job-list-badges">
         <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
@@ -832,3 +843,30 @@ if (!document.getElementById("back-to-top-btn")) {
 state.handlers.renderJobs = renderJobs;
 state.handlers.getFilteredJobs = getFilteredJobs;
 state.handlers.updateBulkBar = updateBulkBar;
+  const markAppliedBtn = detailEl.querySelector(".btn-mark-applied");
+  if (markAppliedBtn) {
+    markAppliedBtn.addEventListener("click", async () => {
+      if (!db) {
+        showToast("Missing Firebase config.");
+        return;
+      }
+      const today = new Date().toISOString();
+      const todayDate = today.slice(0, 10);
+      try {
+        await updateDoc(doc(db, collectionName, job.id), {
+          application_status: "applied",
+          application_date: `${todayDate}T00:00:00.000Z`,
+          last_touch_date: `${todayDate}T00:00:00.000Z`,
+          updated_at: today,
+        });
+        job.application_status = "applied";
+        job.application_date = `${todayDate}T00:00:00.000Z`;
+        job.last_touch_date = `${todayDate}T00:00:00.000Z`;
+        showToast("Marked as applied");
+        renderJobs();
+      } catch (err) {
+        console.error(err);
+        showToast("Failed to mark applied.");
+      }
+    });
+  }

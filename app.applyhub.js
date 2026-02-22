@@ -223,6 +223,8 @@ export const quickApply = async (job, card) => {
           }
         }
         showToast("Marked as applied");
+        if (state.handlers.renderJobs) state.handlers.renderJobs();
+        if (state.handlers.renderApplyHub) state.handlers.renderApplyHub();
       });
     } else {
       showToast("Copied + opened link");
