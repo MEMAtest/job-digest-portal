@@ -454,6 +454,18 @@ const renderJobDetail = (job, detailEl) => {
           <div class="long-text">${formatInlineText(job.cover_letter || "Not available yet.")}</div>
           <button class="btn btn-tertiary copy-btn" data-copy-type="cover_letter" data-job-id="${escapeHtml(job.id)}">Copy cover letter</button>
         </div>
+        <div class="detail-box">
+          <div class="section-title">Application confirmation</div>
+          <p style="font-size:12px;color:#64748b;margin:0 0 10px;">Paste the confirmation details to mark this role as applied.</p>
+          <div class="tracking-grid">
+            <label>Confirmation subject</label>
+            <input type="text" class="confirmation-subject" value="${escapeHtml(job.confirmation_subject || "")}" placeholder="Thank you for your application — Company" />
+            <label>Confirmation date</label>
+            <input type="date" class="confirmation-date" value="${job.confirmation_received_at ? job.confirmation_received_at.slice(0, 10) : ""}" />
+          </div>
+          <button class="btn btn-primary save-confirmation">Save confirmation</button>
+          <div class="confirmation-status-msg"></div>
+        </div>
         <div class="detail-box tracking">
           <div class="section-title">Application tracking</div>
           <div class="tracking-grid">
@@ -638,6 +650,10 @@ const renderJobDetail = (job, detailEl) => {
   }
 
   const saveBtn = detailEl.querySelector(".save-tracking");
+  const confirmSubjectEl = detailEl.querySelector(".confirmation-subject");
+  const confirmDateEl = detailEl.querySelector(".confirmation-date");
+  const confirmBtn = detailEl.querySelector(".save-confirmation");
+  const confirmStatusMsg = detailEl.querySelector(".confirmation-status-msg");
   const statusEl = detailEl.querySelector(".tracking-status");
   const appliedEl = detailEl.querySelector(".tracking-applied");
   const lastTouchEl = detailEl.querySelector(".tracking-last-touch");
@@ -697,6 +713,38 @@ const renderJobDetail = (job, detailEl) => {
       } catch (error) {
         console.error(error);
         statusMsg.textContent = "Save failed.";
+      }
+    });
+  }
+
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", async () => {
+      if (!db) {
+        if (confirmStatusMsg) confirmStatusMsg.textContent = "Missing Firebase config.";
+        return;
+      }
+      const subject = confirmSubjectEl?.value?.trim() || "";
+      const dateValue = confirmDateEl?.value || new Date().toISOString().slice(0, 10);
+      const isoDate = `${dateValue}T00:00:00.000Z`;
+      try {
+        await updateDoc(doc(db, collectionName, job.id), {
+          confirmation_subject: subject,
+          confirmation_received_at: isoDate,
+          application_status: "applied",
+          application_date: isoDate,
+          last_touch_date: isoDate,
+          updated_at: new Date().toISOString(),
+        });
+        job.confirmation_subject = subject;
+        job.confirmation_received_at = isoDate;
+        job.application_status = "applied";
+        job.application_date = isoDate;
+        job.last_touch_date = isoDate;
+        if (confirmStatusMsg) confirmStatusMsg.textContent = "Confirmation saved. Marked as applied.";
+        renderJobs();
+      } catch (error) {
+        console.error(error);
+        if (confirmStatusMsg) confirmStatusMsg.textContent = "Save failed.";
       }
     });
   }
