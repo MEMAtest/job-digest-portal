@@ -261,11 +261,27 @@ body {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
 }
 
 .quick-filter-buttons .btn {
   padding: 6px 12px;
   font-size: 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .filters {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .quick-filter-buttons .btn {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
 }
 
 .manual-link-bar {
