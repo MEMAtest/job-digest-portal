@@ -26,6 +26,7 @@ import {
   quickFilterPredicate,
   uniqueCompanyOnly,
   applyQuickFilter,
+  isPostedToday,
 } from "./app.core.js";
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply } from "./app.applyhub.js";
@@ -328,10 +329,11 @@ const renderJobDetail = (job, detailEl) => {
   const metaLine = metaParts.join(" · ");
   const isManual = job.manual_link || job.source === "Manual";
   const manualBadge = isManual ? `<span class="badge badge--manual">Pasted</span>` : "";
+  const todayBadge = isPostedToday(job) ? `<span class="badge badge--today">Today</span>` : "";
 
   detailEl.innerHTML = `
     <button class="btn btn-tertiary btn-back-to-list">\u2190 Back to all roles</button>
-    <div class="job-detail-card">
+    <div class="job-detail-card${isPostedToday(job) ? " job-detail-card--today" : ""}">
       <div class="job-detail-header">
         <div>
           <div class="job-detail-title">${escapeHtml(job.role)}</div>
@@ -342,6 +344,7 @@ const renderJobDetail = (job, detailEl) => {
         <div class="job-detail-badges">
           <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
           <div class="${getLocationBadgeClass(job.location)}" title="${escapeHtml(job.location)}">${escapeHtml(job.location || "Unknown")}</div>
+          ${todayBadge}
           ${manualBadge}
           ${job.apply_method ? `<span class="badge badge--method">${escapeHtml(job.apply_method)}</span>` : ""}
           ${formatApplicantBadge(job.applicant_count)}
@@ -895,9 +898,10 @@ export const renderJobs = () => {
       (job.is_closed ? "Closed" : "");
     const statusSuffix = openStatus ? ` · ${openStatus}` : "";
     const isManual = job.manual_link || job.source === "Manual";
+    const isToday = isPostedToday(job);
 
     const item = document.createElement("div");
-    item.className = `job-list-item${job.id === state.selectedJobId ? " is-active" : ""}`;
+    item.className = `job-list-item${job.id === state.selectedJobId ? " is-active" : ""}${isToday ? " job-list-item--today" : ""}`;
     item.dataset.jobId = job.id;
     item.innerHTML = `
       <label class="bulk-check-label"><input type="checkbox" class="bulk-check" data-job-id="${escapeHtml(job.id)}" ${
@@ -911,6 +915,7 @@ export const renderJobs = () => {
       </div>
       <div class="job-list-badges">
         <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
+        ${isToday ? `<span class="badge badge--today">Today</span>` : ""}
         ${isManual ? `<span class="badge badge--manual">Pasted</span>` : ""}
       </div>
     `;

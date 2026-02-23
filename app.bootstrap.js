@@ -36,6 +36,8 @@ import {
   db,
   escapeHtml,
   showToast,
+  applyQuickFilter,
+  isPostedToday,
   lastUpdatedLabel,
   lastUpdatedFooter,
 } from "./app.core.js";
@@ -196,6 +198,16 @@ const manualLinkSubmit = document.getElementById("manual-link-submit");
 
 const quickShortlisted = document.getElementById("quick-shortlisted");
 const quickDismissed = document.getElementById("quick-dismissed");
+const quickToday = document.getElementById("quick-today");
+if (quickToday) {
+  quickToday.addEventListener("click", () => {
+    applyQuickFilter({
+      label: "Posted today",
+      predicate: (job) => isPostedToday(job),
+      status: "",
+    });
+  });
+}
 if (quickShortlisted) {
   quickShortlisted.addEventListener("click", () => {
     if (statusSelect) statusSelect.value = "shortlisted";

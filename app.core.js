@@ -268,6 +268,28 @@ export const parseDateValue = (value) => {
   return null;
 };
 
+export const isPostedToday = (job) => {
+  if (!job) return false;
+  const raw = job.posted_raw || job.posted || job.posted_date || "";
+  if (!raw) return false;
+  const text = String(raw).toLowerCase();
+  if (
+    text.includes("today") ||
+    text.includes("just now") ||
+    text.includes("minute") ||
+    text.includes("hour") ||
+    text.includes("new")
+  ) {
+    return true;
+  }
+  if (text.includes("yesterday")) return false;
+  const date = parseDateValue(raw);
+  if (!date) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date >= today;
+};
+
 export const escapeHtml = (value) => {
   if (!value) return "";
   return String(value)

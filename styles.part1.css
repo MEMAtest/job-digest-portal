@@ -350,6 +350,11 @@ body {
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
+.job-list-item--today {
+  border-left: 5px solid #4f46e5;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.08), #ffffff 40%);
+}
+
 .job-list-item + .job-list-item {
   margin-top: 6px;
 }
@@ -397,6 +402,11 @@ body {
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 20px;
+}
+
+.job-detail-card--today {
+  border-color: #c7d2fe;
+  box-shadow: 0 16px 30px rgba(79, 70, 229, 0.12);
 }
 
 .job-detail-header {
@@ -489,6 +499,16 @@ body {
   color: #92400e;
   font-size: 11px;
   font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.badge--today {
+  background: #4f46e5;
+  border: 1px solid #4338ca;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
   padding: 4px 10px;
   border-radius: 999px;
 }
