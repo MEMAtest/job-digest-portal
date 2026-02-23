@@ -17,6 +17,7 @@ import {
   setCollectionNames,
   initializeApp,
   getFirestore,
+  initializeFirestore,
   collection,
   query,
   orderBy,
@@ -73,6 +74,11 @@ const setActiveTab = (tabId) => {
     if (state.handlers.updateBulkBar) state.handlers.updateBulkBar();
   }
   // CV Hub rendered eagerly on load; the cvpage tab reveals it
+};
+
+const isSafariBrowser = () => {
+  const ua = navigator.userAgent || "";
+  return /safari/i.test(ua) && !/chrome|crios|android|edge|edg/i.test(ua);
 };
 
 state.handlers.setActiveTab = setActiveTab;
@@ -210,7 +216,14 @@ const loadJobs = async () => {
 
   try {
     const app = initializeApp(window.FIREBASE_CONFIG);
-    setDb(getFirestore(app));
+    const firestore =
+      isSafariBrowser()
+        ? initializeFirestore(app, {
+            experimentalForceLongPolling: true,
+            useFetchStreams: false,
+          })
+        : getFirestore(app);
+    setDb(firestore);
     setCollectionNames({
       collectionName: window.FIREBASE_COLLECTION || "jobs",
       statsCollection: window.FIREBASE_STATS_COLLECTION || "job_stats",
@@ -259,7 +272,13 @@ const loadJobs = async () => {
     summaryLine.textContent = `Failed to load roles: ${message}`;
     if (alertBanner) {
       alertBanner.classList.remove("hidden");
-      if (String(message).toLowerCase().includes("permissions")) {
+      const lower = String(message).toLowerCase();
+      if (lower.includes("blocked_by_client") || lower.includes("access control checks")) {
+        alertBanner.innerHTML = `
+          <strong>Browser blocked Firestore:</strong> A content blocker or privacy setting is preventing data from loading.
+          <div style="margin-top:6px;">Safari: Settings for This Website → disable Content Blockers, then refresh.</div>
+        `;
+      } else if (lower.includes("permissions")) {
         alertBanner.innerHTML =
           "<strong>Permission error:</strong> Update your Firestore rules to allow read access to the jobs collection.";
       } else {
