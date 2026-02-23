@@ -8,9 +8,9 @@ import {
   orderBy,
   query,
   limit,
-  updateDoc,
-  setDoc,
-  getDoc,
+  updateDoc as firebaseUpdateDoc,
+  setDoc as firebaseSetDoc,
+  getDoc as firebaseGetDoc,
   where,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -24,9 +24,6 @@ export {
   orderBy,
   query,
   limit,
-  updateDoc,
-  setDoc,
-  getDoc,
   where,
 };
 
@@ -58,6 +55,7 @@ export const statusSelect = document.getElementById("status");
 export const ukOnlyCheckbox = document.getElementById("ukOnly");
 
 export let db = null;
+export let useProxy = false;
 export let collectionName = "jobs";
 export let statsCollection = "job_stats";
 export let suggestionsCollection = "role_suggestions";
@@ -67,6 +65,74 @@ export let notificationsCollection = "notifications";
 
 export const setDb = (value) => {
   db = value;
+};
+
+export const setProxyMode = (value) => {
+  useProxy = Boolean(value);
+};
+
+const extractDocInfo = (docRef) => {
+  if (!docRef || !docRef.path) return null;
+  const parts = docRef.path.split("/");
+  if (parts.length < 2) return null;
+  return { collection: parts[0], id: parts[1] };
+};
+
+const proxyFetch = async (url, options) => {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Proxy request failed");
+  }
+  return res.json();
+};
+
+export const updateDoc = async (docRef, payload) => {
+  if (!useProxy) {
+    return firebaseUpdateDoc(docRef, payload);
+  }
+  const info = extractDocInfo(docRef);
+  if (!info) {
+    throw new Error("Proxy update failed: invalid document reference");
+  }
+  await proxyFetch("/.netlify/functions/firestore-update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ collection: info.collection, id: info.id, data: payload }),
+  });
+};
+
+export const setDoc = async (docRef, payload) => {
+  if (!useProxy) {
+    return firebaseSetDoc(docRef, payload);
+  }
+  const info = extractDocInfo(docRef);
+  if (!info) {
+    throw new Error("Proxy set failed: invalid document reference");
+  }
+  await proxyFetch("/.netlify/functions/firestore-update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ collection: info.collection, id: info.id, data: payload }),
+  });
+};
+
+export const getDoc = async (docRef) => {
+  if (!useProxy) {
+    return firebaseGetDoc(docRef);
+  }
+  const info = extractDocInfo(docRef);
+  if (!info) {
+    throw new Error("Proxy get failed: invalid document reference");
+  }
+  const data = await proxyFetch(
+    `/.netlify/functions/firestore-get?collection=${encodeURIComponent(info.collection)}&id=${encodeURIComponent(
+      info.id
+    )}`
+  );
+  return {
+    data: () => data?.data || null,
+  };
 };
 
 export const getDb = () => db;

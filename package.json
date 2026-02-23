@@ -1,0 +1,7 @@
+{
+  "name": "job-digest-portal",
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^12.1.0"
+  }
+}

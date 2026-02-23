@@ -14,6 +14,7 @@ import {
   prepCloseBtn,
   state,
   setDb,
+  setProxyMode,
   setCollectionNames,
   initializeApp,
   getFirestore,
@@ -79,6 +80,63 @@ const setActiveTab = (tabId) => {
 const isSafariBrowser = () => {
   const ua = navigator.userAgent || "";
   return /safari/i.test(ua) && !/chrome|crios|android|edge|edg/i.test(ua);
+};
+
+const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
+  state.jobs = jobs;
+  state.sources = new Set(jobs.map((job) => job.source).filter(Boolean));
+  state.locations = new Set(jobs.map((job) => job.location).filter(Boolean));
+
+  await loadBaseCvFromFirestore();
+
+  renderDashboardStats(jobs);
+  renderPipelineView(jobs);
+  renderFollowUps(jobs);
+  renderFollowUpBanner(jobs);
+  renderFilters();
+  if (statusSelect && !statusSelect.value) {
+    statusSelect.value = "saved";
+  }
+  renderJobs();
+  renderApplyHub();
+  renderCvHub();
+  renderTriagePrompt(jobs);
+
+  const nowLabel = new Date().toLocaleString();
+  summaryLine.textContent = `${jobs.length} roles loaded · Last update ${nowLabel}`;
+  if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${nowLabel}`;
+  if (lastUpdatedFooter) lastUpdatedFooter.textContent = `Updated: ${nowLabel}`;
+
+  if (stats && Array.isArray(stats)) {
+    renderSourceStats(stats);
+  }
+  if (suggestions) {
+    renderRoleSuggestions(suggestions);
+  }
+  if (candidatePrep) {
+    state.candidatePrep = candidatePrep || {};
+    renderCandidatePrep(candidatePrep);
+  }
+};
+
+const loadJobsViaProxy = async () => {
+  try {
+    const res = await fetch("/.netlify/functions/jobs?limit=200");
+    if (!res.ok) {
+      throw new Error(await res.text());
+    }
+    const data = await res.json();
+    await applyLoadedJobs({
+      jobs: data.jobs || [],
+      stats: data.stats || [],
+      suggestions: data.suggestions || null,
+      candidatePrep: data.candidatePrep || null,
+    });
+    return true;
+  } catch (error) {
+    console.error("Proxy load failed:", error);
+    return false;
+  }
 };
 
 state.handlers.setActiveTab = setActiveTab;
@@ -243,29 +301,7 @@ const loadJobs = async () => {
       prep_questions: docSnap.data().prep_questions || [],
     }));
 
-    state.jobs = jobs;
-    state.sources = new Set(jobs.map((job) => job.source).filter(Boolean));
-    state.locations = new Set(jobs.map((job) => job.location).filter(Boolean));
-
-    await loadBaseCvFromFirestore();
-
-    renderDashboardStats(jobs);
-    renderPipelineView(jobs);
-    renderFollowUps(jobs);
-    renderFollowUpBanner(jobs);
-    renderFilters();
-    if (statusSelect && !statusSelect.value) {
-      statusSelect.value = "saved";
-    }
-    renderJobs();
-    renderApplyHub();
-    renderCvHub();
-    renderTriagePrompt(jobs);
-
-    const nowLabel = new Date().toLocaleString();
-    summaryLine.textContent = `${jobs.length} roles loaded · Last update ${nowLabel}`;
-    if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${nowLabel}`;
-    if (lastUpdatedFooter) lastUpdatedFooter.textContent = `Updated: ${nowLabel}`;
+    await applyLoadedJobs({ jobs, stats: null, suggestions: null, candidatePrep: null });
   } catch (error) {
     console.error(error);
     const message = error?.message || "Unknown error";
@@ -274,9 +310,15 @@ const loadJobs = async () => {
       alertBanner.classList.remove("hidden");
       const lower = String(message).toLowerCase();
       if (lower.includes("blocked_by_client") || lower.includes("access control checks")) {
+        setProxyMode(true);
+        const proxyOk = await loadJobsViaProxy();
+        if (proxyOk) {
+          alertBanner.classList.add("hidden");
+          return;
+        }
         alertBanner.innerHTML = `
           <strong>Browser blocked Firestore:</strong> A content blocker or privacy setting is preventing data from loading.
-          <div style="margin-top:6px;">Safari: Settings for This Website → disable Content Blockers, then refresh.</div>
+          <div style="margin-top:6px;">Try disabling content blockers, or refresh to use the proxy fallback.</div>
         `;
       } else if (lower.includes("permissions")) {
         alertBanner.innerHTML =
