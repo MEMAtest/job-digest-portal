@@ -135,6 +135,14 @@ const loadJobsViaProxy = async () => {
     return true;
   } catch (error) {
     console.error("Proxy load failed:", error);
+    if (alertBanner) {
+      alertBanner.classList.remove("hidden");
+      const message = String(error?.message || error || "");
+      if (message.includes("FIREBASE_SERVICE_ACCOUNT_JSON")) {
+        alertBanner.innerHTML =
+          "<strong>Proxy not configured:</strong> Set <code>FIREBASE_SERVICE_ACCOUNT_JSON</code> in Netlify env vars to enable the fallback.";
+      }
+    }
     return false;
   }
 };
