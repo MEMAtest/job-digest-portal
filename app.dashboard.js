@@ -41,10 +41,10 @@ const truncateText = (text, len = 120) => {
 
 const CONTRACT_STORAGE_KEY = "contract_calc_v1";
 const CONTRACT_DEFAULTS = {
-  minRate: 650,
-  maxRate: 825,
-  daysPerWeek: 5,
-  weeksPerYear: 46,
+  minRate: "",
+  maxRate: "",
+  daysPerWeek: "",
+  weeksPerYear: "",
 };
 
 const readContractSettings = () => {
@@ -79,19 +79,19 @@ const renderContractCalculator = () => {
     <div class="contract-grid">
       <div class="contract-field">
         <label>Day rate (min)</label>
-        <input type="number" class="contract-input" data-field="minRate" min="0" value="${current.minRate}" />
+        <input type="number" class="contract-input" data-field="minRate" min="0" value="${current.minRate}" placeholder="e.g. 650" />
       </div>
       <div class="contract-field">
         <label>Day rate (max)</label>
-        <input type="number" class="contract-input" data-field="maxRate" min="0" value="${current.maxRate}" />
+        <input type="number" class="contract-input" data-field="maxRate" min="0" value="${current.maxRate}" placeholder="e.g. 825" />
       </div>
       <div class="contract-field">
         <label>Days per week</label>
-        <input type="number" class="contract-input" data-field="daysPerWeek" min="1" max="7" value="${current.daysPerWeek}" />
+        <input type="number" class="contract-input" data-field="daysPerWeek" min="1" max="7" value="${current.daysPerWeek}" placeholder="e.g. 5" />
       </div>
       <div class="contract-field">
         <label>Weeks per year</label>
-        <input type="number" class="contract-input" data-field="weeksPerYear" min="1" max="52" value="${current.weeksPerYear}" />
+        <input type="number" class="contract-input" data-field="weeksPerYear" min="1" max="52" value="${current.weeksPerYear}" placeholder="e.g. 46" />
       </div>
     </div>
     <div class="contract-results">
@@ -117,23 +117,43 @@ const renderContractCalculator = () => {
     const settings = { ...CONTRACT_DEFAULTS };
     inputs.forEach((input) => {
       const key = input.dataset.field;
-      const raw = Number(input.value);
-      settings[key] = Number.isFinite(raw) && raw > 0 ? raw : CONTRACT_DEFAULTS[key];
+      const raw = input.value;
+      settings[key] = raw;
     });
-    if (settings.maxRate < settings.minRate) settings.maxRate = settings.minRate;
 
-    const minAnnual = settings.minRate * settings.daysPerWeek * settings.weeksPerYear;
-    const maxAnnual = settings.maxRate * settings.daysPerWeek * settings.weeksPerYear;
-    const minMonthly = minAnnual / 12;
-    const maxMonthly = maxAnnual / 12;
+    const days = Number(settings.daysPerWeek);
+    const weeks = Number(settings.weeksPerYear);
+    const hasSchedule = Number.isFinite(days) && days > 0 && Number.isFinite(weeks) && weeks > 0;
+    const minRate = Number(settings.minRate);
+    const maxRate = Number(settings.maxRate);
 
     const minEl = contractCalculator.querySelector('[data-result="min"] .contract-result__value');
     const maxEl = contractCalculator.querySelector('[data-result="max"] .contract-result__value');
+
+    if (!hasSchedule) {
+      if (minEl) minEl.textContent = "Enter days/week + weeks/year";
+      if (maxEl) maxEl.textContent = "Enter days/week + weeks/year";
+      saveContractSettings(settings);
+      return;
+    }
+
     if (minEl) {
-      minEl.textContent = `${formatter.format(minAnnual)} / year · ${formatter.format(minMonthly)} / month`;
+      if (Number.isFinite(minRate) && minRate > 0) {
+        const minAnnual = minRate * days * weeks;
+        const minMonthly = minAnnual / 12;
+        minEl.textContent = `${formatter.format(minAnnual)} / year · ${formatter.format(minMonthly)} / month`;
+      } else {
+        minEl.textContent = "Enter a day rate";
+      }
     }
     if (maxEl) {
-      maxEl.textContent = `${formatter.format(maxAnnual)} / year · ${formatter.format(maxMonthly)} / month`;
+      if (Number.isFinite(maxRate) && maxRate > 0) {
+        const maxAnnual = maxRate * days * weeks;
+        const maxMonthly = maxAnnual / 12;
+        maxEl.textContent = `${formatter.format(maxAnnual)} / year · ${formatter.format(maxMonthly)} / month`;
+      } else {
+        maxEl.textContent = "Enter a day rate";
+      }
     }
 
     saveContractSettings(settings);
