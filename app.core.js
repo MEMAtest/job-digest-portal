@@ -87,9 +87,19 @@ const proxyFetch = async (url, options) => {
   return res.json();
 };
 
+const isBlockedError = (error) => {
+  const message = String(error?.message || error || "").toLowerCase();
+  return message.includes("blocked_by_client") || message.includes("access control checks");
+};
+
 export const updateDoc = async (docRef, payload) => {
   if (!useProxy) {
-    return firebaseUpdateDoc(docRef, payload);
+    try {
+      return await firebaseUpdateDoc(docRef, payload);
+    } catch (error) {
+      if (!isBlockedError(error)) throw error;
+      useProxy = true;
+    }
   }
   const info = extractDocInfo(docRef);
   if (!info) {
@@ -104,7 +114,12 @@ export const updateDoc = async (docRef, payload) => {
 
 export const setDoc = async (docRef, payload) => {
   if (!useProxy) {
-    return firebaseSetDoc(docRef, payload);
+    try {
+      return await firebaseSetDoc(docRef, payload);
+    } catch (error) {
+      if (!isBlockedError(error)) throw error;
+      useProxy = true;
+    }
   }
   const info = extractDocInfo(docRef);
   if (!info) {
@@ -119,7 +134,12 @@ export const setDoc = async (docRef, payload) => {
 
 export const getDoc = async (docRef) => {
   if (!useProxy) {
-    return firebaseGetDoc(docRef);
+    try {
+      return await firebaseGetDoc(docRef);
+    } catch (error) {
+      if (!isBlockedError(error)) throw error;
+      useProxy = true;
+    }
   }
   const info = extractDocInfo(docRef);
   if (!info) {

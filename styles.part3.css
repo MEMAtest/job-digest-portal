@@ -22,10 +22,12 @@
   position: fixed;
   inset: 0;
   z-index: 10000;
-  background: #f4f6fb;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  padding: 24px 16px 32px;
 }
 .triage-overlay.hidden {
   display: none;
@@ -35,6 +37,10 @@
   border-bottom: 1px solid #e2e8f0;
   background: #fff;
   position: relative;
+  max-width: 720px;
+  margin: 0 auto;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
 }
 .triage-overlay__header h2 {
   margin: 0;
@@ -62,7 +68,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 24px 0;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 /* ── Triage Card ── */
@@ -71,7 +80,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 20px;
   padding: 24px;
-  max-width: 480px;
+  max-width: 720px;
   width: 100%;
   box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
   transition: transform 0.3s ease, opacity 0.3s ease;
@@ -186,7 +195,12 @@
 /* ── Triage Summary ── */
 .triage-summary {
   text-align: center;
-  max-width: 400px;
+  max-width: 520px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 24px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
 }
 .triage-summary h3 {
   font-size: 22px;

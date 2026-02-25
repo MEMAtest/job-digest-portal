@@ -38,6 +38,7 @@ import {
   showToast,
   applyQuickFilter,
   isPostedToday,
+  clearQuickFilter,
   lastUpdatedLabel,
   lastUpdatedFooter,
 } from "./app.core.js";
@@ -199,6 +200,14 @@ const manualLinkSubmit = document.getElementById("manual-link-submit");
 const quickShortlisted = document.getElementById("quick-shortlisted");
 const quickDismissed = document.getElementById("quick-dismissed");
 const quickToday = document.getElementById("quick-today");
+const quickAll = document.getElementById("quick-all");
+if (quickAll) {
+  quickAll.addEventListener("click", () => {
+    if (statusSelect) statusSelect.value = "";
+    clearQuickFilter();
+    renderJobs();
+  });
+}
 if (quickToday) {
   quickToday.addEventListener("click", () => {
     applyQuickFilter({
