@@ -380,6 +380,7 @@ export const renderApplyHub = () => {
 
         <div class="hub-card__actions">
           <button class="btn btn-primary btn-quick-apply ${allReady ? "btn-quick-apply--ready" : ""}" data-job-id="${escapeHtml(job.id)}">${actionLabel}</button>
+          ${!hasCvTailoredChanges(job) ? `<button class="btn btn-secondary generate-cv-btn" data-job-id="${escapeHtml(job.id)}">Generate Tailored CV</button>` : ""}
           <button class="btn btn-secondary download-cv-btn" data-job-id="${escapeHtml(job.id)}">Download CV PDF</button>
           <button class="btn btn-tertiary copy-cv-text-btn" data-job-id="${escapeHtml(job.id)}">Copy CV text</button>
         </div>
@@ -524,6 +525,31 @@ export const renderApplyHub = () => {
     btn.addEventListener("click", () => {
       copyToClipboard(getTailoredCvPlainText(job));
       showToast("CV text copied");
+    });
+  });
+
+  hubContainer.querySelectorAll(".generate-cv-btn").forEach((btn) => {
+    const jobId = btn.dataset.jobId;
+    btn.addEventListener("click", async () => {
+      btn.textContent = "Generating...";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/.netlify/functions/generate-cv", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Generation failed");
+        const job = state.jobs.find((j) => j.id === jobId);
+        if (job) job.tailored_cv_sections = data.sections;
+        showToast("CV generated");
+        renderApplyHub();
+      } catch (err) {
+        showToast("CV generation failed: " + err.message);
+        btn.textContent = "Generate Tailored CV";
+        btn.disabled = false;
+      }
     });
   });
 

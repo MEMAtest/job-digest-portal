@@ -18,5 +18,8 @@ scripts/role_shortlist_*.xlsx
 scripts/bank_roles_*.xlsx
 scripts/target_roles_2026*
 
+# Dependencies
+node_modules/
+
 # Local Netlify folder
 .netlify

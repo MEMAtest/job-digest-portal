@@ -251,6 +251,51 @@ SEARCH_KEYWORDS = [
     "product manager risk platform",
     "product manager screening platform",
     "product manager financial crime platform",
+    "client lifecycle management",
+    "client lifecycle manager",
+    "customer lifecycle management",
+    "clm manager",
+    "client lifecycle operations",
+    "client lifecycle operations lead",
+    "customer lifecycle operations",
+    "customer lifecycle operations lead",
+    "client lifecycle product",
+    "customer lifecycle product",
+    "onboarding operations",
+    "onboarding operations lead",
+    "client onboarding operations",
+    "customer onboarding operations",
+    "operations strategy",
+    "operations strategy manager",
+    "operations strategy lead",
+    "operating model",
+    "operating model design",
+    "operating model manager",
+    "operating model lead",
+    "process owner",
+    "customer onboarding lead",
+    "client onboarding lead",
+    "kyc operations lead",
+    "aml operations lead",
+    "compliance operations lead",
+    "financial crime operations",
+    "financial crime operations manager",
+    "risk operations manager",
+    "regulatory operations manager",
+    "business analyst kyc",
+    "business analyst aml",
+    "business analyst onboarding",
+    "business analyst compliance",
+    "business analyst financial crime",
+    "lead business analyst",
+    "senior business analyst",
+    "principal business analyst",
+    "product business analyst",
+    "process owner onboarding",
+    "process owner kyc",
+    "process owner compliance",
+    "client lifecycle analyst",
+    "customer lifecycle analyst",
 ]
 
 BOARD_KEYWORDS = [
@@ -262,6 +307,18 @@ BOARD_KEYWORDS = [
     "product owner onboarding",
     "product manager fraud",
     "product manager financial crime",
+    "client lifecycle management",
+    "customer lifecycle management",
+    "operations strategy",
+    "onboarding operations",
+    "client onboarding operations",
+    "customer onboarding operations",
+    "process owner",
+    "operating model",
+    "business analyst kyc",
+    "business analyst onboarding",
+    "lead business analyst",
+    "process owner onboarding",
 ]
 BROAD_BOARD_KEYWORDS = [
     "product manager",
@@ -269,6 +326,18 @@ BROAD_BOARD_KEYWORDS = [
     "product lead",
     "product director",
     "product operations",
+    "operations strategy",
+    "onboarding operations",
+    "client onboarding operations",
+    "customer onboarding operations",
+    "operating model",
+    "process owner",
+    "client lifecycle manager",
+    "customer lifecycle manager",
+    "business analyst",
+    "lead business analyst",
+    "senior business analyst",
+    "process owner",
 ]
 
 COMPANY_SEARCH_TERMS = [
@@ -282,6 +351,24 @@ COMPANY_SEARCH_TERMS = [
     "product management",
     "product operations",
     "product specialist",
+    "client lifecycle",
+    "customer lifecycle",
+    "clm",
+    "client lifecycle management",
+    "customer lifecycle management",
+    "onboarding operations",
+    "client onboarding operations",
+    "customer onboarding operations",
+    "operations strategy",
+    "operating model",
+    "process owner",
+    "financial crime operations",
+    "compliance operations",
+    "business analyst",
+    "lead business analyst",
+    "senior business analyst",
+    "principal business analyst",
+    "process owner",
 ]
 
 SEARCH_COMPANIES = [
@@ -4701,7 +4788,7 @@ def main() -> None:
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
     # Optional OpenAI tailored CV generation
-    records = enhance_records_with_openai_cv(records)
+    # records = enhance_records_with_openai_cv(records)  # Disabled: now on-demand via portal
 
     # Optional Firebase persistence
     write_records_to_firestore(records)
