@@ -38,7 +38,7 @@ import {
   showToast,
   applyQuickFilter,
   isPostedToday,
-  clearQuickFilter,
+  resetFilters,
   lastUpdatedLabel,
   lastUpdatedFooter,
 } from "./app.core.js";
@@ -203,8 +203,7 @@ const quickToday = document.getElementById("quick-today");
 const quickAll = document.getElementById("quick-all");
 if (quickAll) {
   quickAll.addEventListener("click", () => {
-    if (statusSelect) statusSelect.value = "";
-    clearQuickFilter();
+    resetFilters();
     renderJobs();
   });
 }
@@ -214,17 +213,20 @@ if (quickToday) {
       label: "Posted today",
       predicate: (job) => isPostedToday(job),
       status: "",
+      resetFilters: true,
     });
   });
 }
 if (quickShortlisted) {
   quickShortlisted.addEventListener("click", () => {
+    resetFilters({ keepStatus: true });
     if (statusSelect) statusSelect.value = "shortlisted";
     renderJobs();
   });
 }
 if (quickDismissed) {
   quickDismissed.addEventListener("click", () => {
+    resetFilters({ keepStatus: true });
     if (statusSelect) statusSelect.value = "dismissed";
     renderJobs();
   });

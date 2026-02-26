@@ -457,7 +457,20 @@ export const clearQuickFilter = () => {
   if (state.handlers.renderJobs) state.handlers.renderJobs();
 };
 
-export const applyQuickFilter = ({ label, predicate, status, uniqueCompanies } = {}) => {
+export const resetFilters = ({ keepStatus = false } = {}) => {
+  if (searchInput) searchInput.value = "";
+  if (minFitSelect) minFitSelect.value = "0";
+  if (sourceSelect) sourceSelect.value = "";
+  if (locationSelect) locationSelect.value = "";
+  if (!keepStatus && statusSelect) statusSelect.value = "";
+  if (ukOnlyCheckbox) ukOnlyCheckbox.checked = false;
+  clearQuickFilter();
+};
+
+export const applyQuickFilter = ({ label, predicate, status, uniqueCompanies, resetFilters: shouldReset } = {}) => {
+  if (shouldReset) {
+    resetFilters({ keepStatus: false });
+  }
   quickFilterPredicate = predicate || null;
   quickFilterLabel = label || "";
   uniqueCompanyOnly = Boolean(uniqueCompanies);

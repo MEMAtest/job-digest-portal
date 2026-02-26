@@ -661,7 +661,7 @@ export const renderDashboardStats = (jobs) => {
     const stat = card.dataset.stat;
     card.addEventListener("click", () => {
       if (stat === "links") {
-        applyQuickFilter({ label: "All roles", predicate: null, status: "" });
+        applyQuickFilter({ label: "All roles", predicate: null, status: "", resetFilters: true });
         return;
       }
       if (stat === "new24") {
@@ -671,6 +671,7 @@ export const renderDashboardStats = (jobs) => {
             const dt = parseDateValue(job.updated_at);
             return dt && dt >= last24;
           },
+          resetFilters: true,
         });
         return;
       }
@@ -681,6 +682,7 @@ export const renderDashboardStats = (jobs) => {
             const dt = parseDateValue(job.updated_at);
             return dt && dt >= last72;
           },
+          resetFilters: true,
         });
         return;
       }
@@ -692,6 +694,7 @@ export const renderDashboardStats = (jobs) => {
             const dt = parseDateValue(job.application_date);
             return dt && dt >= startToday;
           },
+          resetFilters: true,
         });
         return;
       }
@@ -703,20 +706,16 @@ export const renderDashboardStats = (jobs) => {
             const dt = parseDateValue(job.application_date);
             return dt && dt >= startYesterday && dt < startToday;
           },
+          resetFilters: true,
         });
         return;
       }
       if (stat === "saved") {
-        const savedJobs = jobs.filter((j) => safeStatus(j) === "saved");
-        if (savedJobs.length > 0) {
-          openTriageMode(savedJobs);
-        } else {
-          applyQuickFilter({ label: "New roles", status: "saved" });
-        }
+        applyQuickFilter({ label: "New roles", status: "saved", resetFilters: true });
         return;
       }
       if (stat === "shortlisted") {
-        applyQuickFilter({ label: "Shortlisted roles", status: "shortlisted" });
+        applyQuickFilter({ label: "Shortlisted roles", status: "shortlisted", resetFilters: true });
         return;
       }
       if (stat === "readyToApply") {
@@ -724,15 +723,15 @@ export const renderDashboardStats = (jobs) => {
         return;
       }
       if (stat === "interview") {
-        applyQuickFilter({ label: "Interview stage", status: "interview" });
+        applyQuickFilter({ label: "Interview stage", status: "interview", resetFilters: true });
         return;
       }
       if (stat === "offer") {
-        applyQuickFilter({ label: "Offers", status: "offer" });
+        applyQuickFilter({ label: "Offers", status: "offer", resetFilters: true });
         return;
       }
       if (stat === "uniqueCompanies") {
-        applyQuickFilter({ label: "Unique companies", uniqueCompanies: true });
+        applyQuickFilter({ label: "Unique companies", uniqueCompanies: true, resetFilters: true });
         return;
       }
     });

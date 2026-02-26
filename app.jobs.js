@@ -159,7 +159,8 @@ export const getFilteredJobs = () => {
       (job.role_summary || "").toLowerCase().includes(searchTerm) ||
       (job.tailored_summary || "").toLowerCase().includes(searchTerm);
 
-    const matchesFit = job.fit_score >= minFit;
+    const fitScore = Number(job.fit_score || 0);
+    const matchesFit = fitScore >= minFit;
     const matchesSource = !sourceFilter || job.source === sourceFilter;
     const matchesLocation = !locationFilter || job.location === locationFilter;
     const matchesStatus = !statusFilter || jobStatus === statusFilter;
