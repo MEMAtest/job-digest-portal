@@ -523,32 +523,75 @@ export const renderSourceStats = (statsDocs) => {
     if (sourceStatsContainer) sourceStatsContainer.innerHTML = "";
     return;
   }
-  const latest = statsDocs[0];
-  const counts = latest.counts || {};
-  const total = latest.total || 0;
-  const sevenDayTotal = statsDocs.reduce((acc, doc) => acc + (doc.total || 0), 0);
-  const avg = statsDocs.length ? Math.round(sevenDayTotal / statsDocs.length) : 0;
+  const latest = statsDocs[0] || {};
+  const previous = statsDocs[1] || {};
+  const countsToday = latest.counts || {};
+  const totalToday = latest.total || 0;
+  const last3Docs = statsDocs.slice(0, 3);
 
-  const cards = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .map(
-      ([source, count]) => `
-      <div class="stat-card">
-        <div class="stat-card__label">${escapeHtml(source)}</div>
-        <div class="stat-card__value">${count}</div>
-        <div class="stat-card__trend">7‑day avg: ${avg}</div>
-      </div>`
-    )
+  const counts3 = {};
+  let total3 = 0;
+  last3Docs.forEach((doc) => {
+    total3 += doc.total || 0;
+    const counts = doc.counts || {};
+    Object.entries(counts).forEach(([source, count]) => {
+      counts3[source] = (counts3[source] || 0) + (Number(count) || 0);
+    });
+  });
+
+  const sources = new Set([...Object.keys(countsToday), ...Object.keys(counts3)]);
+  const rows = Array.from(sources)
+    .sort((a, b) => (counts3[b] || 0) - (counts3[a] || 0))
+    .map((source) => {
+      const todayCount = countsToday[source] || 0;
+      const threeCount = counts3[source] || 0;
+      const todayPct = totalToday ? Math.round((todayCount / totalToday) * 100) : 0;
+      const threePct = total3 ? Math.round((threeCount / total3) * 100) : 0;
+      const prevCount = (previous.counts || {})[source] || 0;
+      const delta = todayCount - prevCount;
+      const deltaLabel = delta === 0 ? "—" : delta > 0 ? `+${delta}` : `${delta}`;
+
+      return `
+        <tr>
+          <td class="source-mix__source">${escapeHtml(source)}</td>
+          <td>${todayCount}</td>
+          <td>${todayPct}%</td>
+          <td>${threeCount}</td>
+          <td>${threePct}%</td>
+          <td>${deltaLabel}</td>
+        </tr>
+      `;
+    })
     .join("");
 
   if (sourceStatsContainer) {
     sourceStatsContainer.innerHTML = `
-      <div class="stat-card">
-        <div class="stat-card__label">Total (today)</div>
-        <div class="stat-card__value">${total}</div>
-        <div class="stat-card__trend">7‑day total: ${sevenDayTotal}</div>
+      <div class="source-mix">
+        <div class="source-mix__header">
+          <div>
+            <h3 class="source-mix__title">Source mix (last 3 days)</h3>
+            <p class="source-mix__meta">Today: ${totalToday} roles · 3‑day total: ${total3}</p>
+          </div>
+          <div class="source-mix__meta">Latest snapshot: ${escapeHtml(latest.date || "today")}</div>
+        </div>
+        <div class="source-mix__table-wrapper">
+          <table class="source-mix__table">
+            <thead>
+              <tr>
+                <th class="source-mix__source">Source</th>
+                <th>Today</th>
+                <th>Today %</th>
+                <th>3‑day</th>
+                <th>3‑day %</th>
+                <th>Δ vs yesterday</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || `<tr><td colspan="6">No source stats available.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
       </div>
-      ${cards}
     `;
   }
 };

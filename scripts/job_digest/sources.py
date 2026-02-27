@@ -1761,6 +1761,75 @@ def jobserve_search(session: requests.Session) -> List[Dict[str, str]]:
     return jobs
 
 
+def weloveproduct_search(session: requests.Session) -> List[Dict[str, str]]:
+    jobs: List[Dict[str, str]] = []
+    base_url = JOB_BOARD_URLS.get("WeLoveProduct")
+    if not base_url:
+        return jobs
+
+    job_map: Dict[str, Dict[str, str]] = {}
+    search_paths = [
+        "/jobs",
+        "/jobs/",
+        "/job-board",
+        "/jobs?query=product",
+        "/jobs?search=product",
+        "/jobs?remote=true",
+        "/jobs?location=United Kingdom",
+    ]
+
+    for path in search_paths:
+        search_url = f"{base_url}{path}"
+        try:
+            resp = session.get(search_url, timeout=30)
+        except requests.RequestException:
+            continue
+        if resp.status_code != 200:
+            continue
+
+        links = extract_job_links(resp.text, base_url)
+        for link, title in links:
+            if link in job_map:
+                continue
+            job_map[link] = {
+                "title": title,
+                "company": "WeLoveProduct",
+                "location": "United Kingdom",
+                "link": link,
+                "posted_text": "",
+                "posted_date": "",
+                "summary": "",
+                "source": "WeLoveProduct",
+            }
+
+        time.sleep(0.2)
+
+    detail_links = list(job_map.keys())[:8]
+    for link in detail_links:
+        try:
+            resp = session.get(link, timeout=30)
+        except requests.RequestException:
+            continue
+        if resp.status_code != 200:
+            continue
+        details = parse_job_detail_jsonld(resp.text, job_map[link]["title"])
+        if details:
+            job_map[link]["title"] = details.get("title") or job_map[link]["title"]
+            job_map[link]["company"] = details.get("company") or job_map[link]["company"]
+            job_map[link]["location"] = details.get("location") or job_map[link]["location"]
+            job_map[link]["posted_date"] = details.get("posted_date") or job_map[link]["posted_date"]
+            if details.get("summary"):
+                job_map[link]["summary"] = details["summary"]
+        if not job_map[link]["posted_text"] and not job_map[link]["posted_date"]:
+            posted_text = extract_relative_posted_text(resp.text)
+            if posted_text:
+                job_map[link]["posted_text"] = posted_text
+        time.sleep(0.2)
+
+    jobs.extend(job_map.values())
+    return jobs
+
+
 def job_board_search(session: requests.Session) -> List[Dict[str, str]]:
     jobs: List[Dict[str, str]] = []
     for source in JOB_BOARD_SOURCES:
@@ -1788,6 +1857,8 @@ def job_board_search(session: requests.Session) -> List[Dict[str, str]]:
         elif source["type"] == "html":
             if source["name"] == "JobServe":
                 jobs.extend(jobserve_search(session))
+            elif source["name"] == "WeLoveProduct":
+                jobs.extend(weloveproduct_search(session))
             elif source["name"] == "Totaljobs":
                 jobs.extend(html_board_search(session, "Totaljobs", source["url"]))
             elif source["name"] == "CWJobs":

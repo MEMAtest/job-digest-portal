@@ -189,6 +189,7 @@ JOB_BOARD_SOURCES = [
     {"name": "RemoteYeah", "type": "rss", "url": "https://remoteyeah.com/jobs.rss"},
     {"name": "Jobicy", "type": "api", "url": "https://jobicy.com/api/v2/remote-jobs"},
     {"name": "MeetFrank", "type": "api", "url": "https://api.meetfrank.com/ai/jobs"},
+    {"name": "WeLoveProduct", "type": "html", "url": "https://weloveproduct.co"},
     {"name": "Empllo", "type": "rss", "url": "https://empllo.com/rss/remote-product-jobs.rss"},
     {"name": "JobsCollider", "type": "rss", "url": "https://jobscollider.com/remote-jobs.rss"},
     {"name": "RealWorkFromAnywhere", "type": "rss", "url": "https://www.realworkfromanywhere.com/rss.xml"},
