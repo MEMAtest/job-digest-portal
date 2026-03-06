@@ -97,9 +97,6 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
   renderFollowUps(jobs);
   renderFollowUpBanner(jobs);
   renderFilters();
-  if (statusSelect && !statusSelect.value) {
-    statusSelect.value = "saved";
-  }
   renderJobs();
   renderApplyHub();
   renderCvHub();
