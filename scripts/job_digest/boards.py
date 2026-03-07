@@ -147,12 +147,17 @@ ASHBY_BOARDS = [
     "thoughtmachine",
 ]
 
+WORKABLE_ACCOUNTS = [
+    "kroo",
+]
+
 EXTRA_GREENHOUSE = [x.strip() for x in os.getenv("JOB_DIGEST_GREENHOUSE_BOARDS", "").split(",") if x.strip()]
 EXTRA_LEVER = [x.strip() for x in os.getenv("JOB_DIGEST_LEVER_BOARDS", "").split(",") if x.strip()]
 EXTRA_SMARTRECRUITERS = [
     x.strip() for x in os.getenv("JOB_DIGEST_SMARTRECRUITERS", "").split(",") if x.strip()
 ]
 EXTRA_ASHBY = [x.strip() for x in os.getenv("JOB_DIGEST_ASHBY_BOARDS", "").split(",") if x.strip()]
+EXTRA_WORKABLE = [x.strip() for x in os.getenv("JOB_DIGEST_WORKABLE_ACCOUNTS", "").split(",") if x.strip()]
 
 uk_feed_targets = load_uk_feed_targets(UK_FEEDS_PATH)
 if uk_feed_targets["greenhouse"]:
@@ -163,6 +168,8 @@ if uk_feed_targets["smartrecruiters"]:
     SMARTRECRUITERS_COMPANIES.extend(uk_feed_targets["smartrecruiters"])
 if uk_feed_targets["ashby"]:
     ASHBY_BOARDS.extend(uk_feed_targets["ashby"])
+if uk_feed_targets["workable"]:
+    WORKABLE_ACCOUNTS.extend(uk_feed_targets["workable"])
 if uk_feed_targets["workday"]:
     WORKDAY_SITES.extend(uk_feed_targets["workday"])
 
@@ -174,11 +181,14 @@ if EXTRA_SMARTRECRUITERS:
     SMARTRECRUITERS_COMPANIES.extend(EXTRA_SMARTRECRUITERS)
 if EXTRA_ASHBY:
     ASHBY_BOARDS.extend(EXTRA_ASHBY)
+if EXTRA_WORKABLE:
+    WORKABLE_ACCOUNTS.extend(EXTRA_WORKABLE)
 
 GREENHOUSE_BOARDS = dedupe_keep_order(GREENHOUSE_BOARDS)
 LEVER_BOARDS = dedupe_keep_order(LEVER_BOARDS)
 SMARTRECRUITERS_COMPANIES = dedupe_keep_order(SMARTRECRUITERS_COMPANIES)
 ASHBY_BOARDS = dedupe_keep_order(ASHBY_BOARDS)
+WORKABLE_ACCOUNTS = dedupe_keep_order(WORKABLE_ACCOUNTS)
 WORKDAY_SITES = dedupe_keep_order(WORKDAY_SITES)
 
 JOB_BOARD_SOURCES = [

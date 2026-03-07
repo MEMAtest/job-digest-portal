@@ -41,6 +41,7 @@ from .sources import (
     linkedin_job_details,
     linkedin_search,
     smartrecruiters_search,
+    workable_search,
 )
 from .summary import build_email_html, build_sources_summary, send_email
 from .utils import (
@@ -325,6 +326,50 @@ def main() -> None:
                 why_fit=why_fit,
                 cv_gap=cv_gap,
                 notes=summary,
+            )
+        )
+
+    workable_jobs = workable_search(session)
+    for job in workable_jobs:
+        title = job.get("title", "")
+        company = job.get("company", "")
+        location = job.get("location", "") or "Remote"
+        if not is_relevant_title(title):
+            continue
+        if not is_relevant_location(location):
+            continue
+
+        posted_text = job.get("posted_text", "")
+        posted_date = job.get("posted_date", "")
+        if not parse_posted_within_window(posted_text, posted_date, config.WINDOW_HOURS):
+            continue
+
+        summary = job.get("summary", "")
+        full_text = f"{title} {company} {summary}"
+        score, _, _ = score_fit(full_text, company)
+        if score < config.MIN_SCORE:
+            continue
+
+        why_fit = build_reasons(full_text)
+        cv_gap = build_gaps(full_text)
+        preference_match = build_preference_match(full_text, company, location)
+
+        all_jobs.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_text or posted_date,
+                posted_raw=posted_text or posted_date,
+                posted_date=posted_date,
+                source="Workable",
+                fit_score=score,
+                preference_match=preference_match,
+                why_fit=why_fit,
+                cv_gap=cv_gap,
+                notes=summary,
+                job_status=job.get("job_status", ""),
             )
         )
 

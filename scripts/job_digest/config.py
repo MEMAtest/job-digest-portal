@@ -164,6 +164,7 @@ def load_uk_feed_targets(path: Path) -> Dict[str, List[str]]:
         "lever": [],
         "smartrecruiters": [],
         "ashby": [],
+        "workable": [],
         "workday": [],
     }
     if not path.exists():
@@ -191,6 +192,16 @@ def load_uk_feed_targets(path: Path) -> Dict[str, List[str]]:
                     board = feed_url.split("/job-board/")[1].split("/")[0]
                     if board:
                         targets["ashby"].append(board)
+                elif platform == "workable":
+                    account = ""
+                    if "/api/accounts/" in feed_url:
+                        account = feed_url.split("/api/accounts/")[1].split("?")[0].split("/")[0]
+                    elif "apply.workable.com/" in feed_url:
+                        account = feed_url.split("apply.workable.com/")[1].split("/")[0]
+                    elif "apply.workable.com/" in (row.get("careers_url") or ""):
+                        account = (row.get("careers_url") or "").split("apply.workable.com/")[1].split("/")[0]
+                    if account:
+                        targets["workable"].append(account)
                 elif platform == "workday" and workday_entry:
                     targets["workday"].append(workday_entry)
     except OSError:

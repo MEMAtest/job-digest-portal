@@ -4,6 +4,8 @@ import json
 import re
 import time
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from typing import Dict, Iterable, List, Optional, Tuple
 from urllib.parse import quote_plus, urljoin, urlparse
 
@@ -17,6 +19,7 @@ from .boards import (
     JOB_BOARD_URLS,
     LEVER_BOARDS,
     SMARTRECRUITERS_COMPANIES,
+    WORKABLE_ACCOUNTS,
     WORKDAY_SITES,
 )
 from .config import (
@@ -24,13 +27,16 @@ from .config import (
     ADZUNA_APP_KEY,
     BOARD_KEYWORDS,
     BROAD_BOARD_KEYWORDS,
+    COMPANY_SEARCH_TERMS,
     CV_LIBRARY_API_KEY,
     EXCLUDE_COMPANIES,
     JOOBLE_API_KEY,
     REED_API_KEY,
+    SEARCH_COMPANIES,
     SEARCH_KEYWORDS,
     SEARCH_LOCATIONS,
     USER_AGENT,
+    select_company_batch,
 )
 from .models import JobRecord
 from .utils import clean_link, extract_relative_posted_text, normalize_text, trim_summary
@@ -306,6 +312,160 @@ def ashby_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": link,
                     "posted_text": "",
                     "posted_date": posted_date,
+                }
+            )
+    return jobs
+
+
+def _workable_text(value: object) -> str:
+    if isinstance(value, str):
+        return normalize_text(BeautifulSoup(value, "html.parser").get_text(" "))
+    if isinstance(value, list):
+        parts = [_workable_text(item) for item in value]
+        return normalize_text(" ".join(part for part in parts if part))
+    if isinstance(value, dict):
+        preferred_keys = [
+            "city",
+            "region",
+            "country",
+            "name",
+            "location",
+            "locationStr",
+            "locationName",
+            "workplaceType",
+            "workplace_type",
+            "description",
+            "text",
+            "value",
+        ]
+        parts = []
+        for key in preferred_keys:
+            part = _workable_text(value.get(key))
+            if part:
+                parts.append(part)
+        return normalize_text(", ".join(parts)) if parts else ""
+    return ""
+
+
+def iter_workable_jobs(data: object) -> Iterable[Dict[str, object]]:
+    if isinstance(data, dict):
+        title = data.get("title") or data.get("name")
+        shortcode = data.get("shortcode") or data.get("shortCode") or data.get("code")
+        link = (
+            data.get("url")
+            or data.get("shortlink")
+            or data.get("applyUrl")
+            or data.get("application_url")
+            or data.get("jobUrl")
+        )
+        if isinstance(title, str) and (isinstance(shortcode, str) or isinstance(link, str)):
+            yield data
+        for value in data.values():
+            yield from iter_workable_jobs(value)
+    elif isinstance(data, list):
+        for item in data:
+            yield from iter_workable_jobs(item)
+
+
+def workable_search(session: requests.Session) -> List[Dict[str, str]]:
+    jobs: List[Dict[str, str]] = []
+    seen_links: set[str] = set()
+
+    for account in WORKABLE_ACCOUNTS:
+        payload = None
+        urls = [
+            f"https://www.workable.com/api/accounts/{account}?details=true",
+            f"https://apply.workable.com/api/v1/widget/accounts/{account}",
+            f"https://apply.workable.com/api/v1/widget/accounts/{account}?details=true",
+        ]
+        for url in urls:
+            try:
+                resp = session.get(url, timeout=20)
+            except requests.RequestException:
+                continue
+            if resp.status_code != 200:
+                continue
+            try:
+                payload = resp.json()
+            except ValueError:
+                payload = None
+            if payload:
+                break
+        if not payload:
+            continue
+
+        default_company = account.replace("-", " ").title()
+        company_name = (
+            payload.get("name")
+            or payload.get("company")
+            or payload.get("companyName")
+            or default_company
+        )
+
+        for job in iter_workable_jobs(payload):
+            title = str(job.get("title") or job.get("name") or "").strip()
+            if not title:
+                continue
+
+            status = str(job.get("state") or job.get("status") or job.get("jobStatus") or "").lower()
+            if status and status not in {"active", "live", "open", "published"}:
+                continue
+
+            shortcode = str(job.get("shortcode") or job.get("shortCode") or job.get("code") or "").strip()
+            link = (
+                job.get("url")
+                or job.get("shortlink")
+                or job.get("applyUrl")
+                or job.get("application_url")
+                or job.get("jobUrl")
+                or ""
+            )
+            if not link and shortcode:
+                link = f"https://apply.workable.com/{account}/j/{shortcode}/"
+            link = clean_link(str(link))
+            if not link or link in seen_links:
+                continue
+            seen_links.add(link)
+
+            location = (
+                _workable_text(job.get("location"))
+                or _workable_text(job.get("locations"))
+                or _workable_text(job.get("locationStr"))
+                or _workable_text(job.get("locationName"))
+                or _workable_text(job.get("workplaceType"))
+                or _workable_text(job.get("workplace_type"))
+                or ""
+            )
+            posted_date = (
+                str(
+                    job.get("published")
+                    or job.get("publishedAt")
+                    or job.get("published_at")
+                    or job.get("updated_at")
+                    or job.get("created_at")
+                    or job.get("datePublished")
+                    or ""
+                ).strip()
+            )
+            summary = _workable_text(
+                job.get("description")
+                or job.get("descriptionHtml")
+                or job.get("description_html")
+                or job.get("job")
+                or job.get("content")
+            )
+
+            jobs.append(
+                {
+                    "title": title,
+                    "company": str(job.get("company") or job.get("companyName") or company_name),
+                    "location": location,
+                    "link": link,
+                    "posted_text": "",
+                    "posted_date": posted_date,
+                    "summary": trim_summary(summary),
+                    "source": "Workable",
+                    "job_status": status,
                 }
             )
     return jobs

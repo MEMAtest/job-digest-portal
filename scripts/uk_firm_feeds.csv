@@ -91,6 +91,7 @@ Modulr,Fintech/Regtech (ATS),Lever,https://jobs.lever.co/modulr,https://api.leve
 Curve,Fintech/Regtech (ATS),Lever,https://jobs.lever.co/curve,https://api.lever.co/v0/postings/curve?mode=json,,ATS feed from internal board list,internal_lever_list
 Chip,Fintech/Regtech (ATS),Lever,https://jobs.lever.co/chip,https://api.lever.co/v0/postings/chip?mode=json,,ATS feed from internal board list,internal_lever_list
 Kroo,Fintech/Regtech (ATS),Lever,https://jobs.lever.co/kroo,https://api.lever.co/v0/postings/kroo?mode=json,,ATS feed from internal board list,internal_lever_list
+Kroo,Fintech/Regtech (ATS),Workable,https://apply.workable.com/kroo/,https://www.workable.com/api/accounts/kroo?details=true,,Workable public account feed,manual_workable_target
 Zopa,Fintech/Regtech (ATS),Lever,https://jobs.lever.co/zopa,https://api.lever.co/v0/postings/zopa?mode=json,,ATS feed from internal board list,internal_lever_list
 Oaknorth,Fintech/Regtech (ATS),Lever,https://jobs.lever.co/oaknorth,https://api.lever.co/v0/postings/oaknorth?mode=json,,ATS feed from internal board list,internal_lever_list
 Plaid,Fintech/Regtech (ATS),Lever,https://jobs.lever.co/plaid,https://api.lever.co/v0/postings/plaid?mode=json,,ATS feed from internal board list,internal_lever_list
