@@ -44,6 +44,7 @@ const SEARCH_ALIAS_MAP = {
   pm: ["product manager", "product owner", "product lead"],
   po: ["product owner", "product manager"],
   ba: ["business analyst", "lead business analyst", "senior business analyst"],
+  fc: ["financial crime", "financial crime operations"],
   clm: ["client lifecycle management", "client lifecycle", "lifecycle management"],
   kyc: ["know your customer", "kyc"],
   aml: ["anti money laundering", "aml"],
@@ -54,6 +55,7 @@ const SEARCH_ALIAS_MAP = {
   onboarding: ["client onboarding", "customer onboarding", "onboarding"],
   screening: ["sanctions screening", "name screening", "screening"],
   strategy: ["operations strategy", "product strategy", "strategy"],
+  transformation: ["financial crime transformation", "regulatory transformation", "transformation"],
 };
 
 const normaliseSearchText = (value) =>

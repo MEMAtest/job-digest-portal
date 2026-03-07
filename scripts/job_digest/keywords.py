@@ -80,6 +80,23 @@ SEARCH_KEYWORDS = [
     "process owner compliance",
     "client lifecycle analyst",
     "customer lifecycle analyst",
+    "clm product manager",
+    "clm business analyst",
+    "client lifecycle lead",
+    "customer lifecycle lead",
+    "lead business analyst onboarding",
+    "lead business analyst financial crime",
+    "business analyst screening",
+    "business analyst sanctions",
+    "business analyst client lifecycle",
+    "business analyst customer lifecycle",
+    "senior manager operations strategy",
+    "operations strategy financial crime",
+    "financial crime transformation",
+    "financial crime transformation manager",
+    "regulatory transformation manager",
+    "onboarding transformation manager",
+    "product operations manager",
 ]
 
 BOARD_KEYWORDS = [
@@ -103,6 +120,10 @@ BOARD_KEYWORDS = [
     "business analyst onboarding",
     "lead business analyst",
     "process owner onboarding",
+    "business analyst sanctions",
+    "business analyst client lifecycle",
+    "operations strategy financial crime",
+    "financial crime transformation",
 ]
 
 BROAD_BOARD_KEYWORDS = [
@@ -122,6 +143,11 @@ BROAD_BOARD_KEYWORDS = [
     "business analyst",
     "lead business analyst",
     "senior business analyst",
+    "business analyst sanctions",
+    "business analyst client lifecycle",
+    "clm business analyst",
+    "financial crime transformation",
+    "product operations manager",
     "process owner",
 ]
 
@@ -153,6 +179,11 @@ COMPANY_SEARCH_TERMS = [
     "lead business analyst",
     "senior business analyst",
     "principal business analyst",
+    "business analyst sanctions",
+    "business analyst client lifecycle",
+    "clm business analyst",
+    "financial crime transformation",
+    "product operations manager",
     "process owner",
 ]
 
