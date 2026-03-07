@@ -219,6 +219,7 @@ def greenhouse_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": link,
                     "posted_text": "",
                     "posted_date": updated_at,
+                    "ats_account": board,
                 }
             )
     return jobs
@@ -264,6 +265,7 @@ def lever_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": link,
                     "posted_text": "",
                     "posted_date": posted_date,
+                    "ats_account": board,
                 }
             )
     return jobs
@@ -312,6 +314,7 @@ def ashby_search(session: requests.Session) -> List[Dict[str, str]]:
                     "link": link,
                     "posted_text": "",
                     "posted_date": posted_date,
+                    "ats_account": board,
                 }
             )
     return jobs
@@ -466,6 +469,7 @@ def workable_search(session: requests.Session) -> List[Dict[str, str]]:
                     "summary": trim_summary(summary),
                     "source": "Workable",
                     "job_status": status,
+                    "ats_account": account,
                 }
             )
     return jobs
@@ -523,6 +527,7 @@ def smartrecruiters_search(session: requests.Session) -> List[Dict[str, str]]:
                         "link": link,
                         "posted_text": "",
                         "posted_date": posted_date,
+                        "ats_account": company,
                     }
                 )
 
@@ -1196,6 +1201,7 @@ def build_manual_record(session: requests.Session, link: str) -> Optional[JobRec
         why_fit=why_fit,
         cv_gap=cv_gap,
         notes=summary or full_text[:500],
+        source_family="Manual",
     )
 
 

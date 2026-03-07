@@ -26,6 +26,29 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip())
 
 
+ATS_FAMILY_SOURCES = {"Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday", "Workable"}
+AGGREGATOR_SOURCES = {"LinkedIn"}
+MANUAL_SOURCES = {"Manual"}
+
+
+def infer_ats_family(source: str) -> str:
+    source_value = (source or "").strip()
+    return source_value if source_value in ATS_FAMILY_SOURCES else ""
+
+
+def infer_source_family(source: str) -> str:
+    source_value = (source or "").strip()
+    if source_value in MANUAL_SOURCES:
+        return "Manual"
+    if source_value in ATS_FAMILY_SOURCES:
+        return "ATS"
+    if source_value in AGGREGATOR_SOURCES:
+        return "Aggregator"
+    if source_value:
+        return "JobBoard"
+    return ""
+
+
 def trim_summary(text: str) -> str:
     if not text:
         return ""

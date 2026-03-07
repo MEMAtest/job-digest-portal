@@ -8,6 +8,7 @@ import {
   searchInput,
   minFitSelect,
   sourceSelect,
+  sourceFamilySelect,
   locationSelect,
   statusSelect,
   ukOnlyCheckbox,
@@ -39,6 +40,8 @@ import {
   applyQuickFilter,
   isPostedToday,
   resetFilters,
+  getJobAtsFamily,
+  getJobSourceFamily,
   lastUpdatedLabel,
   lastUpdatedFooter,
 } from "./app.core.js";
@@ -86,9 +89,14 @@ const isSafariBrowser = () => {
 };
 
 const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
-  state.jobs = jobs;
-  state.sources = new Set(jobs.map((job) => job.source).filter(Boolean));
-  state.locations = new Set(jobs.map((job) => job.location).filter(Boolean));
+  state.jobs = jobs.map((job) => ({
+    ...job,
+    source_family: job.source_family || getJobSourceFamily(job),
+    ats_family: job.ats_family || getJobAtsFamily(job),
+  }));
+  state.sources = new Set(state.jobs.map((job) => job.source).filter(Boolean));
+  state.sourceFamilies = new Set(state.jobs.map((job) => job.source_family).filter(Boolean));
+  state.locations = new Set(state.jobs.map((job) => job.location).filter(Boolean));
 
   await loadBaseCvFromFirestore();
 
@@ -414,6 +422,7 @@ refreshBtn.addEventListener("click", loadJobs);
 searchInput.addEventListener("input", renderJobs);
 minFitSelect.addEventListener("change", renderJobs);
 sourceSelect.addEventListener("change", renderJobs);
+if (sourceFamilySelect) sourceFamilySelect.addEventListener("change", renderJobs);
 locationSelect.addEventListener("change", renderJobs);
 statusSelect.addEventListener("change", renderJobs);
 ukOnlyCheckbox.addEventListener("change", renderJobs);

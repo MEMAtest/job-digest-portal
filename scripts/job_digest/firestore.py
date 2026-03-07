@@ -17,7 +17,7 @@ from .llm import (
     parse_gemini_payload,
 )
 from .models import JobRecord
-from .utils import now_utc, parse_applicant_count
+from .utils import infer_ats_family, infer_source_family, now_utc, parse_applicant_count
 
 try:
     import firebase_admin
@@ -73,6 +73,8 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
         return
 
     for record in records:
+        ats_family = record.ats_family or infer_ats_family(record.source)
+        source_family = record.source_family or infer_source_family(record.source)
         doc_id = record_document_id(record)
         doc_ref = client.collection(config.FIREBASE_COLLECTION).document(doc_id)
         existing_data: Dict[str, object] = {}
@@ -93,6 +95,9 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "posted_raw": record.posted_raw or record.posted,
             "posted_date": record.posted_date,
             "source": record.source,
+            "source_family": source_family,
+            "ats_family": ats_family,
+            "ats_account": record.ats_account,
             "fit_score": record.fit_score,
             "preference_match": record.preference_match,
             "why_fit": record.why_fit,
@@ -177,14 +182,24 @@ def write_source_stats(records: List[JobRecord]) -> None:
         return
 
     counts: Dict[str, int] = {}
+    source_family_counts: Dict[str, int] = {}
+    ats_family_counts: Dict[str, int] = {}
     for record in records:
         counts[record.source] = counts.get(record.source, 0) + 1
+        source_family = record.source_family or infer_source_family(record.source)
+        ats_family = record.ats_family or infer_ats_family(record.source)
+        if source_family:
+            source_family_counts[source_family] = source_family_counts.get(source_family, 0) + 1
+        if ats_family:
+            ats_family_counts[ats_family] = ats_family_counts.get(ats_family, 0) + 1
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     payload = {
         "date": today,
         "total": sum(counts.values()),
         "counts": counts,
+        "source_family_counts": source_family_counts,
+        "ats_family_counts": ats_family_counts,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
@@ -219,6 +234,8 @@ def write_notifications(records: List[JobRecord]) -> None:
             "fit_score": record.fit_score,
             "link": record.link,
             "source": record.source,
+            "source_family": record.source_family or infer_source_family(record.source),
+            "ats_family": record.ats_family or infer_ats_family(record.source),
             "seen": False,
             "created_at": now_iso,
         }
@@ -326,6 +343,9 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
                 why_fit=data.get("why_fit") or "",
                 cv_gap=data.get("cv_gap") or "",
                 notes=notes,
+                source_family=data.get("source_family") or "",
+                ats_family=data.get("ats_family") or "",
+                ats_account=data.get("ats_account") or "",
             )
             records.append(record)
             doc_ids.append(doc.id)

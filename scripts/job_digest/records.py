@@ -6,6 +6,7 @@ from typing import List
 
 from .config import dedupe_keep_order
 from .models import JobRecord
+from .utils import infer_ats_family, infer_source_family
 
 TITLE_STRIP_TOKENS = {
     "senior",
@@ -31,6 +32,18 @@ def normalise_title(title: str) -> str:
 
 def record_richness(record: JobRecord) -> float:
     score = 0.0
+    source_family = record.source_family or infer_source_family(record.source)
+    ats_family = record.ats_family or infer_ats_family(record.source)
+    if source_family == "Manual":
+        score += 3.0
+    elif source_family == "ATS":
+        score += 2.5
+    elif source_family == "JobBoard":
+        score += 1.5
+    elif source_family == "Aggregator":
+        score += 1.0
+    if ats_family:
+        score += 0.5
     score += 1.0 if record.notes else 0.0
     score += 1.0 if record.posted else 0.0
     score += 1.0 if record.location else 0.0
@@ -51,6 +64,18 @@ def merge_records(primary: JobRecord, secondary: JobRecord) -> JobRecord:
         primary.location = secondary.location
     if secondary.applicant_count and not primary.applicant_count:
         primary.applicant_count = secondary.applicant_count
+    if secondary.job_status and not primary.job_status:
+        primary.job_status = secondary.job_status
+    if secondary.posted_date and not primary.posted_date:
+        primary.posted_date = secondary.posted_date
+    if secondary.posted_raw and not primary.posted_raw:
+        primary.posted_raw = secondary.posted_raw
+    if secondary.source_family and not primary.source_family:
+        primary.source_family = secondary.source_family
+    if secondary.ats_family and not primary.ats_family:
+        primary.ats_family = secondary.ats_family
+    if secondary.ats_account and not primary.ats_account:
+        primary.ats_account = secondary.ats_account
     return primary
 
 

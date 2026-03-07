@@ -37,4 +37,7 @@ class JobRecord:
     tailored_cv_sections: dict = field(default_factory=dict)
     applicant_count: str = ""
     job_status: str = ""
+    ats_family: str = ""
+    ats_account: str = ""
+    source_family: str = ""
     alternate_links: List[Dict[str, str]] = field(default_factory=list)

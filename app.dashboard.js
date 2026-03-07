@@ -19,6 +19,8 @@ import {
   TRIAGE_PROMPT_THRESHOLD,
   applyQuickFilter,
   showToast,
+  inferAtsFamily,
+  inferSourceFamily,
 } from "./app.core.js";
 import { openTriageMode } from "./app.triage.js";
 
@@ -539,6 +541,56 @@ export const renderSourceStats = (statsDocs) => {
     });
   });
 
+  const aggregateFamilies = (docs, familyKey, inferFn) => {
+    const totals = {};
+    docs.forEach((doc) => {
+      const explicitCounts = doc[familyKey] || {};
+      if (Object.keys(explicitCounts).length) {
+        Object.entries(explicitCounts).forEach(([family, count]) => {
+          totals[family] = (totals[family] || 0) + (Number(count) || 0);
+        });
+        return;
+      }
+      const counts = doc.counts || {};
+      Object.entries(counts).forEach(([source, count]) => {
+        const family = inferFn(source);
+        if (!family) return;
+        totals[family] = (totals[family] || 0) + (Number(count) || 0);
+      });
+    });
+    return totals;
+  };
+
+  const latestSourceFamilies = aggregateFamilies([latest], "source_family_counts", inferSourceFamily);
+  const latestAtsFamilies = aggregateFamilies([latest], "ats_family_counts", inferAtsFamily);
+  const last3SourceFamilies = aggregateFamilies(last3Docs, "source_family_counts", inferSourceFamily);
+  const last3AtsFamilies = aggregateFamilies(last3Docs, "ats_family_counts", inferAtsFamily);
+
+  const renderMiniTable = (title, counts) => {
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return `
+      <div class="source-mix__mini">
+        <h4>${escapeHtml(title)}</h4>
+        <div class="source-mix__mini-list">
+          ${
+            entries.length
+              ? entries
+                  .map(
+                    ([name, count]) => `
+                      <div class="source-mix__mini-row">
+                        <span>${escapeHtml(name)}</span>
+                        <strong>${count}</strong>
+                      </div>
+                    `
+                  )
+                  .join("")
+              : `<div class="source-mix__mini-row"><span>Not available</span><strong>0</strong></div>`
+          }
+        </div>
+      </div>
+    `;
+  };
+
   const sources = new Set([...Object.keys(countsToday), ...Object.keys(counts3)]);
   const rows = Array.from(sources)
     .sort((a, b) => (counts3[b] || 0) - (counts3[a] || 0))
@@ -590,6 +642,12 @@ export const renderSourceStats = (statsDocs) => {
               ${rows || `<tr><td colspan="6">No source stats available.</td></tr>`}
             </tbody>
           </table>
+        </div>
+        <div class="source-mix__mini-grid">
+          ${renderMiniTable("Source families · today", latestSourceFamilies)}
+          ${renderMiniTable("Source families · last 3 days", last3SourceFamilies)}
+          ${renderMiniTable("ATS families · today", latestAtsFamilies)}
+          ${renderMiniTable("ATS families · last 3 days", last3AtsFamilies)}
         </div>
       </div>
     `;

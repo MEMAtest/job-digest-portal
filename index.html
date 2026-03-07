@@ -97,6 +97,7 @@
             <div class="filter">
               <label for="search">Search</label>
               <input id="search" type="text" placeholder="Search role or company…" />
+              <div class="filter-help">Try company, role, clm, lead ba, workable</div>
             </div>
             <div class="filter">
               <label for="minFit">Min Fit</label>
@@ -112,6 +113,12 @@
             <div class="filter">
               <label for="source">Source</label>
               <select id="source"></select>
+            </div>
+            <div class="filter">
+              <label for="sourceFamily">Source family</label>
+              <select id="sourceFamily">
+                <option value="">All source families</option>
+              </select>
             </div>
             <div class="filter">
               <label for="location">Location</label>
@@ -149,6 +156,7 @@
             <button id="manual-link-submit" class="btn btn-primary">Add link</button>
           </div>
           <div id="quick-filter" class="quick-filter hidden"></div>
+          <div id="search-summary" class="search-summary hidden"></div>
           <div class="triage-entry">
             <button id="triage-btn" class="btn btn-primary">Start triaging</button>
           </div>

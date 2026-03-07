@@ -50,9 +50,11 @@ export const prepCloseBtn = document.getElementById("prep-close");
 export const searchInput = document.getElementById("search");
 export const minFitSelect = document.getElementById("minFit");
 export const sourceSelect = document.getElementById("source");
+export const sourceFamilySelect = document.getElementById("sourceFamily");
 export const locationSelect = document.getElementById("location");
 export const statusSelect = document.getElementById("status");
 export const ukOnlyCheckbox = document.getElementById("ukOnly");
+export const searchSummary = document.getElementById("search-summary");
 
 export let db = null;
 export let useProxy = false;
@@ -169,6 +171,7 @@ export const setCollectionNames = (config = {}) => {
 export const state = {
   jobs: [],
   sources: new Set(),
+  sourceFamilies: new Set(),
   locations: new Set(),
   candidatePrep: {},
   roleSuggestions: null,
@@ -279,6 +282,43 @@ export const isUkOrRemote = (location) => {
     loc.includes("scotland") ||
     loc.includes("wales")
   );
+};
+
+const ATS_FAMILY_SOURCES = new Set([
+  "Greenhouse",
+  "Lever",
+  "Ashby",
+  "SmartRecruiters",
+  "Workday",
+  "Workable",
+]);
+
+const AGGREGATOR_SOURCES = new Set(["LinkedIn"]);
+const MANUAL_SOURCES = new Set(["Manual"]);
+
+export const inferAtsFamily = (source) => {
+  if (!source) return "";
+  const value = String(source).trim();
+  return ATS_FAMILY_SOURCES.has(value) ? value : "";
+};
+
+export const inferSourceFamily = (source) => {
+  if (!source) return "";
+  const value = String(source).trim();
+  if (MANUAL_SOURCES.has(value)) return "Manual";
+  if (ATS_FAMILY_SOURCES.has(value)) return "ATS";
+  if (AGGREGATOR_SOURCES.has(value)) return "Aggregator";
+  return "JobBoard";
+};
+
+export const getJobAtsFamily = (job) => {
+  if (!job) return "";
+  return job.ats_family || inferAtsFamily(job.source);
+};
+
+export const getJobSourceFamily = (job) => {
+  if (!job) return "";
+  return job.source_family || inferSourceFamily(job.source);
 };
 
 export const parseDateValue = (value) => {
@@ -461,6 +501,7 @@ export const resetFilters = ({ keepStatus = false } = {}) => {
   if (searchInput) searchInput.value = "";
   if (minFitSelect) minFitSelect.value = "0";
   if (sourceSelect) sourceSelect.value = "";
+  if (sourceFamilySelect) sourceFamilySelect.value = "";
   if (locationSelect) locationSelect.value = "";
   if (!keepStatus && statusSelect) statusSelect.value = "";
   if (ukOnlyCheckbox) ukOnlyCheckbox.checked = false;

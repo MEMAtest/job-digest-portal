@@ -928,6 +928,15 @@
     margin-bottom: 16px;
   }
 
+  .search-summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-summary .btn {
+    width: 100%;
+  }
+
   /* Stats — 2-col */
   .stats-grid {
     grid-template-columns: 1fr 1fr;

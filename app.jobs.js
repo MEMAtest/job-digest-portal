@@ -4,9 +4,11 @@ import {
   searchInput,
   minFitSelect,
   sourceSelect,
+  sourceFamilySelect,
   locationSelect,
   statusSelect,
   ukOnlyCheckbox,
+  searchSummary,
   db,
   collectionName,
   doc,
@@ -27,6 +29,10 @@ import {
   uniqueCompanyOnly,
   applyQuickFilter,
   isPostedToday,
+  parseDateValue,
+  resetFilters,
+  getJobSourceFamily,
+  getJobAtsFamily,
 } from "./app.core.js";
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply } from "./app.applyhub.js";
@@ -34,8 +40,213 @@ import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } fro
 
 let mobileNavObserver = null;
 
+const SEARCH_ALIAS_MAP = {
+  pm: ["product manager", "product owner", "product lead"],
+  po: ["product owner", "product manager"],
+  ba: ["business analyst", "lead business analyst", "senior business analyst"],
+  clm: ["client lifecycle management", "client lifecycle", "lifecycle management"],
+  kyc: ["know your customer", "kyc"],
+  aml: ["anti money laundering", "aml"],
+  cdd: ["customer due diligence", "cdd"],
+  edd: ["enhanced due diligence", "edd"],
+  ops: ["operations", "operations strategy", "operations management"],
+  fincrime: ["financial crime", "financial crime operations"],
+  onboarding: ["client onboarding", "customer onboarding", "onboarding"],
+  screening: ["sanctions screening", "name screening", "screening"],
+  strategy: ["operations strategy", "product strategy", "strategy"],
+};
+
+const normaliseSearchText = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[\/|]/g, " ")
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const collapseSearchText = (value) => normaliseSearchText(value).replace(/\s+/g, "");
+const tokenizeSearchText = (value) => normaliseSearchText(value).split(" ").filter(Boolean);
+
+const joinField = (value) => {
+  if (Array.isArray(value)) return value.join(" ");
+  if (value && typeof value === "object") return Object.values(value).join(" ");
+  return String(value || "");
+};
+
+const expandQueryTerms = (query) => {
+  const expanded = new Set();
+  const queryNorm = normaliseSearchText(query);
+  if (!queryNorm) return [];
+  expanded.add(queryNorm);
+  const queryTokens = tokenizeSearchText(queryNorm);
+  queryTokens.forEach((token) => {
+    expanded.add(token);
+    (SEARCH_ALIAS_MAP[token] || []).forEach((alias) => expanded.add(normaliseSearchText(alias)));
+  });
+  return Array.from(expanded).filter(Boolean);
+};
+
+const levenshteinDistance = (left, right) => {
+  if (left === right) return 0;
+  if (!left.length) return right.length;
+  if (!right.length) return left.length;
+  const rows = Array.from({ length: left.length + 1 }, (_, index) => [index]);
+  for (let column = 0; column <= right.length; column += 1) {
+    rows[0][column] = column;
+  }
+  for (let row = 1; row <= left.length; row += 1) {
+    for (let column = 1; column <= right.length; column += 1) {
+      const cost = left[row - 1] === right[column - 1] ? 0 : 1;
+      rows[row][column] = Math.min(
+        rows[row - 1][column] + 1,
+        rows[row][column - 1] + 1,
+        rows[row - 1][column - 1] + cost
+      );
+    }
+  }
+  return rows[left.length][right.length];
+};
+
+const buildSearchIndex = (job) => {
+  const role = job.role || "";
+  const company = job.company || "";
+  const source = job.source || "";
+  const sourceFamily = getJobSourceFamily(job);
+  const atsFamily = getJobAtsFamily(job);
+  const fields = [
+    role,
+    company,
+    job.location || "",
+    source,
+    sourceFamily,
+    atsFamily,
+    job.why_fit || "",
+    job.role_summary || "",
+    job.tailored_summary || "",
+    joinField(job.key_requirements),
+    joinField(job.match_notes),
+    joinField(job.company_insights),
+    joinField(job.notes),
+  ].filter(Boolean);
+  const text = normaliseSearchText(fields.join(" "));
+  const collapsed = collapseSearchText(fields.join(" "));
+  const roleNorm = normaliseSearchText(role);
+  const companyNorm = normaliseSearchText(company);
+  const roleCollapsed = collapseSearchText(role);
+  const companyCollapsed = collapseSearchText(company);
+  return {
+    text,
+    collapsed,
+    roleNorm,
+    companyNorm,
+    roleCollapsed,
+    companyCollapsed,
+    roleTokens: new Set(tokenizeSearchText(roleNorm)),
+    companyTokens: new Set(tokenizeSearchText(companyNorm)),
+    textTokens: new Set(tokenizeSearchText(text)),
+    sourceNorm: normaliseSearchText(source),
+    sourceFamilyNorm: normaliseSearchText(sourceFamily),
+    atsFamilyNorm: normaliseSearchText(atsFamily),
+  };
+};
+
+const scoreSearchMatch = (job, query) => {
+  const queryNorm = normaliseSearchText(query);
+  if (!queryNorm) return { score: 0, reasons: [] };
+
+  const index = buildSearchIndex(job);
+  const queryCollapsed = collapseSearchText(queryNorm);
+  const queryTerms = expandQueryTerms(queryNorm);
+  const queryTokens = tokenizeSearchText(queryNorm);
+  const reasons = new Set();
+  let score = 0;
+
+  if (index.companyNorm === queryNorm || index.companyCollapsed === queryCollapsed) {
+    score += 320;
+    reasons.add("Company match");
+  } else if (index.companyNorm.includes(queryNorm) || index.companyCollapsed.includes(queryCollapsed)) {
+    score += 180;
+    reasons.add("Company match");
+  }
+
+  if (index.roleNorm === queryNorm || index.roleCollapsed === queryCollapsed) {
+    score += 320;
+    reasons.add("Role match");
+  } else if (index.roleNorm.includes(queryNorm) || index.roleCollapsed.includes(queryCollapsed)) {
+    score += 200;
+    reasons.add("Role match");
+  }
+
+  if (
+    index.sourceNorm.includes(queryNorm) ||
+    index.sourceFamilyNorm.includes(queryNorm) ||
+    index.atsFamilyNorm.includes(queryNorm)
+  ) {
+    score += 140;
+    reasons.add("ATS match");
+  }
+
+  if (index.text.includes(queryNorm) || index.collapsed.includes(queryCollapsed)) {
+    score += 70;
+    reasons.add("Summary match");
+  }
+
+  queryTerms.forEach((term) => {
+    const termTokens = tokenizeSearchText(term);
+    const aliasMatch = term !== queryNorm && !queryTokens.includes(term);
+    let matched = false;
+
+    if (index.roleNorm.includes(term) || index.roleCollapsed.includes(collapseSearchText(term))) {
+      score += aliasMatch ? 45 : 60;
+      reasons.add(aliasMatch ? "Alias match" : "Role match");
+      matched = true;
+    } else if (index.companyNorm.includes(term) || index.companyCollapsed.includes(collapseSearchText(term))) {
+      score += aliasMatch ? 40 : 55;
+      reasons.add(aliasMatch ? "Alias match" : "Company match");
+      matched = true;
+    } else if (index.text.includes(term)) {
+      score += aliasMatch ? 18 : 24;
+      reasons.add(aliasMatch ? "Alias match" : "Summary match");
+      matched = true;
+    } else if (termTokens.length === 1 && term.length >= 4) {
+      for (const token of [...index.roleTokens, ...index.companyTokens]) {
+        const distance = levenshteinDistance(term, token);
+        const maxDistance = term.length >= 8 ? 2 : 1;
+        if (distance <= maxDistance) {
+          score += 12;
+          reasons.add("Fuzzy match");
+          matched = true;
+          break;
+        }
+      }
+    }
+
+    if (matched && aliasMatch) {
+      reasons.add("Alias match");
+    }
+  });
+
+  const matchedTokens = queryTokens.filter(
+    (token) =>
+      index.roleTokens.has(token) ||
+      index.companyTokens.has(token) ||
+      index.textTokens.has(token) ||
+      index.collapsed.includes(collapseSearchText(token))
+  );
+  if (queryTokens.length > 1 && matchedTokens.length >= Math.max(1, queryTokens.length - 1)) {
+    score += 25;
+  }
+
+  return { score, reasons: Array.from(reasons).slice(0, 4) };
+};
+
 export const renderFilters = () => {
   if (!sourceSelect || !locationSelect) return;
+  const selectedSource = sourceSelect.value;
+  const selectedSourceFamily = sourceFamilySelect?.value || "";
+  const selectedLocation = locationSelect.value;
+
   sourceSelect.innerHTML = '<option value="">All sources</option>';
   Array.from(state.sources)
     .sort()
@@ -45,6 +256,20 @@ export const renderFilters = () => {
       option.textContent = source;
       sourceSelect.appendChild(option);
     });
+  if (selectedSource) sourceSelect.value = selectedSource;
+
+  if (sourceFamilySelect) {
+    sourceFamilySelect.innerHTML = '<option value="">All source families</option>';
+    Array.from(state.sourceFamilies)
+      .sort()
+      .forEach((family) => {
+        const option = document.createElement("option");
+        option.value = family;
+        option.textContent = family;
+        sourceFamilySelect.appendChild(option);
+      });
+    if (selectedSourceFamily) sourceFamilySelect.value = selectedSourceFamily;
+  }
 
   locationSelect.innerHTML = '<option value="">All locations</option>';
   Array.from(state.locations)
@@ -55,6 +280,7 @@ export const renderFilters = () => {
       option.textContent = location;
       locationSelect.appendChild(option);
     });
+  if (selectedLocation) locationSelect.value = selectedLocation;
 };
 
 export const updateBulkBar = () => {
@@ -142,26 +368,20 @@ const handleBulkAction = async (action) => {
 };
 
 export const getFilteredJobs = () => {
-  const searchTerm = searchInput.value.toLowerCase();
+  const searchTerm = searchInput.value;
   const minFit = Number(minFitSelect.value || 0);
   const sourceFilter = sourceSelect.value;
+  const sourceFamilyFilter = sourceFamilySelect?.value || "";
   const locationFilter = locationSelect.value;
   const statusFilter = statusSelect.value;
   const ukOnly = ukOnlyCheckbox.checked;
 
   let filtered = state.jobs.filter((job) => {
     const jobStatus = (job.application_status || "saved").toLowerCase();
-    const matchesSearch =
-      !searchTerm ||
-      (job.role || "").toLowerCase().includes(searchTerm) ||
-      (job.company || "").toLowerCase().includes(searchTerm) ||
-      (job.why_fit || "").toLowerCase().includes(searchTerm) ||
-      (job.role_summary || "").toLowerCase().includes(searchTerm) ||
-      (job.tailored_summary || "").toLowerCase().includes(searchTerm);
-
     const fitScore = Number(job.fit_score || 0);
     const matchesFit = fitScore >= minFit;
     const matchesSource = !sourceFilter || job.source === sourceFilter;
+    const matchesSourceFamily = !sourceFamilyFilter || getJobSourceFamily(job) === sourceFamilyFilter;
     const matchesLocation = !locationFilter || job.location === locationFilter;
     const matchesStatus = !statusFilter || jobStatus === statusFilter;
     const matchesUkOnly = !ukOnly || isUkOrRemote(job.location);
@@ -169,9 +389,9 @@ export const getFilteredJobs = () => {
     const matchesDismissed = statusFilter === "dismissed" || jobStatus !== "dismissed";
 
     return (
-      matchesSearch &&
       matchesFit &&
       matchesSource &&
+      matchesSourceFamily &&
       matchesLocation &&
       matchesStatus &&
       matchesUkOnly &&
@@ -189,6 +409,25 @@ export const getFilteredJobs = () => {
       return true;
     });
   }
+
+  const queryNorm = normaliseSearchText(searchTerm);
+  filtered = filtered
+    .map((job) => {
+      const match = scoreSearchMatch(job, queryNorm);
+      job.__searchScore = match.score;
+      job.__searchReasons = match.reasons;
+      return job;
+    })
+    .filter((job) => !queryNorm || job.__searchScore > 0)
+    .sort((left, right) => {
+      const scoreDelta = (right.__searchScore || 0) - (left.__searchScore || 0);
+      if (scoreDelta !== 0) return scoreDelta;
+      const fitDelta = Number(right.fit_score || 0) - Number(left.fit_score || 0);
+      if (fitDelta !== 0) return fitDelta;
+      const rightDate = parseDateValue(right.posted_date || right.updated_at)?.getTime() || 0;
+      const leftDate = parseDateValue(left.posted_date || left.updated_at)?.getTime() || 0;
+      return rightDate - leftDate;
+    });
 
   return filtered;
 };
@@ -832,6 +1071,7 @@ const refreshJobViews = (job, options = {}) => {
 
 export const renderJobs = () => {
   const filtered = getFilteredJobs();
+  const queryNorm = normaliseSearchText(searchInput?.value || "");
 
   if (mobileNavObserver) {
     mobileNavObserver.disconnect();
@@ -878,6 +1118,28 @@ export const renderJobs = () => {
   listEl.innerHTML = "";
   detailEl.innerHTML = "";
 
+  if (searchSummary) {
+    if (queryNorm) {
+      searchSummary.classList.remove("hidden");
+      searchSummary.innerHTML = `
+        <div class="search-summary__text">Showing ${filtered.length} of ${state.jobs.length} roles for “${escapeHtml(
+          searchInput.value.trim()
+        )}”</div>
+        <button class="btn btn-tertiary search-summary__clear">Clear all filters</button>
+      `;
+      const clearBtn = searchSummary.querySelector(".search-summary__clear");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          resetFilters();
+          renderJobs();
+        });
+      }
+    } else {
+      searchSummary.classList.add("hidden");
+      searchSummary.innerHTML = "";
+    }
+  }
+
   if (!filtered.length) {
     detailEl.innerHTML = `<div class="job-detail-empty">No roles match these filters yet. Try lowering the fit threshold or clearing filters.</div>`;
     return;
@@ -900,6 +1162,11 @@ export const renderJobs = () => {
     const statusSuffix = openStatus ? ` · ${openStatus}` : "";
     const isManual = job.manual_link || job.source === "Manual";
     const isToday = isPostedToday(job);
+    const matchPills = queryNorm
+      ? (job.__searchReasons || [])
+          .map((reason) => `<span class="job-list-match-pill">${escapeHtml(reason)}</span>`)
+          .join("")
+      : "";
 
     const item = document.createElement("div");
     item.className = `job-list-item${job.id === state.selectedJobId ? " is-active" : ""}${isToday ? " job-list-item--today" : ""}`;
@@ -913,6 +1180,7 @@ export const renderJobs = () => {
         <div class="job-list-company">${escapeHtml(job.company || "Company not listed")}</div>
         <div class="job-list-meta">${escapeHtml(formatPosted(postedDisplay))} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
         <div class="job-list-meta">${escapeHtml(buildStatusLine(job))}</div>
+        ${matchPills ? `<div class="job-list-match-pills">${matchPills}</div>` : ""}
       </div>
       <div class="job-list-badges">
         <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
