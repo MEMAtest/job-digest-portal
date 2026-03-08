@@ -1570,138 +1570,226 @@ def technojobs_search(session: requests.Session) -> List[Dict[str, str]]:
 
 def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
     jobs: List[Dict[str, str]] = []
-    base_url = JOB_BOARD_URLS.get("IndeedUK")
-    if not base_url:
+    primary_base_url = JOB_BOARD_URLS.get("IndeedUK")
+    if not primary_base_url:
         return jobs
+    base_urls: List[str] = []
+    for candidate in (primary_base_url, "https://www.indeed.co.uk"):
+        cleaned = candidate.strip().rstrip("/")
+        if cleaned and cleaned not in base_urls:
+            base_urls.append(cleaned)
 
     headers = {
         "User-Agent": USER_AGENT,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-GB,en;q=0.9",
-        "Referer": "https://uk.indeed.com/",
+        "Referer": f"{base_urls[0]}/",
     }
 
-    rss_jobs: List[Dict[str, str]] = []
-    for keyword in BROAD_BOARD_KEYWORDS[:3]:
-        rss_url = f"{base_url}/rss?q={quote_plus(keyword)}&l=London&sort=date"
-        entries = []
-        if feedparser is not None:
-            feed = feedparser.parse(rss_url)
-            entries = list(feed.entries)
-        if not entries:
-            entries = fetch_rss_entries(session, rss_url)
-        for entry in entries:
-            if isinstance(entry, dict):
-                title = entry.get("title", "")
-                link = entry.get("link", "")
-                summary = trim_summary(entry.get("summary", "")) if entry.get("summary") else ""
-                company = entry.get("author", "") or "Indeed"
-            else:
-                title = ""
-                link = ""
-                summary = ""
-                company = "Indeed"
-            if not title:
-                continue
-            posted_date = parse_entry_date(entry)
-            rss_jobs.append(
-                {
-                    "title": title,
-                    "company": company,
-                    "location": "London",
-                    "link": clean_link(link),
-                    "posted_text": "",
-                    "posted_date": posted_date,
-                    "summary": summary,
-                    "source": "IndeedUK",
-                }
-            )
-        time.sleep(0.2)
-    if rss_jobs:
-        return rss_jobs
+    search_terms: List[str] = []
+    for keyword in (
+        BOARD_KEYWORDS[:8]
+        + BROAD_BOARD_KEYWORDS[:8]
+        + [
+            "client lifecycle management",
+            "lead business analyst",
+            "business analyst onboarding",
+            "operations strategy",
+            "financial crime transformation",
+            "senior manager operations strategy",
+        ]
+    ):
+        cleaned = normalize_text(keyword)
+        if cleaned and cleaned not in search_terms:
+            search_terms.append(cleaned)
+
+    locations = ["London", "United Kingdom", "Remote"]
 
     job_map: Dict[str, Dict[str, str]] = {}
-    for keyword in BROAD_BOARD_KEYWORDS[:3]:
-        params = {"q": keyword, "l": "London", "fromage": 3, "sort": "date"}
-        try:
-            resp = session.get(f"{base_url}/jobs", params=params, headers=headers, timeout=30)
-        except requests.RequestException:
-            continue
-        if resp.status_code == 403:
-            break
-        if resp.status_code != 200:
-            continue
 
-        soup = BeautifulSoup(resp.text, "html.parser")
-        cards = soup.select("div.job_seen_beacon") or soup.select("a.tapItem")
-        if cards:
-            for card in cards:
-                jk = card.get("data-jk")
-                link = ""
-                if jk:
-                    link = f"{base_url}/viewjob?jk={jk}"
+    def add_job(payload: Dict[str, str]) -> None:
+        link = clean_link(payload.get("link", ""))
+        title = normalize_text(payload.get("title", ""))
+        if not link or not title:
+            return
+        existing = job_map.get(link)
+        if not existing:
+            payload["link"] = link
+            payload["title"] = title
+            payload["company"] = normalize_text(payload.get("company", "") or "Indeed")
+            payload["location"] = normalize_text(payload.get("location", "") or "United Kingdom")
+            payload["summary"] = trim_summary(payload.get("summary", ""))
+            payload["source"] = "IndeedUK"
+            job_map[link] = payload
+            return
+        if payload.get("summary") and not existing.get("summary"):
+            existing["summary"] = trim_summary(payload.get("summary", ""))
+        if payload.get("posted_date") and not existing.get("posted_date"):
+            existing["posted_date"] = payload.get("posted_date", "")
+        if payload.get("posted_text") and not existing.get("posted_text"):
+            existing["posted_text"] = payload.get("posted_text", "")
+        if payload.get("company") and existing.get("company") in {"", "Indeed"}:
+            existing["company"] = normalize_text(payload.get("company", ""))
+        if payload.get("location") and existing.get("location") in {"", "United Kingdom"}:
+            existing["location"] = normalize_text(payload.get("location", ""))
+
+    for base_url in base_urls:
+        headers["Referer"] = f"{base_url}/"
+        for keyword in search_terms[:12]:
+            for location in locations:
+                rss_urls = [
+                    f"{base_url}/jobs?rss=1&q={quote_plus(keyword)}&l={quote_plus(location)}&sort=date&fromage=7",
+                    f"{base_url}/rss?q={quote_plus(keyword)}&l={quote_plus(location)}&sort=date&fromage=7",
+                ]
+                for rss_url in rss_urls:
+                    entries = fetch_rss_entries(session, rss_url)
+                    if not entries and feedparser is not None:
+                        try:
+                            feed = feedparser.parse(rss_url)
+                            entries = list(feed.entries)
+                        except Exception:
+                            entries = []
+                    for entry in entries:
+                        if isinstance(entry, dict):
+                            title = entry.get("title", "")
+                            link = entry.get("link", "")
+                            summary = trim_summary(entry.get("summary", "")) if entry.get("summary") else ""
+                            company = entry.get("author", "") or "Indeed"
+                        else:
+                            title = ""
+                            link = ""
+                            summary = ""
+                            company = "Indeed"
+                        if not title:
+                            continue
+                        add_job(
+                            {
+                                "title": title,
+                                "company": company,
+                                "location": location,
+                                "link": link,
+                                "posted_text": "",
+                                "posted_date": parse_entry_date(entry),
+                                "summary": summary,
+                                "source": "IndeedUK",
+                            }
+                        )
+                    if entries:
+                        break
+                time.sleep(0.15)
+
+    if job_map:
+        return list(job_map.values())
+
+    for base_url in base_urls:
+        headers["Referer"] = f"{base_url}/"
+        for keyword in search_terms[:6]:
+            for location in locations:
+                params = {"q": keyword, "l": location, "fromage": 7, "sort": "date"}
+                try:
+                    resp = session.get(f"{base_url}/jobs", params=params, headers=headers, timeout=30)
+                except requests.RequestException:
+                    continue
+                if resp.status_code == 403:
+                    continue
+                if resp.status_code != 200:
+                    continue
+
+                soup = BeautifulSoup(resp.text, "html.parser")
+                cards = (
+                    soup.select("div.job_seen_beacon")
+                    or soup.select("a.tapItem")
+                    or soup.select("div.cardOutline")
+                    or soup.select("td.resultContent")
+                    or soup.select("div[data-jk]")
+                )
+                if cards:
+                    for card in cards:
+                        anchor = None
+                        jk = card.get("data-jk")
+                        link = ""
+                        if jk:
+                            link = f"{base_url}/viewjob?jk={jk}"
+                        else:
+                            anchor = (
+                                card.select_one("a.jcs-JobTitle[href]")
+                                or card.select_one("h2.jobTitle a[href]")
+                                or card.select_one("a.tapItem[href]")
+                                or card.find("a", href=True)
+                            )
+                            if not anchor:
+                                continue
+                            href = anchor.get("href", "")
+                            if "jk=" not in href and "/rc/clk" not in href and "/viewjob" not in href:
+                                continue
+                            link = urljoin(base_url, href)
+                        link = clean_link(link)
+                        if not link or link in job_map:
+                            continue
+                        title_el = (
+                            card.select_one("h2.jobTitle span")
+                            or card.select_one("a.jcs-JobTitle span")
+                            or card.select_one("a[data-jk]")
+                            or anchor
+                        )
+                        title = normalize_text(title_el.get_text(" ")) if title_el else ""
+                        if len(title) < 4:
+                            continue
+                        company_el = card.select_one("span.companyName")
+                        location_el = card.select_one("div.companyLocation")
+                        snippet_el = card.select_one("div.job-snippet") or card.select_one("div.heading6")
+                        posted_el = (
+                            card.select_one("span.date")
+                            or card.select_one("span[aria-label]")
+                            or card.select_one("div.metadata")
+                        )
+
+                        posted_text = ""
+                        if posted_el:
+                            posted_text = extract_relative_posted_text(posted_el.get_text(" "))
+                        if not posted_text:
+                            posted_text = extract_relative_posted_text(normalize_text(card.get_text(" ")))
+
+                        add_job(
+                            {
+                                "title": title,
+                                "company": normalize_text(company_el.get_text(" ")) if company_el else "Indeed",
+                                "location": normalize_text(location_el.get_text(" ")) if location_el else location,
+                                "link": link,
+                                "posted_text": posted_text,
+                                "posted_date": "",
+                                "summary": trim_summary(snippet_el.get_text(" ") if snippet_el else ""),
+                                "source": "IndeedUK",
+                            }
+                        )
                 else:
-                    anchor = card.find("a", href=True)
-                    if not anchor:
-                        continue
-                    href = anchor.get("href", "")
-                    if "jk=" not in href and "/rc/clk" not in href and "/viewjob" not in href:
-                        continue
-                    link = urljoin(base_url, href)
-                link = clean_link(link)
-                if not link or link in job_map:
-                    continue
-                title_el = card.select_one("h2.jobTitle span") or card.select_one("a[data-jk]")
-                title = normalize_text(title_el.get_text(" ")) if title_el else ""
-                if len(title) < 4:
-                    continue
-                company_el = card.select_one("span.companyName")
-                location_el = card.select_one("div.companyLocation")
-                snippet_el = card.select_one("div.job-snippet")
-                posted_el = card.select_one("span.date") or card.select_one("span[aria-label]")
+                    for anchor in soup.find_all("a", href=True):
+                        href = anchor.get("href", "")
+                        if "jk=" not in href:
+                            continue
+                        if "/rc/clk" not in href and "/viewjob" not in href:
+                            continue
+                        link = urljoin(base_url, href)
+                        link = clean_link(link)
+                        if not link or link in job_map:
+                            continue
+                        title = normalize_text(anchor.get_text(" "))
+                        if len(title) < 4:
+                            continue
+                        add_job(
+                            {
+                                "title": title,
+                                "company": "Indeed",
+                                "location": location,
+                                "link": link,
+                                "posted_text": "",
+                                "posted_date": "",
+                                "summary": "",
+                                "source": "IndeedUK",
+                            }
+                        )
 
-                posted_text = ""
-                if posted_el:
-                    posted_text = extract_relative_posted_text(posted_el.get_text(" "))
-                if not posted_text:
-                    posted_text = extract_relative_posted_text(normalize_text(card.get_text(" ")))
-
-                job_map[link] = {
-                    "title": title,
-                    "company": normalize_text(company_el.get_text(" ")) if company_el else "Indeed",
-                    "location": normalize_text(location_el.get_text(" ")) if location_el else "London",
-                    "link": link,
-                    "posted_text": posted_text,
-                    "posted_date": "",
-                    "summary": trim_summary(snippet_el.get_text(" ") if snippet_el else ""),
-                    "source": "IndeedUK",
-                }
-        else:
-            for anchor in soup.find_all("a", href=True):
-                href = anchor.get("href", "")
-                if "jk=" not in href:
-                    continue
-                if "/rc/clk" not in href and "/viewjob" not in href:
-                    continue
-                link = urljoin(base_url, href)
-                link = clean_link(link)
-                if not link or link in job_map:
-                    continue
-                title = normalize_text(anchor.get_text(" "))
-                if len(title) < 4:
-                    continue
-                job_map[link] = {
-                    "title": title,
-                    "company": "Indeed",
-                    "location": "London",
-                    "link": link,
-                    "posted_text": "",
-                    "posted_date": "",
-                    "summary": "",
-                    "source": "IndeedUK",
-                }
-
-        time.sleep(0.2)
+                time.sleep(0.2)
 
     jobs.extend(job_map.values())
     return jobs
