@@ -602,16 +602,38 @@ export const renderSourceStats = (statsDocs) => {
       const prevCount = (previous.counts || {})[source] || 0;
       const delta = todayCount - prevCount;
       const deltaLabel = delta === 0 ? "—" : delta > 0 ? `+${delta}` : `${delta}`;
+      const deltaClass =
+        delta === 0 ? "source-mix__delta--neutral" : delta > 0 ? "source-mix__delta--positive" : "source-mix__delta--negative";
 
       return `
-        <tr>
-          <td class="source-mix__source">${escapeHtml(source)}</td>
-          <td>${todayCount}</td>
-          <td>${todayPct}%</td>
-          <td>${threeCount}</td>
-          <td>${threePct}%</td>
-          <td>${deltaLabel}</td>
-        </tr>
+        <article class="source-mix__row">
+          <div class="source-mix__row-main">
+            <div class="source-mix__source-name">${escapeHtml(source)}</div>
+            <div class="source-mix__row-sub">Today ${todayCount} · 3-day ${threeCount}</div>
+          </div>
+          <div class="source-mix__metrics">
+            <div class="source-mix__metric">
+              <span>Today</span>
+              <strong>${todayCount}</strong>
+            </div>
+            <div class="source-mix__metric">
+              <span>Today %</span>
+              <strong>${todayPct}%</strong>
+            </div>
+            <div class="source-mix__metric">
+              <span>3-day</span>
+              <strong>${threeCount}</strong>
+            </div>
+            <div class="source-mix__metric">
+              <span>3-day %</span>
+              <strong>${threePct}%</strong>
+            </div>
+            <div class="source-mix__metric source-mix__metric--delta ${deltaClass}">
+              <span>Δ vs yesterday</span>
+              <strong>${deltaLabel}</strong>
+            </div>
+          </div>
+        </article>
       `;
     })
     .join("");
@@ -626,22 +648,13 @@ export const renderSourceStats = (statsDocs) => {
           </div>
           <div class="source-mix__meta">Latest snapshot: ${escapeHtml(latest.date || "today")}</div>
         </div>
-        <div class="source-mix__table-wrapper">
-          <table class="source-mix__table">
-            <thead>
-              <tr>
-                <th class="source-mix__source">Source</th>
-                <th>Today</th>
-                <th>Today %</th>
-                <th>3‑day</th>
-                <th>3‑day %</th>
-                <th>Δ vs yesterday</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows || `<tr><td colspan="6">No source stats available.</td></tr>`}
-            </tbody>
-          </table>
+        <div class="source-mix__rows">
+          ${
+            rows ||
+            `<div class="source-mix__empty">
+              <span>No source stats available.</span>
+            </div>`
+          }
         </div>
         <div class="source-mix__mini-grid">
           ${renderMiniTable("Source families · today", latestSourceFamilies)}
@@ -950,7 +963,9 @@ export const renderFollowUps = (jobs) => {
       const jobId = el.dataset.jobId;
       if (state.handlers.setActiveTab) state.handlers.setActiveTab("live");
       setTimeout(() => {
-        const target = document.querySelector(`#carousel-${jobId}`)?.closest(".job-card");
+        state.selectedJobId = jobId;
+        if (state.handlers.renderJobs) state.handlers.renderJobs();
+        const target = document.querySelector(`.job-list-item[data-job-id="${jobId}"]`);
         if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 100);
     });

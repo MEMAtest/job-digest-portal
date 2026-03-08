@@ -34,6 +34,7 @@ export const openTriageMode = (jobs) => {
   state.triageIndex = 0;
   state.triageStats = { dismissed: 0, shortlisted: 0, apply: 0 };
   triageOverlay.classList.remove("hidden");
+  triageOverlay.scrollTop = 0;
   document.body.style.overflow = "hidden";
   renderTriageCard();
 };

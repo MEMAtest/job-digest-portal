@@ -66,9 +66,9 @@
 .triage-content {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 0;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 12px 0 0;
   max-width: 720px;
   margin: 0 auto;
   width: 100%;
@@ -82,6 +82,7 @@
   padding: 24px;
   max-width: 720px;
   width: 100%;
+  margin-top: 8px;
   box-shadow: 0 10px 40px rgba(15, 23, 42, 0.08);
   transition: transform 0.3s ease, opacity 0.3s ease;
   user-select: none;
@@ -196,11 +197,13 @@
 .triage-summary {
   text-align: center;
   max-width: 520px;
+  width: 100%;
   background: #fff;
   border-radius: 20px;
   padding: 28px 24px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  margin-top: 8px;
 }
 .triage-summary h3 {
   font-size: 22px;
@@ -245,6 +248,8 @@
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 16px;
+  min-width: 0;
+  overflow: hidden;
 }
 .hub-card--applied {
   opacity: 0.7;
@@ -253,17 +258,25 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 12px;
   margin-bottom: 16px;
+  min-width: 0;
+}
+.hub-card__header > div {
+  min-width: 0;
+  flex: 1;
 }
 .hub-card__header h3 {
   font-size: 16px;
   font-weight: 700;
   margin: 0 0 4px;
+  overflow-wrap: anywhere;
 }
 .hub-card__header p {
   font-size: 13px;
   color: #64748b;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 .hub-controls {
   display: flex;
@@ -371,6 +384,7 @@
   justify-content: space-between;
   margin: 12px 0;
   gap: 10px;
+  min-width: 0;
 }
 
 .hub-progress__bar {
@@ -392,6 +406,7 @@
   font-size: 12px;
   color: #64748b;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .hub-card__section {
@@ -400,6 +415,8 @@
   border-radius: 12px;
   padding: 10px 12px;
   background: #f8fafc;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .hub-card__section summary {
@@ -409,6 +426,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .hub-card__section summary::marker,
@@ -424,6 +443,8 @@
   font-weight: 600;
   margin-bottom: 0;
   margin-top: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .hub-card__preview {
@@ -434,6 +455,8 @@
   text-overflow: ellipsis;
   flex: 1;
   text-align: right;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .hub-card__section[open] .hub-card__preview {
@@ -446,6 +469,13 @@
   padding-top: 16px;
   border-top: 1px solid #e2e8f0;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.hub-card__actions .btn,
+.hub-card__actions a {
+  min-width: 0;
 }
 
 .hub-card__checklist {
@@ -476,6 +506,13 @@
   gap: 8px;
   font-size: 13px;
   color: #0f172a;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.checklist-item span:not(.checklist-tag) {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .checklist-item input[type="checkbox"] {
@@ -528,6 +565,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #fff;
+  min-width: 0;
 }
 
 .hub-card__notes label {
@@ -562,6 +600,9 @@
   font-size: 12px;
   color: #94a3b8;
   margin-top: 6px;
+  min-width: 0;
+  max-width: 100%;
+  gap: 12px;
 }
 
 .hub-notes__saved {
@@ -585,6 +626,9 @@
   overflow: hidden;
   transition: max-height 0.25s ease;
   padding-top: 10px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 /* ── CV Diff ── */
@@ -620,6 +664,7 @@
   font-size: 13px;
   line-height: 1.5;
   color: #334155;
+  overflow-wrap: anywhere;
 }
 .cv-diff__content ul {
   margin: 0;
@@ -632,6 +677,12 @@
   padding: 8px 12px;
   background: #f8fafc;
   border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+#apply-hub {
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ── Applicant Badges ── */
@@ -1005,6 +1056,82 @@
 
 /* ── CV Hub Mobile ── */
 @media (max-width: 900px) {
+  .hub-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hub-toggle {
+    width: 100%;
+  }
+
+  .hub-sort {
+    width: 100%;
+  }
+
+  .hub-sort__pill {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+  }
+
+  .hub-card {
+    padding: 16px;
+  }
+
+  .hub-card__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hub-card__section summary {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .hub-card__preview {
+    width: 100%;
+    flex: 0 0 100%;
+    text-align: left;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .hub-card__progress {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hub-progress__label {
+    text-align: left;
+  }
+
+  .checklist-item {
+    align-items: flex-start;
+  }
+
+  .checklist-tag {
+    margin-left: 24px;
+  }
+
+  .hub-card__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .hub-card__actions .btn,
+  .hub-card__actions a {
+    width: 100%;
+    text-align: center;
+    margin-top: 0;
+  }
+
+  .hub-notes__meta {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
   .cv-compare-grid {
     grid-template-columns: 1fr;
     gap: 12px;

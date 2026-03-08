@@ -937,6 +937,14 @@
     width: 100%;
   }
 
+  .manual-link-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-link-bar .btn {
+    width: 100%;
+  }
+
   /* Stats — 2-col */
   .stats-grid {
     grid-template-columns: 1fr 1fr;
@@ -945,171 +953,66 @@
   .stat-card { padding: 10px; }
   .stat-card__value { font-size: 18px; }
 
-  /* Job list → horizontal scroll-snap */
-  .job-grid {
-    display: flex;
-    flex-direction: row;
-    gap: 0;
-    overflow-x: scroll;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+  .jobs-split {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    min-width: 0;
   }
-  .job-grid::-webkit-scrollbar {
+
+  .job-list,
+  .job-detail,
+  .job-detail-card,
+  .detail-tab-panel {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .job-detail-card {
+    padding: 14px;
+  }
+
+  .job-detail-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .job-detail-badges {
+    justify-content: flex-start;
+  }
+
+  .job-detail-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .job-detail-actions .btn,
+  .job-detail-actions a {
+    width: 100%;
+    min-width: 0;
+    margin-top: 0;
+    text-align: center;
+  }
+
+  .job-detail-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .job-detail-tabs::-webkit-scrollbar {
     display: none;
   }
 
-  /* Job card → full-screen swipable card */
-  .job-card {
-    flex: 0 0 100%;
-    scroll-snap-align: start;
-    height: calc(100vh - 220px);
-    height: calc(100dvh - 220px);
-    display: grid;
-    grid-template-rows: auto 1fr auto;
-    padding: 12px;
-    gap: 10px;
-    overflow-x: hidden;
-    overflow-y: auto;
-    position: relative;
-    overscroll-behavior: contain;
-  }
-  .job-card__header {
-    flex-direction: column;
-    gap: 6px;
-  }
-  .job-card__title { font-size: 15px; }
-  .job-card__meta { font-size: 12px; }
-  .job-card__badges {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-  }
-  .badge--location {
-    max-width: none;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: unset;
+  .detail-tab {
+    flex: 0 0 auto;
   }
 
-  /* HIDE desktop carousel chrome */
-  .detail-carousel-header { display: none; }
-  .carousel-dots { display: none; }
-
-  /* Convert carousel → vertical accordion (scrollable within card) */
-  .detail-carousel-wrap {
-    margin-top: 8px;
-    overflow-y: auto;
-    min-height: 0;
-  }
-  .job-card__details.detail-carousel {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    overflow-x: visible;
-    overflow-y: visible;
-    scroll-snap-type: none;
-    padding-bottom: 0;
-  }
-
-  /* Each detail-box becomes an accordion item */
-  .detail-box {
-    flex: none;
-    min-width: 0;
-    max-width: 100%;
-    width: 100%;
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-    border-bottom: none;
-    padding: 0;
-    background: transparent;
-    overflow: hidden;
-  }
-  .detail-box:first-child {
-    border-top: none;
-  }
-  .detail-box:last-child {
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  /* Section title = accordion trigger */
-  .detail-box .section-title {
-    padding: 10px 12px;
-    margin-bottom: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .detail-box .section-title::after {
-    content: "\25B8";
-    font-size: 12px;
-    color: #94a3b8;
-    transition: transform 0.2s ease;
-    flex-shrink: 0;
-    margin-left: 8px;
-  }
-  .detail-box.accordion-open .section-title::after {
-    transform: rotate(90deg);
-  }
-
-  /* Accordion content (everything after section-title) */
-  .detail-box .accordion-body {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.25s ease;
-    padding: 0 12px;
-  }
-  .detail-box.accordion-open .accordion-body {
-    max-height: 8000px;
-    padding: 8px 12px 12px;
-  }
-
-  /* Actions */
-  .job-card__actions {
-    margin-top: 4px;
-    display: flex;
-    gap: 8px;
-  }
-  .job-card__actions .btn-quick-apply {
-    flex: 1;
-    order: -1;
-    text-align: center;
-    font-size: 12px;
-    padding: 10px;
-  }
-  .job-card__actions a {
-    flex: 1;
-    text-align: center;
-    font-size: 12px;
-    padding: 10px;
-  }
-
-  /* Tracking grid */
   .tracking-grid {
     grid-template-columns: 1fr;
     gap: 6px;
-  }
-
-  /* Top pick */
-  .top-pick {
-    padding: 12px;
-  }
-  .top-pick .job-card__details {
-    flex-direction: column;
-    overflow: visible;
-    gap: 8px;
-  }
-  .top-pick .detail-box {
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 10px;
-    background: #f8fafc;
   }
 
   /* Alert */

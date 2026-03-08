@@ -89,9 +89,17 @@ const proxyFetch = async (url, options) => {
   return res.json();
 };
 
-const isBlockedError = (error) => {
+export const isRecoverableFirestoreError = (error) => {
   const message = String(error?.message || error || "").toLowerCase();
-  return message.includes("blocked_by_client") || message.includes("access control checks");
+  return (
+    message.includes("blocked_by_client") ||
+    message.includes("blocked by client") ||
+    message.includes("access control checks") ||
+    message.includes("failed to fetch") ||
+    message.includes("network request failed") ||
+    message.includes("load failed") ||
+    message.includes("networkerror")
+  );
 };
 
 export const updateDoc = async (docRef, payload) => {
@@ -99,7 +107,7 @@ export const updateDoc = async (docRef, payload) => {
     try {
       return await firebaseUpdateDoc(docRef, payload);
     } catch (error) {
-      if (!isBlockedError(error)) throw error;
+      if (!isRecoverableFirestoreError(error)) throw error;
       useProxy = true;
     }
   }
@@ -119,7 +127,7 @@ export const setDoc = async (docRef, payload) => {
     try {
       return await firebaseSetDoc(docRef, payload);
     } catch (error) {
-      if (!isBlockedError(error)) throw error;
+      if (!isRecoverableFirestoreError(error)) throw error;
       useProxy = true;
     }
   }
@@ -139,7 +147,7 @@ export const getDoc = async (docRef) => {
     try {
       return await firebaseGetDoc(docRef);
     } catch (error) {
-      if (!isBlockedError(error)) throw error;
+      if (!isRecoverableFirestoreError(error)) throw error;
       useProxy = true;
     }
   }
