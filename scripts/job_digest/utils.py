@@ -70,6 +70,44 @@ def extract_relative_posted_text(text: str) -> str:
     return ""
 
 
+def parse_posted_date_value(posted_date: str) -> Optional[datetime]:
+    if not posted_date:
+        return None
+    try:
+        cleaned = posted_date.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(cleaned)
+    except ValueError:
+        try:
+            dt = parsedate_to_datetime(posted_date)
+        except (TypeError, ValueError):
+            if posted_date.isdigit():
+                try:
+                    ts = int(posted_date)
+                    if ts > 10_000_000_000:
+                        ts = ts / 1000
+                    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+                except (ValueError, OSError):
+                    return None
+            else:
+                return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt
+
+
+def canonicalize_posted_fields(posted_text: str, posted_date: str) -> Tuple[str, str, str]:
+    raw_text = normalize_text(posted_text or "")
+    relative_text = extract_relative_posted_text(raw_text)
+    parsed_date = parse_posted_date_value(posted_date or "")
+    normalized_date = parsed_date.isoformat() if parsed_date else ""
+
+    canonical_raw = relative_text or (raw_text if not normalized_date else "")
+    canonical_display = canonical_raw or normalized_date or raw_text
+    return canonical_display, canonical_raw, normalized_date
+
+
 def clean_link(url: str) -> str:
     if not url:
         return ""
@@ -226,27 +264,9 @@ def parse_posted_within_window(posted_text: str, posted_date: str, window_hours:
         return (number * 7 * 24) <= window_hours
 
     if posted_date:
-        try:
-            cleaned = posted_date.replace("Z", "+00:00")
-            dt = datetime.fromisoformat(cleaned)
-        except ValueError:
-            try:
-                dt = parsedate_to_datetime(posted_date)
-            except (TypeError, ValueError):
-                if posted_date.isdigit():
-                    try:
-                        ts = int(posted_date)
-                        if ts > 10_000_000_000:
-                            ts = ts / 1000
-                        dt = datetime.fromtimestamp(ts, tz=timezone.utc)
-                    except (ValueError, OSError):
-                        return False
-                else:
-                    return False
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        else:
-            dt = dt.astimezone(timezone.utc)
+        dt = parse_posted_date_value(posted_date)
+        if not dt:
+            return False
         return (now_utc() - dt) <= timedelta(hours=window_hours)
 
     return False

@@ -29,12 +29,13 @@ export {
 
 export const summaryLine = document.getElementById("summary-line");
 export const jobsContainer = document.getElementById("jobs");
-export const topPickContainer = document.getElementById("top-pick");
+// topPickContainer removed — unused
 export const sourceStatsContainer = document.getElementById("source-stats");
 export const refreshBtn = document.getElementById("refresh-btn");
 export const runNowBtn = document.getElementById("run-now-btn");
 export const runStatusLine = document.getElementById("run-status-line");
 export const dashboardStatsContainer = document.getElementById("dashboard-stats");
+export const appliedTrackerContainer = document.getElementById("applied-tracker");
 export const breadcrumbLine = document.getElementById("breadcrumb");
 export const alertBanner = document.getElementById("alert-banner");
 export const followUpBanner = document.getElementById("follow-up-banner");
@@ -161,6 +162,7 @@ export const getDoc = async (docRef) => {
     )}`
   );
   return {
+    exists: () => data?.data != null,
     data: () => data?.data || null,
   };
 };
@@ -203,6 +205,7 @@ export const state = {
     renderApplyHub: null,
     renderCvHub: null,
     renderDashboardStats: null,
+    renderAppliedTracker: null,
     renderPipelineView: null,
     renderFollowUps: null,
     renderFollowUpBanner: null,
@@ -393,6 +396,13 @@ export const isPostedToday = (job) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return date >= today;
+};
+
+export const safeHref = (url) => {
+  if (!url) return "#";
+  const trimmed = String(url).trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return "#";
 };
 
 export const escapeHtml = (value) => {

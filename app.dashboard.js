@@ -1,6 +1,7 @@
 import {
   state,
   dashboardStatsContainer,
+  appliedTrackerContainer,
   sourceStatsContainer,
   searchInput,
   followUpBanner,
@@ -176,6 +177,17 @@ const renderContractCalculator = () => {
   });
 
   updateResults();
+};
+
+const openJobFromDashboard = (jobId) => {
+  if (!jobId) return;
+  if (state.handlers.setActiveTab) state.handlers.setActiveTab("live");
+  window.setTimeout(() => {
+    state.selectedJobId = jobId;
+    if (state.handlers.renderJobs) state.handlers.renderJobs();
+    const target = document.querySelector(`.job-list-item[data-job-id="${jobId}"]`);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, 100);
 };
 
 const stripMarkdown = (value) =>
@@ -909,6 +921,95 @@ export const renderDashboardStats = (jobs) => {
   renderContractCalculator();
 };
 
+export const renderAppliedTracker = (jobs) => {
+  if (!appliedTrackerContainer) return;
+
+  const tracked = jobs
+    .filter((job) => {
+      const status = (job.application_status || "saved").toLowerCase();
+      return ["applied", "interview", "offer"].includes(status);
+    })
+    .sort((left, right) => {
+      const rightDate = parseDateValue(right.application_date || right.updated_at)?.getTime() || 0;
+      const leftDate = parseDateValue(left.application_date || left.updated_at)?.getTime() || 0;
+      return rightDate - leftDate;
+    });
+
+  const applied = tracked.filter((job) => (job.application_status || "").toLowerCase() === "applied");
+  const interview = tracked.filter((job) => (job.application_status || "").toLowerCase() === "interview");
+  const offer = tracked.filter((job) => (job.application_status || "").toLowerCase() === "offer");
+
+  const renderRows = (rows) => {
+    if (!rows.length) {
+      return `<div class="applied-tracker__empty">Nothing here yet.</div>`;
+    }
+    return rows
+      .slice(0, 6)
+      .map((job) => {
+        const appliedLabel = job.application_date ? formatInlineText(job.application_date.slice(0, 10)) : "Date not logged";
+        const nextAction = job.next_action ? escapeHtml(job.next_action) : "No next action";
+        return `
+          <button class="applied-tracker__item" data-job-id="${escapeHtml(job.id)}">
+            <div class="applied-tracker__item-top">
+              <strong>${escapeHtml(job.role)}</strong>
+              <span>${escapeHtml((job.application_status || "saved").replaceAll("_", " "))}</span>
+            </div>
+            <div class="applied-tracker__item-company">${escapeHtml(job.company || "Company not listed")}</div>
+            <div class="applied-tracker__item-meta">${escapeHtml(appliedLabel)} · ${nextAction}</div>
+          </button>
+        `;
+      })
+      .join("");
+  };
+
+  appliedTrackerContainer.innerHTML = `
+    <div class="applied-tracker">
+      <div class="applied-tracker__header">
+        <div>
+          <h3>Application tracker</h3>
+          <p>Quick view of what you already applied for and what needs follow-up.</p>
+        </div>
+        <button class="btn btn-tertiary applied-tracker__open-hub">Open Apply Hub</button>
+      </div>
+      <div class="applied-tracker__stats">
+        <div class="applied-tracker__stat">
+          <span>Applied</span>
+          <strong>${applied.length}</strong>
+        </div>
+        <div class="applied-tracker__stat">
+          <span>Interview</span>
+          <strong>${interview.length}</strong>
+        </div>
+        <div class="applied-tracker__stat">
+          <span>Offer</span>
+          <strong>${offer.length}</strong>
+        </div>
+      </div>
+      <div class="applied-tracker__columns">
+        <div class="applied-tracker__column">
+          <h4>Recently applied</h4>
+          ${renderRows(applied)}
+        </div>
+        <div class="applied-tracker__column">
+          <h4>Interview / offer</h4>
+          ${renderRows([...interview, ...offer])}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const openHub = appliedTrackerContainer.querySelector(".applied-tracker__open-hub");
+  if (openHub) {
+    openHub.addEventListener("click", () => {
+      if (state.handlers.setActiveTab) state.handlers.setActiveTab("top");
+    });
+  }
+
+  appliedTrackerContainer.querySelectorAll(".applied-tracker__item").forEach((item) => {
+    item.addEventListener("click", () => openJobFromDashboard(item.dataset.jobId));
+  });
+};
+
 export const renderPipelineView = (jobs) => {
   const container = document.getElementById("pipeline-view");
   if (!container) return;
@@ -1016,13 +1117,7 @@ export const renderFollowUps = (jobs) => {
   container.querySelectorAll(".follow-up-card").forEach((el) => {
     el.addEventListener("click", () => {
       const jobId = el.dataset.jobId;
-      if (state.handlers.setActiveTab) state.handlers.setActiveTab("live");
-      setTimeout(() => {
-        state.selectedJobId = jobId;
-        if (state.handlers.renderJobs) state.handlers.renderJobs();
-        const target = document.querySelector(`.job-list-item[data-job-id="${jobId}"]`);
-        if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 100);
+      openJobFromDashboard(jobId);
     });
   });
 
@@ -1034,7 +1129,8 @@ export const renderFollowUps = (jobs) => {
       if (!job) return;
       const current = parseDateValue(job.follow_up_date) || new Date();
       const next = new Date(current.getTime() + 24 * 60 * 60 * 1000);
-      const nextIso = `${next.toISOString().slice(0, 10)}T00:00:00.000Z`;
+      const pad = (n) => String(n).padStart(2, "0");
+      const nextIso = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}T00:00:00.000Z`;
       try {
         if (db) {
           await updateDoc(doc(db, collectionName, jobId), {
@@ -1169,6 +1265,7 @@ export const renderTriagePrompt = (jobs) => {
 };
 
 state.handlers.renderDashboardStats = renderDashboardStats;
+state.handlers.renderAppliedTracker = renderAppliedTracker;
 state.handlers.renderPipelineView = renderPipelineView;
 state.handlers.renderFollowUps = renderFollowUps;
 state.handlers.renderFollowUpBanner = renderFollowUpBanner;

@@ -68,8 +68,17 @@ def merge_records(primary: JobRecord, secondary: JobRecord) -> JobRecord:
         primary.job_status = secondary.job_status
     if secondary.posted_date and not primary.posted_date:
         primary.posted_date = secondary.posted_date
-    if secondary.posted_raw and not primary.posted_raw:
+    if secondary.posted_date and secondary.posted_date != primary.posted_date:
+        if secondary.posted_date > primary.posted_date:
+            primary.posted_date = secondary.posted_date
+            if secondary.posted:
+                primary.posted = secondary.posted
+            if secondary.posted_raw:
+                primary.posted_raw = secondary.posted_raw
+    if secondary.posted_raw and (not primary.posted_raw or not primary.posted_date):
         primary.posted_raw = secondary.posted_raw
+    if secondary.posted and not primary.posted:
+        primary.posted = secondary.posted
     if secondary.source_family and not primary.source_family:
         primary.source_family = secondary.source_family
     if secondary.ats_family and not primary.ats_family:

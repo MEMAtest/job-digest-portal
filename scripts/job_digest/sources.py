@@ -39,7 +39,7 @@ from .config import (
     select_company_batch,
 )
 from .models import JobRecord
-from .utils import clean_link, extract_relative_posted_text, normalize_text, trim_summary
+from .utils import canonicalize_posted_fields, clean_link, extract_relative_posted_text, normalize_text, trim_summary
 
 try:
     import feedparser
@@ -1185,7 +1185,7 @@ def build_manual_record(session: requests.Session, link: str) -> Optional[JobRec
     why_fit = build_reasons(full_text)
     cv_gap = build_gaps(full_text)
     preference_match = build_preference_match(full_text, company, location)
-    posted_value = posted_text or posted_date or ""
+    posted_value, posted_raw, normalized_posted_date = canonicalize_posted_fields(posted_text, posted_date)
 
     return JobRecord(
         role=title,
@@ -1193,8 +1193,8 @@ def build_manual_record(session: requests.Session, link: str) -> Optional[JobRec
         location=location or "Unknown",
         link=link,
         posted=posted_value,
-        posted_raw=posted_value,
-        posted_date=posted_date,
+        posted_raw=posted_raw,
+        posted_date=normalized_posted_date,
         source="Manual",
         fit_score=score,
         preference_match=preference_match,

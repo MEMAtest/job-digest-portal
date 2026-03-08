@@ -53,6 +53,7 @@ import { renderCvHub } from "./app.cvhub.js";
 import { loadBaseCvFromFirestore } from "./app.cv.js";
 import {
   renderDashboardStats,
+  renderAppliedTracker,
   renderPipelineView,
   renderFollowUps,
   renderFollowUpBanner,
@@ -157,6 +158,7 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
   await loadBaseCvFromFirestore();
 
   renderDashboardStats(jobs);
+  renderAppliedTracker(jobs);
   renderPipelineView(jobs);
   renderFollowUps(jobs);
   renderFollowUpBanner(jobs);
@@ -170,7 +172,7 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
   const freshTodayCount = state.jobs.filter(
     (job) => (job.application_status || "saved").toLowerCase() !== "dismissed" && isPostedToday(job)
   ).length;
-  summaryLine.textContent = `${jobs.length} roles loaded · ${freshTodayCount} fresh today · Last update ${nowLabel}`;
+  if (summaryLine) summaryLine.textContent = `${jobs.length} roles loaded · ${freshTodayCount} fresh today · Last update ${nowLabel}`;
   if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${nowLabel}`;
   if (lastUpdatedFooter) lastUpdatedFooter.textContent = `Updated: ${nowLabel}`;
 
@@ -395,19 +397,19 @@ const pollRunStatus = async (ref) => {
       const data = useProxy ? await fetchRunStatusViaProxy() : (await getDoc(ref)).data();
       const status = data?.status;
       if (status === "running") {
-        runStatusLine.textContent = "Running — fetching jobs…";
+        if (runStatusLine) runStatusLine.textContent = "Running — fetching jobs…";
       } else if (status === "done") {
-        runStatusLine.textContent = "Done — refreshing results…";
+        if (runStatusLine) runStatusLine.textContent = "Done — refreshing results…";
         return { status: "done", data };
       } else if (status === "error") {
         return { status: "error", data };
       } else {
-        runStatusLine.textContent = "Run triggered — waiting for Mac watcher (~2 min)…";
+        if (runStatusLine) runStatusLine.textContent = "Run triggered — waiting for Mac watcher (~2 min)…";
       }
     } catch (error) {
       if (isRecoverableFirestoreError(error)) {
         setProxyMode(true);
-        runStatusLine.textContent = "Browser blocked Firestore — using fallback polling…";
+        if (runStatusLine) runStatusLine.textContent = "Browser blocked Firestore — using fallback polling…";
         await wait(1000);
         continue;
       }
@@ -463,11 +465,11 @@ if (manualLinkSubmit) {
 setActiveTab("dashboard");
 
 const loadJobs = async () => {
-  summaryLine.textContent = "Fetching latest roles…";
+  if (summaryLine) summaryLine.textContent = "Fetching latest roles…";
   clearAlertBanner();
 
   if (!window.FIREBASE_CONFIG) {
-    summaryLine.textContent = "Missing Firebase config. Add config.js first.";
+    if (summaryLine) summaryLine.textContent = "Missing Firebase config. Add config.js first.";
     if (alertBanner) {
       alertBanner.classList.remove("hidden");
       alertBanner.innerHTML =
@@ -488,7 +490,7 @@ const loadJobs = async () => {
     const message = error?.message || "Unknown error";
     if (isRecoverableFirestoreError(error)) {
       setProxyMode(true);
-      summaryLine.textContent = "Browser blocked Firestore — using fallback.";
+      if (summaryLine) summaryLine.textContent = "Browser blocked Firestore — using fallback.";
       const proxyOk = await loadJobsViaProxy();
       if (proxyOk) {
         if (alertBanner) {
@@ -499,13 +501,13 @@ const loadJobs = async () => {
         }
         return;
       }
-      summaryLine.textContent = "Failed to load roles via fallback.";
+      if (summaryLine) summaryLine.textContent = "Failed to load roles via fallback.";
       showProxyConfigBanner(
         "<strong>Browser blocked Firestore:</strong> Direct access failed and the proxy fallback is not available."
       );
       return;
     }
-    summaryLine.textContent = `Failed to load roles: ${message}`;
+    if (summaryLine) summaryLine.textContent = `Failed to load roles: ${message}`;
     if (alertBanner) {
       alertBanner.classList.remove("hidden");
       const lower = String(message).toLowerCase();
@@ -519,20 +521,24 @@ const loadJobs = async () => {
   }
 };
 
-refreshBtn.addEventListener("click", loadJobs);
-searchInput.addEventListener("input", renderJobs);
-minFitSelect.addEventListener("change", renderJobs);
-sourceSelect.addEventListener("change", renderJobs);
+if (refreshBtn) refreshBtn.addEventListener("click", loadJobs);
+if (searchInput) searchInput.addEventListener("input", renderJobs);
+if (minFitSelect) minFitSelect.addEventListener("change", renderJobs);
+if (sourceSelect) sourceSelect.addEventListener("change", renderJobs);
 if (sourceFamilySelect) sourceFamilySelect.addEventListener("change", renderJobs);
-locationSelect.addEventListener("change", renderJobs);
-statusSelect.addEventListener("change", renderJobs);
-ukOnlyCheckbox.addEventListener("change", renderJobs);
+if (locationSelect) locationSelect.addEventListener("change", renderJobs);
+if (statusSelect) statusSelect.addEventListener("change", renderJobs);
+if (ukOnlyCheckbox) ukOnlyCheckbox.addEventListener("change", renderJobs);
 
-runNowBtn.addEventListener("click", async () => {
+if (runNowBtn) runNowBtn.addEventListener("click", async () => {
   runNowBtn.disabled = true;
   runNowBtn.textContent = "Triggering…";
-  runStatusLine.textContent = "Sending run request…";
-  runStatusLine.classList.remove("hidden");
+  if (runStatusLine) {
+  if (runStatusLine) {
+    runStatusLine.textContent = "Sending run request…";
+    runStatusLine.classList.remove("hidden");
+  }
+  }
 
   try {
     const ref = await triggerRunRequest();
@@ -540,27 +546,27 @@ runNowBtn.addEventListener("click", async () => {
 
     if (result.status === "done") {
       await loadJobs();
-      runStatusLine.textContent = "Complete.";
+      if (runStatusLine) runStatusLine.textContent = "Complete.";
     } else if (result.status === "error") {
       const tail = result.data?.error_tail ? `\n${result.data.error_tail}` : "";
-      runStatusLine.textContent = `Run failed — check watcher log on Mac.${tail}`;
+      if (runStatusLine) runStatusLine.textContent = `Run failed — check watcher log on Mac.${tail}`;
     } else if (result.status === "timeout") {
-      runStatusLine.textContent = "Timed out — run may still complete in background.";
+      if (runStatusLine) runStatusLine.textContent = "Timed out — run may still complete in background.";
     }
   } catch (error) {
     console.error("Poll error:", error);
     const message = String(error?.message || error || "");
     if (message.toLowerCase().includes("missing firebase config")) {
-      runStatusLine.textContent = "Missing Firebase config.";
+      if (runStatusLine) runStatusLine.textContent = "Missing Firebase config.";
     } else if (isRecoverableFirestoreError(error)) {
       setProxyMode(true);
-      runStatusLine.textContent = "Browser blocked Firestore — refresh is using fallback.";
+      if (runStatusLine) runStatusLine.textContent = "Browser blocked Firestore — refresh is using fallback.";
       const proxyOk = await loadJobsViaProxy();
       if (!proxyOk) {
-        runStatusLine.textContent = "Polling failed and fallback refresh was unavailable.";
+        if (runStatusLine) runStatusLine.textContent = "Polling failed and fallback refresh was unavailable.";
       }
     } else {
-      runStatusLine.textContent = "Connection error during polling.";
+      if (runStatusLine) runStatusLine.textContent = "Connection error during polling.";
     }
   } finally {
     runNowBtn.disabled = false;

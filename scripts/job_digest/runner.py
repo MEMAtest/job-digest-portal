@@ -45,6 +45,7 @@ from .sources import (
 )
 from .summary import build_email_html, build_sources_summary, send_email
 from .utils import (
+    canonicalize_posted_fields,
     filter_new_records,
     load_run_state,
     load_seen_cache,
@@ -57,6 +58,10 @@ from .utils import (
     should_run_now,
     _parse_run_time,
 )
+
+
+def normalize_posted(job: dict) -> tuple[str, str, str]:
+    return canonicalize_posted_fields(job.get("posted_text", "") or job.get("posted", ""), job.get("posted_date", ""))
 
 try:
     from zoneinfo import ZoneInfo
@@ -122,9 +127,10 @@ def main() -> None:
         if not is_relevant_location(location, desc_text):
             continue
 
-        posted_text = posted_detail or job.get("posted_text", "")
-        posted_date = job.get("posted_date", "")
-        if not parse_posted_within_window(posted_text, posted_date, config.WINDOW_HOURS):
+        posted_display, posted_raw, posted_date = normalize_posted(
+            {"posted_text": posted_detail or job.get("posted_text", ""), "posted_date": job.get("posted_date", "")}
+        )
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
         summary = desc_text[:500]
@@ -144,8 +150,8 @@ def main() -> None:
                 company=company,
                 location=location,
                 link=job.get("link", ""),
-                posted=posted_text,
-                posted_raw=posted_text,
+                posted=posted_display,
+                posted_raw=posted_raw,
                 posted_date=posted_date,
                 source="LinkedIn",
                 source_family="Aggregator",
@@ -168,9 +174,8 @@ def main() -> None:
         if not is_relevant_location(location):
             continue
 
-        posted_text = job.get("posted_text", "")
-        posted_date = job.get("posted_date", "")
-        if not parse_posted_within_window(posted_text, posted_date, config.WINDOW_HOURS):
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
         summary = job.get("summary", "")
@@ -189,8 +194,8 @@ def main() -> None:
                 company=company,
                 location=location,
                 link=job.get("link", ""),
-                posted=posted_text or posted_date,
-                posted_raw=posted_text or posted_date,
+                posted=posted_display,
+                posted_raw=posted_raw,
                 posted_date=posted_date,
                 source="Greenhouse",
                 source_family="ATS",
@@ -214,9 +219,8 @@ def main() -> None:
         if not is_relevant_location(location):
             continue
 
-        posted_text = job.get("posted_text", "")
-        posted_date = job.get("posted_date", "")
-        if not parse_posted_within_window(posted_text, posted_date, config.WINDOW_HOURS):
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
         summary = job.get("summary", "")
@@ -235,8 +239,8 @@ def main() -> None:
                 company=company,
                 location=location,
                 link=job.get("link", ""),
-                posted=posted_text or posted_date,
-                posted_raw=posted_text or posted_date,
+                posted=posted_display,
+                posted_raw=posted_raw,
                 posted_date=posted_date,
                 source="Lever",
                 source_family="ATS",
@@ -260,9 +264,8 @@ def main() -> None:
         if not is_relevant_location(location):
             continue
 
-        posted_text = job.get("posted_text", "")
-        posted_date = job.get("posted_date", "")
-        if not parse_posted_within_window(posted_text, posted_date, config.WINDOW_HOURS):
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
         summary = job.get("summary", "")
@@ -281,8 +284,8 @@ def main() -> None:
                 company=company,
                 location=location,
                 link=job.get("link", ""),
-                posted=posted_text or posted_date,
-                posted_raw=posted_text or posted_date,
+                posted=posted_display,
+                posted_raw=posted_raw,
                 posted_date=posted_date,
                 source="SmartRecruiters",
                 source_family="ATS",
@@ -306,9 +309,8 @@ def main() -> None:
         if not is_relevant_location(location):
             continue
 
-        posted_text = job.get("posted_text", "")
-        posted_date = job.get("posted_date", "")
-        if not parse_posted_within_window(posted_text, posted_date, config.WINDOW_HOURS):
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
         summary = job.get("summary", "")
@@ -327,8 +329,8 @@ def main() -> None:
                 company=company,
                 location=location,
                 link=job.get("link", ""),
-                posted=posted_text or posted_date,
-                posted_raw=posted_text or posted_date,
+                posted=posted_display,
+                posted_raw=posted_raw,
                 posted_date=posted_date,
                 source="Ashby",
                 source_family="ATS",
@@ -352,9 +354,8 @@ def main() -> None:
         if not is_relevant_location(location):
             continue
 
-        posted_text = job.get("posted_text", "")
-        posted_date = job.get("posted_date", "")
-        if not parse_posted_within_window(posted_text, posted_date, config.WINDOW_HOURS):
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
         summary = job.get("summary", "")
@@ -373,8 +374,8 @@ def main() -> None:
                 company=company,
                 location=location,
                 link=job.get("link", ""),
-                posted=posted_text or posted_date,
-                posted_raw=posted_text or posted_date,
+                posted=posted_display,
+                posted_raw=posted_raw,
                 posted_date=posted_date,
                 source="Workable",
                 source_family="ATS",
@@ -400,9 +401,8 @@ def main() -> None:
         if not is_relevant_location(location, summary):
             continue
 
-        posted_text = job.get("posted_text", "")
-        posted_date = job.get("posted_date", "")
-        if not parse_posted_within_window(posted_text, posted_date, config.WINDOW_HOURS):
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
         full_text = f"{title} {company} {summary}"
@@ -420,8 +420,8 @@ def main() -> None:
                 company=company,
                 location=location,
                 link=job.get("link", ""),
-                posted=posted_text or posted_date,
-                posted_raw=posted_text or posted_date,
+                posted=posted_display,
+                posted_raw=posted_raw,
                 posted_date=posted_date,
                 source=job.get("source", "Job board"),
                 source_family="JobBoard",

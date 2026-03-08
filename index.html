@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Job Digest Portal</title>
+    <title>Make Money</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -57,7 +57,55 @@
             <span id="last-updated-label">Updated: --</span>
           </div>
         <button id="notify-toggle" class="btn-notify">Enable notifications</button>
+        <button id="settings-gear" class="btn-settings-gear" aria-label="Notification settings" title="Notification settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
       </aside>
+
+      <!-- Settings Modal -->
+      <div id="settings-modal" class="settings-modal hidden">
+        <div class="settings-modal__backdrop"></div>
+        <div class="settings-modal__content">
+          <div class="settings-modal__header">
+            <h3>Notification Settings</h3>
+            <button class="settings-modal__close" aria-label="Close">&times;</button>
+          </div>
+          <div class="settings-modal__body">
+            <div class="settings-section">
+              <h4>Push Notifications</h4>
+              <label class="settings-toggle">
+                <span>Enable push</span>
+                <input type="checkbox" id="settings-push-enabled" />
+                <span class="settings-toggle__slider"></span>
+              </label>
+            </div>
+            <div class="settings-section">
+              <h4>New Job Alerts</h4>
+              <label class="settings-toggle">
+                <span>High-fit jobs</span>
+                <input type="checkbox" id="settings-new-jobs" checked />
+                <span class="settings-toggle__slider"></span>
+              </label>
+              <label class="settings-range">
+                <span>Min fit score: <strong id="settings-min-fit-label">80</strong>%</span>
+                <input type="range" id="settings-min-fit" min="60" max="100" step="5" value="80" />
+              </label>
+            </div>
+            <div class="settings-section">
+              <h4>Follow-up Reminders</h4>
+              <label class="settings-toggle">
+                <span>Due follow-ups</span>
+                <input type="checkbox" id="settings-follow-ups" checked />
+                <span class="settings-toggle__slider"></span>
+              </label>
+            </div>
+            <div class="settings-status" id="settings-status">Status: Not subscribed</div>
+          </div>
+        </div>
+      </div>
 
       <main class="content">
         <header class="topbar">
@@ -79,6 +127,7 @@
           <section id="follow-up-banner" class="banner hidden"></section>
           <section id="triage-prompt" class="banner hidden"></section>
           <section id="dashboard-stats" class="stats-grid"></section>
+          <section id="applied-tracker"></section>
           <section id="adjacent-roles"></section>
           <section id="pipeline-view"></section>
           <section id="follow-ups"></section>
@@ -88,6 +137,13 @@
 
         <section class="tab-section hidden" data-tab="live">
           <section class="filters">
+            <div class="live-state-tabs">
+              <button id="quick-today" class="btn btn-primary">Fresh today</button>
+              <button id="quick-inbox" class="btn btn-tertiary">Inbox</button>
+              <button id="quick-applied" class="btn btn-tertiary">Applied</button>
+              <button id="quick-shortlisted" class="btn btn-tertiary">Shortlisted</button>
+              <button id="quick-all" class="btn btn-tertiary">All roles</button>
+            </div>
             <div class="filter">
               <label for="search">Search</label>
               <input id="search" type="text" placeholder="Search role or company…" />
@@ -139,11 +195,6 @@
               </label>
             </div>
             <div class="filter quick-filter-buttons">
-              <button id="quick-all" class="btn btn-tertiary">All roles</button>
-              <button id="quick-today" class="btn btn-primary">Today</button>
-              <button id="quick-inbox" class="btn btn-tertiary">Inbox</button>
-              <button id="quick-shortlisted" class="btn btn-tertiary">Shortlisted</button>
-              <button id="quick-applied" class="btn btn-tertiary">Applied</button>
               <button id="quick-dismissed" class="btn btn-tertiary">Dismissed</button>
             </div>
           </section>
