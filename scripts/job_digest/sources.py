@@ -2084,9 +2084,105 @@ def weloveproduct_search(session: requests.Session) -> List[Dict[str, str]]:
     return jobs
 
 
+def workinstartups_search(session: requests.Session) -> List[Dict[str, str]]:
+    jobs: List[Dict[str, str]] = []
+    base_url = "https://workinstartups.com"
+    headers = {"User-Agent": USER_AGENT}
+    job_map: Dict[str, Dict[str, str]] = {}
+
+    search_urls = [f"{base_url}/job-board/jobs-in/london?f=7"]
+    for keyword in BOARD_KEYWORDS[:3]:
+        slug = slugify(keyword)
+        search_urls.append(f"{base_url}/job-board/jobs-in/london/{slug}?f=7")
+
+    for search_url in search_urls:
+        try:
+            resp = session.get(search_url, headers=headers, timeout=30)
+        except requests.RequestException:
+            continue
+        if resp.status_code != 200:
+            continue
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for anchor in soup.find_all("a", href=True):
+            href = anchor.get("href", "")
+            if "/details/" not in href:
+                continue
+            if href.startswith("/"):
+                href = urljoin(base_url, href)
+            href = clean_link(href)
+            if not href or href in job_map:
+                continue
+            title = normalize_text(anchor.get_text(" "))
+            if len(title) < 4:
+                continue
+
+            company = ""
+            location = ""
+            posted_text = ""
+            container = anchor.parent
+            for _ in range(4):
+                if not container:
+                    break
+                text_blob = normalize_text(container.get_text(" "))
+                if not company:
+                    company_el = container.find(
+                        "span", class_=re.compile(r"company|employer", re.I)
+                    ) or container.find("div", class_=re.compile(r"company|employer", re.I))
+                    if company_el:
+                        company = normalize_text(company_el.get_text(" "))
+                if not location:
+                    loc_el = container.find(
+                        "span", class_=re.compile(r"location|place", re.I)
+                    ) or container.find("div", class_=re.compile(r"location|place", re.I))
+                    if loc_el:
+                        location = normalize_text(loc_el.get_text(" "))
+                if not posted_text:
+                    posted_text = extract_relative_posted_text(text_blob)
+                container = container.parent
+
+            job_map[href] = {
+                "title": title,
+                "company": company or "WorkInStartups",
+                "location": location or "London",
+                "link": href,
+                "posted_text": posted_text,
+                "posted_date": "",
+                "summary": "",
+                "source": "WorkInStartups",
+            }
+        time.sleep(0.3)
+
+    detail_links = list(job_map.keys())[:12]
+    for link in detail_links:
+        try:
+            resp = session.get(link, headers=headers, timeout=30)
+        except requests.RequestException:
+            continue
+        if resp.status_code != 200:
+            continue
+        details = parse_job_detail_jsonld(resp.text, job_map[link]["title"])
+        if details:
+            job_map[link]["title"] = details.get("title") or job_map[link]["title"]
+            job_map[link]["company"] = details.get("company") or job_map[link]["company"]
+            job_map[link]["location"] = details.get("location") or job_map[link]["location"]
+            job_map[link]["posted_date"] = details.get("posted_date") or job_map[link]["posted_date"]
+            if details.get("summary"):
+                job_map[link]["summary"] = details["summary"]
+        if not job_map[link]["posted_text"] and not job_map[link]["posted_date"]:
+            posted_text = extract_relative_posted_text(resp.text)
+            if posted_text:
+                job_map[link]["posted_text"] = posted_text
+        time.sleep(0.2)
+
+    jobs.extend(job_map.values())
+    return jobs
+
+
 def job_board_search(session: requests.Session) -> List[Dict[str, str]]:
     jobs: List[Dict[str, str]] = []
     for source in JOB_BOARD_SOURCES:
+        before = len(jobs)
         if source["type"] == "rss":
             jobs.extend(rss_search(session, source["url"], source["name"]))
         elif source["type"] == "api":
@@ -2127,4 +2223,16 @@ def job_board_search(session: requests.Session) -> List[Dict[str, str]]:
                 jobs.extend(efinancialcareers_search(session))
             elif source["name"] == "IndeedUK":
                 jobs.extend(indeed_search(session))
+            elif source["name"] == "WorkInStartups":
+                jobs.extend(workinstartups_search(session))
+        count = len(jobs) - before
+        if count > 0:
+            print(f"  [{source['name']}] {count} jobs found")
+        else:
+            reason = ""
+            if source["name"] == "IndeedUK":
+                reason = " (likely blocked by anti-scraping)"
+            elif source["name"] in ("Adzuna", "Jooble", "Reed", "CVLibrary"):
+                reason = " (API key not configured?)"
+            print(f"  [{source['name']}] 0 jobs found{reason}")
     return jobs

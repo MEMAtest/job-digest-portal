@@ -217,6 +217,7 @@ JOB_BOARD_SOURCES = [
     {"name": "IndeedUK", "type": "html", "url": "https://uk.indeed.com"},
     {"name": "Workday", "type": "api", "url": "workday"},
     {"name": "JobServe", "type": "html", "url": "https://jobserve.com/gb/en/Job-Search/"},
+    {"name": "WorkInStartups", "type": "html", "url": "https://workinstartups.com"},
 ]
 
 JOB_BOARD_URLS = {source["name"]: source["url"] for source in JOB_BOARD_SOURCES}
