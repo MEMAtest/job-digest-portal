@@ -714,8 +714,12 @@ export const renderDashboardStats = (jobs) => {
   startYesterday.setDate(startYesterday.getDate() - 1);
 
   const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
-  const freshToday = jobs.filter((job) => isPostedToday(job)).length;
-  const freshLast72 = jobs.filter((job) => isFreshWithinHours(job, 72, now)).length;
+  const freshToday = jobs.filter(
+    (job) => safeStatus(job) !== "dismissed" && isPostedToday(job)
+  ).length;
+  const freshLast72 = jobs.filter(
+    (job) => safeStatus(job) !== "dismissed" && isFreshWithinHours(job, 72, now)
+  ).length;
 
   const appliedToday = jobs.filter((job) => {
     if (safeStatus(job) !== "applied") return false;
