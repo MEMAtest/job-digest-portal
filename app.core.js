@@ -305,7 +305,7 @@ export const formatPostedMeta = (job) => {
   const exactDate = parseDateValue(job.posted_date);
   const exact = exactDate ? formatExactDate(exactDate) : "";
 
-  if (exactDate) return `${formatRelativeFromDate(exactDate)} · ${exact}`;
+  if (exactDate) return `${exact} · ${formatRelativeFromDate(exactDate)}`;
   if (relative) return formatPosted(relative);
   if (exact) return exact;
   return "Date unavailable";

@@ -103,8 +103,8 @@ def canonicalize_posted_fields(posted_text: str, posted_date: str) -> Tuple[str,
     parsed_date = parse_posted_date_value(posted_date or "")
     normalized_date = parsed_date.isoformat() if parsed_date else ""
 
-    canonical_raw = relative_text or (raw_text if not normalized_date else "")
-    canonical_display = canonical_raw or normalized_date or raw_text
+    canonical_raw = relative_text if not normalized_date else ""
+    canonical_display = normalized_date or canonical_raw or raw_text
     return canonical_display, canonical_raw, normalized_date
 
 
