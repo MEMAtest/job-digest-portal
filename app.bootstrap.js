@@ -67,6 +67,7 @@ import { closePrepMode, switchPrepTab } from "./app.prep.js";
 import { closeTriageMode, handleTriageAction } from "./app.triage.js";
 
 const setActiveTab = (tabId) => {
+  const topbarActions = document.querySelector(".topbar-actions");
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.classList.toggle("nav-item--active", btn.dataset.tab === tabId);
   });
@@ -81,6 +82,9 @@ const setActiveTab = (tabId) => {
   if (tabId !== "live") {
     state.selectedJobs.clear();
     if (state.handlers.updateBulkBar) state.handlers.updateBulkBar();
+  }
+  if (topbarActions) {
+    topbarActions.classList.toggle("hidden", !["dashboard", "live"].includes(tabId));
   }
   // CV Hub rendered eagerly on load; the cvpage tab reveals it
 };
@@ -327,6 +331,8 @@ const quickShortlisted = document.getElementById("quick-shortlisted");
 const quickDismissed = document.getElementById("quick-dismissed");
 const quickToday = document.getElementById("quick-today");
 const quickAll = document.getElementById("quick-all");
+const quickInbox = document.getElementById("quick-inbox");
+const quickApplied = document.getElementById("quick-applied");
 if (quickAll) {
   quickAll.addEventListener("click", () => {
     resetFilters();
@@ -336,11 +342,16 @@ if (quickAll) {
 if (quickToday) {
   quickToday.addEventListener("click", () => {
     applyQuickFilter({
-      label: "Posted today",
+      label: "Fresh today",
       predicate: (job) => isPostedToday(job),
       status: "",
       resetFilters: true,
     });
+  });
+}
+if (quickInbox) {
+  quickInbox.addEventListener("click", () => {
+    applyQuickFilter({ label: "New inbox", status: "saved", resetFilters: true });
   });
 }
 if (quickShortlisted) {
@@ -348,6 +359,11 @@ if (quickShortlisted) {
     resetFilters({ keepStatus: true });
     if (statusSelect) statusSelect.value = "shortlisted";
     renderJobs();
+  });
+}
+if (quickApplied) {
+  quickApplied.addEventListener("click", () => {
+    applyQuickFilter({ label: "Applied roles", status: "applied", resetFilters: true });
   });
 }
 if (quickDismissed) {

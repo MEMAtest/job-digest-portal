@@ -2,6 +2,7 @@ import {
   state,
   dashboardStatsContainer,
   sourceStatsContainer,
+  searchInput,
   followUpBanner,
   triagePrompt,
   db,
@@ -19,6 +20,7 @@ import {
   isPostedToday,
   TRIAGE_PROMPT_THRESHOLD,
   applyQuickFilter,
+  resetFilters,
   showToast,
   inferAtsFamily,
   inferSourceFamily,
@@ -31,6 +33,7 @@ const prepDetailMeta = document.getElementById("prep-detail-meta");
 const prepDetailTabs = document.getElementById("prep-detail-tabs");
 const prepDetailContent = document.getElementById("prep-detail-content");
 const contractCalculator = document.getElementById("contract-calculator");
+const adjacentRolesContainer = document.getElementById("adjacent-roles");
 
 let prepActiveSection = null;
 let prepActiveTab = "star";
@@ -73,40 +76,46 @@ const renderContractCalculator = () => {
   const current = readContractSettings();
 
   contractCalculator.innerHTML = `
-    <div class="contract-card__header">
-      <div>
-        <h3>Contract rate calculator</h3>
-        <p>Estimate gross earnings from day rates (no tax applied).</p>
+    <details class="contract-card__details">
+      <summary class="contract-card__summary">
+        <div class="contract-card__header">
+          <div>
+            <h3>Contract rate calculator</h3>
+            <p>Collapsed by default. Open only when you want to price a contract day rate.</p>
+          </div>
+        </div>
+      </summary>
+      <div class="contract-card__body">
+        <div class="contract-grid">
+          <div class="contract-field">
+            <label>Day rate (min)</label>
+            <input type="number" class="contract-input" data-field="minRate" min="0" value="${current.minRate}" placeholder="e.g. 650" />
+          </div>
+          <div class="contract-field">
+            <label>Day rate (max)</label>
+            <input type="number" class="contract-input" data-field="maxRate" min="0" value="${current.maxRate}" placeholder="e.g. 825" />
+          </div>
+          <div class="contract-field">
+            <label>Days per week</label>
+            <input type="number" class="contract-input" data-field="daysPerWeek" min="1" max="7" value="${current.daysPerWeek}" placeholder="e.g. 5" />
+          </div>
+          <div class="contract-field">
+            <label>Weeks per year</label>
+            <input type="number" class="contract-input" data-field="weeksPerYear" min="1" max="52" value="${current.weeksPerYear}" placeholder="e.g. 46" />
+          </div>
+        </div>
+        <div class="contract-results">
+          <div class="contract-result" data-result="min">
+            <span class="contract-result__label">Min rate estimate</span>
+            <span class="contract-result__value">—</span>
+          </div>
+          <div class="contract-result" data-result="max">
+            <span class="contract-result__label">Max rate estimate</span>
+            <span class="contract-result__value">—</span>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="contract-grid">
-      <div class="contract-field">
-        <label>Day rate (min)</label>
-        <input type="number" class="contract-input" data-field="minRate" min="0" value="${current.minRate}" placeholder="e.g. 650" />
-      </div>
-      <div class="contract-field">
-        <label>Day rate (max)</label>
-        <input type="number" class="contract-input" data-field="maxRate" min="0" value="${current.maxRate}" placeholder="e.g. 825" />
-      </div>
-      <div class="contract-field">
-        <label>Days per week</label>
-        <input type="number" class="contract-input" data-field="daysPerWeek" min="1" max="7" value="${current.daysPerWeek}" placeholder="e.g. 5" />
-      </div>
-      <div class="contract-field">
-        <label>Weeks per year</label>
-        <input type="number" class="contract-input" data-field="weeksPerYear" min="1" max="52" value="${current.weeksPerYear}" placeholder="e.g. 46" />
-      </div>
-    </div>
-    <div class="contract-results">
-      <div class="contract-result" data-result="min">
-        <span class="contract-result__label">Min rate estimate</span>
-        <span class="contract-result__value">—</span>
-      </div>
-      <div class="contract-result" data-result="max">
-        <span class="contract-result__label">Max rate estimate</span>
-        <span class="contract-result__value">—</span>
-      </div>
-    </div>
+    </details>
   `;
 
   const formatter = new Intl.NumberFormat("en-GB", {
@@ -236,7 +245,6 @@ const buildPrepCards = () => {
   const stats = normaliseList(prep.key_stats || []);
   const strengths = normaliseList(prep.strengths || []);
   const risks = normaliseList(prep.risk_mitigations || []);
-  const roles = normaliseList(suggestions.roles || []);
 
   return [
     {
@@ -280,12 +288,6 @@ const buildPrepCards = () => {
       title: "Risk Mitigations",
       meta: `${risks.length} items`,
       preview: truncateText(stripMarkdown(risks[0] || "Not available yet.")),
-    },
-    {
-      id: "adjacent_roles",
-      title: "Adjacent Roles",
-      meta: `${roles.length} roles`,
-      preview: truncateText(stripMarkdown(roles[0] || "Not available yet.")),
     },
   ];
 };
@@ -449,20 +451,6 @@ const renderPrepDetail = () => {
     return;
   }
 
-  if (prepActiveSection === "adjacent_roles") {
-    const roles = normaliseList(suggestions.roles || []);
-    prepDetailTitle.textContent = "Adjacent Roles";
-    prepDetailMeta.textContent = `${roles.length} roles to consider.`;
-    prepDetailContent.innerHTML = `
-      <details class="prep-detail-card">
-        <summary>Roles to consider</summary>
-        <div class="prep-detail-card__body">${formatList(roles)}</div>
-      </details>
-      ${suggestions.rationale ? `<details class="prep-detail-card"><summary>Why these roles</summary><div class="prep-detail-card__body">${formatInlineText(suggestions.rationale)}</div></details>` : ""}
-    `;
-    return;
-  }
-
   prepDetailContent.innerHTML = `<div class="prep-detail-empty">Select a card to view details.</div>`;
 };
 
@@ -611,6 +599,7 @@ export const renderSourceStats = (statsDocs) => {
           <div class="source-mix__row-main">
             <div class="source-mix__source-name">${escapeHtml(source)}</div>
             <div class="source-mix__row-sub">Today ${todayCount} · 3-day ${threeCount}</div>
+            <div class="source-mix__bar" aria-hidden="true"><span style="width:${Math.max(threePct, 4)}%"></span></div>
           </div>
           <div class="source-mix__metrics">
             <div class="source-mix__metric">
@@ -670,6 +659,45 @@ export const renderSourceStats = (statsDocs) => {
 
 export const renderRoleSuggestions = (doc) => {
   state.roleSuggestions = doc || null;
+  const roles = normaliseList(doc?.roles || []);
+  if (adjacentRolesContainer) {
+    if (!roles.length) {
+      adjacentRolesContainer.innerHTML = "";
+    } else {
+      adjacentRolesContainer.innerHTML = `
+        <div class="adjacent-roles-card">
+          <div class="adjacent-roles-card__header">
+            <div>
+              <h3>Adjacent roles being searched</h3>
+              <p>These should surface in the scraper feed, not just inside preparation.</p>
+            </div>
+          </div>
+          <div class="adjacent-roles-card__chips">
+            ${roles
+              .map(
+                (role) =>
+                  `<button class="adjacent-role-chip" data-role="${escapeHtml(role)}">${escapeHtml(role)}</button>`
+              )
+              .join("")}
+          </div>
+          ${
+            doc?.rationale
+              ? `<div class="adjacent-roles-card__note">${formatInlineText(doc.rationale)}</div>`
+              : ""
+          }
+        </div>
+      `;
+      adjacentRolesContainer.querySelectorAll(".adjacent-role-chip").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const role = btn.dataset.role || "";
+          resetFilters();
+          if (searchInput) searchInput.value = role;
+          applyQuickFilter({ label: `Adjacent role: ${role}` });
+          if (state.handlers.setActiveTab) state.handlers.setActiveTab("live");
+        });
+      });
+    }
+  }
   renderPrepBoard();
 };
 
@@ -683,6 +711,12 @@ const getPostedValue = (job) => job?.posted_raw || job?.posted || job?.posted_da
 const isFreshWithinHours = (job, hours, now = new Date()) => {
   if (!job) return false;
   if (hours <= 24 && isPostedToday(job)) return true;
+
+  const exactDate = parseDateValue(job.posted_date);
+  if (exactDate) {
+    const threshold = new Date(now.getTime() - hours * 60 * 60 * 1000);
+    return exactDate >= threshold;
+  }
 
   const raw = String(getPostedValue(job) || "").trim().toLowerCase();
   const threshold = new Date(now.getTime() - hours * 60 * 60 * 1000);

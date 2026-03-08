@@ -162,6 +162,10 @@ body {
   gap: 12px;
 }
 
+.topbar-actions.hidden {
+  display: none;
+}
+
 .btn {
   padding: 10px 16px;
   border-radius: 10px;
@@ -729,6 +733,22 @@ body {
   color: #64748b;
 }
 
+.source-mix__bar {
+  margin-top: 8px;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.source-mix__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f46e5, #60a5fa);
+}
+
 .source-mix__metrics {
   display: grid;
   grid-template-columns: repeat(5, minmax(72px, 1fr));
@@ -894,6 +914,50 @@ body {
   margin-bottom: 24px;
 }
 
+.contract-card__details {
+  border: 0;
+}
+
+.contract-card__summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.contract-card__summary::-webkit-details-marker {
+  display: none;
+}
+
+.contract-card__summary::marker {
+  content: "";
+}
+
+.contract-card__summary .contract-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.contract-card__summary .contract-card__header::after {
+  content: "Open";
+  font-size: 12px;
+  font-weight: 700;
+  color: #3730a3;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: 6px 10px;
+  flex-shrink: 0;
+}
+
+.contract-card__details[open] .contract-card__summary .contract-card__header::after {
+  content: "Hide";
+}
+
+.contract-card__body {
+  margin-top: 12px;
+}
+
 .contract-card__header h3 {
   margin: 0 0 4px;
   font-size: 18px;
@@ -963,6 +1027,62 @@ body {
   font-size: 15px;
   font-weight: 600;
   color: #0f172a;
+}
+
+#adjacent-roles {
+  margin-bottom: 24px;
+}
+
+.adjacent-roles-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.04);
+}
+
+.adjacent-roles-card__header h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.adjacent-roles-card__header p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.adjacent-roles-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.adjacent-role-chip {
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.adjacent-role-chip:hover {
+  background: #e0e7ff;
+}
+
+.adjacent-roles-card__note {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #334155;
 }
 
 .job-card {

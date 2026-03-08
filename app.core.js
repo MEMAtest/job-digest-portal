@@ -277,6 +277,37 @@ export const formatPosted = (value) => {
   return text;
 };
 
+const formatExactDate = (date) =>
+  date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
+const formatRelativeFromDate = (date) => {
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((today.getTime() - target.getTime()) / 86400000);
+
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return `${diffDays} days ago`;
+};
+
+export const formatPostedMeta = (job) => {
+  if (!job) return "Date unavailable";
+  const relative = String(job.posted_raw || job.posted || "").trim();
+  const exactDate = parseDateValue(job.posted_date);
+  const exact = exactDate ? formatExactDate(exactDate) : "";
+
+  if (exactDate) return `${formatRelativeFromDate(exactDate)} · ${exact}`;
+  if (relative) return formatPosted(relative);
+  if (exact) return exact;
+  return "Date unavailable";
+};
+
 export const isUkOrRemote = (location) => {
   if (!location) return false;
   const loc = location.toLowerCase();
@@ -338,7 +369,13 @@ export const parseDateValue = (value) => {
 
 export const isPostedToday = (job) => {
   if (!job) return false;
-  const raw = job.posted_raw || job.posted || job.posted_date || "";
+  const exactDate = parseDateValue(job.posted_date);
+  if (exactDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return exactDate >= today;
+  }
+  const raw = job.posted_raw || job.posted || "";
   if (!raw) return false;
   const text = String(raw).toLowerCase();
   if (

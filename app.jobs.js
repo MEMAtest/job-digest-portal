@@ -18,6 +18,7 @@ import {
   formatFitBadge,
   getLocationBadgeClass,
   formatPosted,
+  formatPostedMeta,
   formatDismissReason,
   isUkOrRemote,
   escapeHtml,
@@ -560,14 +561,14 @@ const renderJobDetail = (job, detailEl) => {
   const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
   const lastTouchDate = job.last_touch_date ? job.last_touch_date.slice(0, 10) : "";
   const dismissNote = statusValue === "dismissed" ? formatDismissReason(job.dismiss_reason) : "";
-  const postedDisplay = job.posted_raw || job.posted || job.posted_date || "";
+  const postedDisplay = formatPostedMeta(job);
   const applicantDisplay = job.applicant_count ? `${job.applicant_count} applicants` : "";
   const openStatus =
     job.job_status ||
     (job.is_open === true ? "Open" : "") ||
     (job.is_open === false ? "Closed" : "") ||
     (job.is_closed ? "Closed" : "");
-  const metaParts = [formatPosted(postedDisplay), job.source, applicantDisplay, openStatus].filter(Boolean);
+  const metaParts = [postedDisplay, job.source, applicantDisplay, openStatus].filter(Boolean);
   const metaLine = metaParts.join(" · ");
   const isManual = job.manual_link || job.source === "Manual";
   const manualBadge = isManual ? `<span class="badge badge--manual">Pasted</span>` : "";
@@ -1154,7 +1155,7 @@ export const renderJobs = () => {
   filtered.forEach((job) => {
     const statusValue = (job.application_status || "saved").toLowerCase();
     const statusLabel = formatStatusLabel(statusValue);
-    const postedDisplay = job.posted_raw || job.posted || job.posted_date || "";
+    const postedDisplay = formatPostedMeta(job);
     const applicantDisplay = job.applicant_count ? ` · ${job.applicant_count} applicants` : "";
     const openStatus =
       job.job_status ||
@@ -1180,7 +1181,7 @@ export const renderJobs = () => {
       <div class="job-list-main">
         <div class="job-list-title">${escapeHtml(job.role)}</div>
         <div class="job-list-company">${escapeHtml(job.company || "Company not listed")}</div>
-        <div class="job-list-meta">${escapeHtml(formatPosted(postedDisplay))} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
+        <div class="job-list-meta">${escapeHtml(postedDisplay)} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
         <div class="job-list-meta">${escapeHtml(buildStatusLine(job))}</div>
         ${matchPills ? `<div class="job-list-match-pills">${matchPills}</div>` : ""}
       </div>
