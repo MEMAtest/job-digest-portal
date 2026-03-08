@@ -16,6 +16,7 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
   getTodayKey,
+  isPostedToday,
   TRIAGE_PROMPT_THRESHOLD,
   applyQuickFilter,
   showToast,
@@ -677,6 +678,32 @@ export const renderCandidatePrep = (doc) => {
   renderPrepBoard();
 };
 
+const getPostedValue = (job) => job?.posted_raw || job?.posted || job?.posted_date || "";
+
+const isFreshWithinHours = (job, hours, now = new Date()) => {
+  if (!job) return false;
+  if (hours <= 24 && isPostedToday(job)) return true;
+
+  const raw = String(getPostedValue(job) || "").trim().toLowerCase();
+  const threshold = new Date(now.getTime() - hours * 60 * 60 * 1000);
+
+  if (raw) {
+    if (/(just now|minute|hour|today|new)/i.test(raw)) return true;
+    if (/yesterday/i.test(raw)) return hours >= 48;
+
+    const dayMatch = raw.match(/(\d+)\s+day/);
+    if (dayMatch) {
+      return Number(dayMatch[1]) * 24 <= hours;
+    }
+
+    const date = parseDateValue(raw);
+    if (date) return date >= threshold;
+  }
+
+  const updatedAt = parseDateValue(job.updated_at);
+  return Boolean(updatedAt && updatedAt >= threshold);
+};
+
 export const renderDashboardStats = (jobs) => {
   if (!dashboardStatsContainer) return;
 
@@ -685,14 +712,10 @@ export const renderDashboardStats = (jobs) => {
   startToday.setHours(0, 0, 0, 0);
   const startYesterday = new Date(startToday);
   startYesterday.setDate(startYesterday.getDate() - 1);
-  const last24 = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const last72 = new Date(now.getTime() - 72 * 60 * 60 * 1000);
 
   const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
-  const updatedDates = jobs.map((job) => parseDateValue(job.updated_at)).filter(Boolean);
-
-  const newLast24 = updatedDates.filter((dt) => dt >= last24).length;
-  const newLast72 = updatedDates.filter((dt) => dt >= last72).length;
+  const freshToday = jobs.filter((job) => isPostedToday(job)).length;
+  const freshLast72 = jobs.filter((job) => isFreshWithinHours(job, 72, now)).length;
 
   const appliedToday = jobs.filter((job) => {
     if (safeStatus(job) !== "applied") return false;
@@ -717,37 +740,37 @@ export const renderDashboardStats = (jobs) => {
     <div class="stat-card stat-card--clickable" data-stat="links">
       <div class="stat-card__label">Links sent</div>
       <div class="stat-card__value">${jobs.length}</div>
-      <div class="stat-card__trend">Live roles in feed</div>
+      <div class="stat-card__trend">Live roles in feed · click to open</div>
     </div>
-    <div class="stat-card stat-card--clickable" data-stat="new24">
-      <div class="stat-card__label">New (24h)</div>
-      <div class="stat-card__value">${newLast24}</div>
-      <div class="stat-card__trend">Updated in last day</div>
+    <div class="stat-card stat-card--clickable" data-stat="freshToday">
+      <div class="stat-card__label">Fresh today</div>
+      <div class="stat-card__value">${freshToday}</div>
+      <div class="stat-card__trend">Posted today · click to open</div>
     </div>
-    <div class="stat-card stat-card--clickable" data-stat="new72">
-      <div class="stat-card__label">New (72h)</div>
-      <div class="stat-card__value">${newLast72}</div>
-      <div class="stat-card__trend">Updated in last 3 days</div>
+    <div class="stat-card stat-card--clickable" data-stat="fresh72">
+      <div class="stat-card__label">Fresh (72h)</div>
+      <div class="stat-card__value">${freshLast72}</div>
+      <div class="stat-card__trend">Posted in last 3 days · click to open</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="appliedToday">
       <div class="stat-card__label">Applied today</div>
       <div class="stat-card__value">${appliedToday}</div>
-      <div class="stat-card__trend">Since midnight</div>
+      <div class="stat-card__trend">Since midnight · click to open</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="appliedYesterday">
       <div class="stat-card__label">Applied yesterday</div>
       <div class="stat-card__value">${appliedYesterday}</div>
-      <div class="stat-card__trend">Previous day</div>
+      <div class="stat-card__trend">Previous day · click to open</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="saved">
       <div class="stat-card__label">New</div>
       <div class="stat-card__value">${savedCount}</div>
-      <div class="stat-card__trend">Tap to triage</div>
+      <div class="stat-card__trend">Click to open Live Roles</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="shortlisted">
       <div class="stat-card__label">Shortlisted</div>
       <div class="stat-card__value">${shortlistedCount}</div>
-      <div class="stat-card__trend">Worth a closer look</div>
+      <div class="stat-card__trend">Worth a closer look · click to open</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="readyToApply">
       <div class="stat-card__label">Ready to Apply</div>
@@ -757,17 +780,17 @@ export const renderDashboardStats = (jobs) => {
     <div class="stat-card stat-card--clickable" data-stat="interview">
       <div class="stat-card__label">Interviews</div>
       <div class="stat-card__value">${interviewCount}</div>
-      <div class="stat-card__trend">Active</div>
+      <div class="stat-card__trend">Active · click to open</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="offer">
       <div class="stat-card__label">Offers</div>
       <div class="stat-card__value">${offerCount}</div>
-      <div class="stat-card__trend">Win rate tracker</div>
+      <div class="stat-card__trend">Win rate tracker · click to open</div>
     </div>
     <div class="stat-card stat-card--clickable" data-stat="uniqueCompanies">
       <div class="stat-card__label">Unique companies</div>
       <div class="stat-card__value">${uniqueCompanies}</div>
-      <div class="stat-card__trend">Company spread</div>
+      <div class="stat-card__trend">Company spread · click to open</div>
     </div>
   `;
 
@@ -778,24 +801,18 @@ export const renderDashboardStats = (jobs) => {
         applyQuickFilter({ label: "All roles", predicate: null, status: "", resetFilters: true });
         return;
       }
-      if (stat === "new24") {
+      if (stat === "freshToday") {
         applyQuickFilter({
-          label: "Updated in last 24 hours",
-          predicate: (job) => {
-            const dt = parseDateValue(job.updated_at);
-            return dt && dt >= last24;
-          },
+          label: "Fresh today",
+          predicate: (job) => isPostedToday(job),
           resetFilters: true,
         });
         return;
       }
-      if (stat === "new72") {
+      if (stat === "fresh72") {
         applyQuickFilter({
-          label: "Updated in last 72 hours",
-          predicate: (job) => {
-            const dt = parseDateValue(job.updated_at);
-            return dt && dt >= last72;
-          },
+          label: "Fresh in last 72 hours",
+          predicate: (job) => isFreshWithinHours(job, 72, now),
           resetFilters: true,
         });
         return;
