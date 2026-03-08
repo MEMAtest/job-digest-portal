@@ -32,6 +32,17 @@
 .triage-overlay.hidden {
   display: none;
 }
+.triage-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px 32px;
+}
 .triage-overlay__header {
   padding: 20px 24px 12px;
   border-bottom: 1px solid #e2e8f0;
