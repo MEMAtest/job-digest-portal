@@ -66,3 +66,19 @@ service cloud.firestore {
 ## Notes
 - The backend (daily job search) should write to the `jobs` collection.
 - The portal is read-only.
+
+## Browser Smoke Test
+Install the Playwright browser once:
+```bash
+npm run test:smoke:install
+```
+
+Run the repeatable smoke test against production:
+```bash
+npm run test:smoke:prod
+```
+
+Or point it at any environment:
+```bash
+npm run test:smoke -- --url=http://127.0.0.1:4173/
+```

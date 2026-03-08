@@ -1,8 +1,16 @@
 {
   "name": "job-digest-portal",
   "private": true,
+  "scripts": {
+    "test:smoke": "node scripts/smoke-e2e.mjs",
+    "test:smoke:prod": "node scripts/smoke-e2e.mjs --url=https://adejob.netlify.app/",
+    "test:smoke:install": "playwright install chromium"
+  },
   "dependencies": {
     "firebase-admin": "^12.1.0",
     "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.52.0"
   }
 }
