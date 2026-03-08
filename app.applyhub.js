@@ -242,6 +242,10 @@ export const renderApplyHub = () => {
   existingNotes.forEach((textarea) => {
     const jobId = textarea.dataset.jobId;
     if (!jobId) return;
+    if (state.hubNotesTimers[jobId]) {
+      clearTimeout(state.hubNotesTimers[jobId]);
+      delete state.hubNotesTimers[jobId];
+    }
     const job = state.jobs.find((j) => j.id === jobId);
     if (!job) return;
     job.application_notes = textarea.value.slice(0, 500);

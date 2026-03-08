@@ -16,6 +16,51 @@ import {
 
 const notifyToggle = document.getElementById("notify-toggle");
 
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
+
+export const subscribeToPush = async () => {
+  if (!("PushManager" in window)) return null;
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    const vapidKey = window.VAPID_PUBLIC_KEY;
+    if (!vapidKey) return null;
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+    });
+  }
+  // Store subscription in Firestore via proxy
+  await fetch("/.netlify/functions/firestore-update", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      collection: "push_subscriptions",
+      id: "browser_main",
+      data: {
+        ...sub.toJSON(),
+        prefs: {
+          enabled: true,
+          new_jobs: true,
+          new_jobs_min_fit: 80,
+          follow_ups: true,
+        },
+        updated_at: new Date().toISOString(),
+      },
+    }),
+  });
+  return sub;
+};
+
 const updateNotifyButton = () => {
   if (!notifyToggle || !("Notification" in window)) return;
   const perm = Notification.permission;
@@ -36,8 +81,15 @@ if (notifyToggle) {
   notifyToggle.addEventListener("click", async () => {
     if (!("Notification" in window)) return;
     if (Notification.permission === "denied") return;
-    await Notification.requestPermission();
+    const result = await Notification.requestPermission();
     updateNotifyButton();
+    if (result === "granted") {
+      try {
+        await subscribeToPush();
+      } catch (err) {
+        console.error("Push subscription failed:", err);
+      }
+    }
   });
 }
 

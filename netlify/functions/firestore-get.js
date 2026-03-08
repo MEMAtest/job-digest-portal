@@ -1,17 +1,11 @@
 const { getFirestore } = require("./_firebase");
+const { withCors, handleOptions } = require("./_cors");
 
-const withCors = (body, statusCode = 200) => ({
-  statusCode,
-  headers: {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-  },
-  body: JSON.stringify(body),
-});
-
-const ALLOWED_COLLECTIONS = new Set(["run_requests", "notifications", "jobs", "cv_settings"]);
+const ALLOWED_COLLECTIONS = new Set(["run_requests", "notifications", "jobs", "cv_settings", "push_subscriptions"]);
 
 exports.handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") return handleOptions();
+
   if (event.httpMethod !== "GET") {
     return withCors({ error: "Method not allowed" }, 405);
   }

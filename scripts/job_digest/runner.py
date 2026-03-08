@@ -8,6 +8,7 @@ import requests
 
 from . import config
 from .firestore import (
+    backfill_posted_dates,
     backfill_role_summaries,
     cleanup_stale_jobs,
     diagnose_backfill,
@@ -622,12 +623,19 @@ def cli() -> None:
         action="store_true",
         help="Run diagnostics for backfill connectivity and model access",
     )
+    parser.add_argument(
+        "--backfill-posted-dates",
+        action="store_true",
+        help="Normalize posted fields for existing Firestore jobs",
+    )
     args = parser.parse_args()
 
     if args.smoke_test:
         run_smoke_test()
     elif args.backfill_diagnose:
         diagnose_backfill()
+    elif args.backfill_posted_dates:
+        backfill_posted_dates(limit=args.backfill_limit or None)
     elif args.backfill_role_summary:
         backfill_role_summaries(limit=args.backfill_limit or None)
     else:

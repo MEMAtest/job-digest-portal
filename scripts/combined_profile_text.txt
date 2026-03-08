@@ -11,32 +11,36 @@ KEY ACHIEVEMENTS
 • 20% operational headcount efficiency through workflow automation
 • 18+ reporting dashboards deployed, used by hundreds of users across APAC and EMEA
 • 3 live RegTech products independently created and deployed using AI-assisted development
-• Napier screening implementation was subsequently validated by Dutch DNB effectiveness assessment
+• Napier screening implementation reviewed during Dutch DNB effectiveness assessment
 • 12 BaFin audit points closed, mitigating multimillion-pound fine exposure
 • £120k ARR secured from Tier 1 global bank proof of concept
 PROFESSIONAL EXPERIENCE
 VISTRA | Global Corporate Services (9,000+ employees, $1.5B revenue)
 Global Product & Process Owner – Onboarding, KYC & Screening | September 2023 – Present
 Product Strategy & Discovery
-• Led 1st line design and implementation of business onboarding and financial crime controls for corporate
-and fund clients, using Fenergo (KYC), Napier (screening) and Enate (orchestration) across EMEA,
-AMER and APAC
-• Defined platform feature requirements and competitor positioning; secured £400k+ business case
-sign-off
-• Led vendor evaluation and pricing negotiation, balancing regulatory and commercial constraints
+• Owned end-to-end design and implementation of business onboarding and financial crime controls for
+corporate and fund clients, using Fenergo (KYC), Napier (screening) and Enate (orchestration) across
+EMEA, AMER and APAC
+• Created and maintained global process design roadmap; produced standard and target process maps for
+onboarding, screening and periodic review operations
+• Built £400k+ business case including cost-benefit analysis, vendor evaluation and pricing negotiation;
+produced business change proposals for Regional Operations Directors
 Platform Development & Delivery
 • Defined Fenergo KYC product model across EMEA, AMER and APAC — global consistency with
 jurisdiction-specific CDD/EDD logic
-• Owned Napier screening design and capacity framework; validated by Dutch DNB effectiveness
+• Owned Napier screening design and capacity framework; reviewed during Dutch DNB effectiveness
 assessment
-• Created Enate orchestration layer from fragmented processes — 55% faster onboarding (45 → 20
-days), thousands of clients annually
+• Designed Enate orchestration layer from fragmented processes, contributing to 55% reduction in
+onboarding time (45 → 20 days), thousands of clients annually
+• Conducted regulatory scanning and change assessment across FCA, Dutch DNB, BaFin, MAS and SFC;
+translated requirements into platform configuration and control specifications
 Reporting Products & Leadership
 • Gathered requirements and built Power BI suite (screening, KYC, onboarding dashboards) through
 direct discovery with APAC, AMER and EMEA teams
-• Managed 4 Business Analysts (reporting, data migration, SOPs, tech implementation); coordinated
-delivery across engineering, compliance, and front office
-• Chaired SteerCo with CFO/COO; delivered QA academy for 150+ analysts across 20 countries
+• Managed 2 Business Analysts (screening and CLM integration); coordinated delivery across engineering,
+compliance, and front office
+• Produced SteerCo-ready updates; presented to CFO/COO and senior leadership on scope decisions,
+delivery milestones and operational readiness
 EBURY | B2B Foreign Exchange Platform (Series E, £1.7B valuation)
 Product Manager – Identity & Financial Crime | April 2022 – September 2023
 • Built onboarding funnel analytics, identifying drop-off points; drove 20% conversion uplift across Spain,

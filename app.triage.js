@@ -45,6 +45,7 @@ export const closeTriageMode = () => {
   state.triageQueue = [];
   state.triageIndex = 0;
   state.triageLastAction = null;
+  triageActionInFlight = false;
 };
 
 const renderTriageCard = () => {
@@ -165,6 +166,7 @@ const undoTriageAction = async () => {
     } catch (err) {
       console.error("Undo triage failed:", err);
       showToast("Undo failed — check your connection.");
+      state.triageLastAction = null;
       return;
     }
   }
@@ -218,10 +220,14 @@ export const handleTriageAction = async (action) => {
 
   if (db) {
     try {
-      await updateDoc(doc(db, collectionName, job.id), {
-        application_status: newStatus,
-        updated_at: now,
-      });
+      const timeoutMs = 5000;
+      await Promise.race([
+        updateDoc(doc(db, collectionName, job.id), {
+          application_status: newStatus,
+          updated_at: now,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),
+      ]);
     } catch (err) {
       console.error("Triage update failed:", err);
     }

@@ -17,7 +17,7 @@ from .llm import (
     parse_gemini_payload,
 )
 from .models import JobRecord
-from .utils import infer_ats_family, infer_source_family, now_utc, parse_applicant_count
+from .utils import canonicalize_posted_fields, infer_ats_family, infer_source_family, now_utc, parse_applicant_count
 
 try:
     import firebase_admin
@@ -410,6 +410,48 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
             print(f"Backfill progress: {idx}/{total} processed, {updated} updated, {errors} errors.")
 
     print(f"Backfill complete: updated {updated} role summaries, {errors} errors.")
+
+
+def backfill_posted_dates(limit: Optional[int] = None) -> None:
+    client = init_firestore_client()
+    if client is None:
+        print("Posted-date backfill skipped: Firestore client not available.")
+        return
+
+    processed = 0
+    updated = 0
+
+    try:
+        for snapshot in client.collection(config.FIREBASE_COLLECTION).stream():
+            data = snapshot.to_dict() or {}
+            posted = data.get("posted") or ""
+            posted_raw = data.get("posted_raw") or ""
+            posted_date = data.get("posted_date") or ""
+            canonical_posted, canonical_raw, canonical_date = canonicalize_posted_fields(
+                posted_raw or posted, posted_date
+            )
+
+            payload = {}
+            if canonical_posted and canonical_posted != posted:
+                payload["posted"] = canonical_posted
+            if canonical_raw != posted_raw:
+                payload["posted_raw"] = canonical_raw
+            if canonical_date != posted_date:
+                payload["posted_date"] = canonical_date
+
+            if payload:
+                payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+                snapshot.reference.set(payload, merge=True)
+                updated += 1
+
+            processed += 1
+            if limit and processed >= limit:
+                break
+    except Exception as exc:
+        print(f"Posted-date backfill failed: {exc}")
+        return
+
+    print(f"Posted-date backfill complete. Processed={processed} Updated={updated}")
 
 
 def diagnose_backfill() -> None:

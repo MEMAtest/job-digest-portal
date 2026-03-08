@@ -1,16 +1,6 @@
 const { getFirestore } = require("./_firebase");
+const { withCors, handleOptions } = require("./_cors");
 const OpenAI = require("openai");
-
-const withCors = (body, statusCode = 200) => ({
-  statusCode,
-  headers: {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  },
-  body: JSON.stringify(body),
-});
 
 const buildCvPrompt = (profileText, job) => {
   return (
@@ -82,9 +72,7 @@ const buildCvPrompt = (profileText, job) => {
 };
 
 exports.handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") {
-    return withCors({});
-  }
+  if (event.httpMethod === "OPTIONS") return handleOptions();
 
   if (event.httpMethod !== "POST") {
     return withCors({ error: "Method not allowed" }, 405);
@@ -131,13 +119,18 @@ exports.handler = async (event) => {
     });
 
     const text = response.choices[0]?.message?.content || "";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return withCors({ error: "Failed to parse CV response" }, 500);
+    let sections;
+    try {
+      const parsed = JSON.parse(text);
+      sections = parsed.tailored_cv_sections || parsed;
+    } catch {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return withCors({ error: "Failed to parse CV response" }, 500);
+      }
+      const parsed = JSON.parse(jsonMatch[0]);
+      sections = parsed.tailored_cv_sections || parsed;
     }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    const sections = parsed.tailored_cv_sections || parsed;
 
     // Write back to Firestore
     await db.collection("jobs").doc(jobId).update({

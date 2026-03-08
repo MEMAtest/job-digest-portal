@@ -34,6 +34,7 @@ import {
   resetFilters,
   getJobSourceFamily,
   getJobAtsFamily,
+  safeHref,
 } from "./app.core.js";
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply } from "./app.applyhub.js";
@@ -414,6 +415,9 @@ export const getFilteredJobs = () => {
   }
 
   const queryNorm = normaliseSearchText(searchTerm);
+  if (!queryNorm) {
+    state.jobs.forEach((j) => { j.__searchScore = 0; j.__searchReasons = []; });
+  }
   filtered = filtered
     .map((job) => {
       const match = scoreSearchMatch(job, queryNorm);
@@ -603,7 +607,7 @@ const renderJobDetail = (job, detailEl) => {
         }</button>
         <button class="btn btn-secondary btn-dismiss">Dismiss</button>
         <button class="btn btn-prep" data-job-id="${escapeHtml(job.id)}">Prep</button>
-        <a class="btn btn-tertiary" href="${escapeHtml(job.link)}" target="_blank" rel="noreferrer">View link</a>
+        <a class="btn btn-tertiary" href="${escapeHtml(safeHref(job.link))}" target="_blank" rel="noreferrer">View link</a>
       </div>
       <div class="job-detail-tabs">
         <button class="detail-tab detail-tab--active" data-tab="summary">Summary</button>
@@ -817,7 +821,7 @@ const renderJobDetail = (job, detailEl) => {
   const shortlistBtn = detailEl.querySelector(".btn-shortlist");
   if (shortlistBtn) {
     shortlistBtn.addEventListener("click", async () => {
-      if (shortlistBtn.classList.contains("disabled")) return;
+      if (shortlistBtn.disabled) return;
       if (!db) {
         showToast("Missing Firebase config.");
         return;

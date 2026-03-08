@@ -376,13 +376,8 @@ const renderStudyDeck = (container, job, prebuiltItems = null) => {
         const value = btn.dataset.conf;
         safeLocalStorageSet(getConfidenceKey(job.id, item.key), value);
         setTimeout(() => {
-          if (currentIndex < items.length - 1) {
-            currentIndex += 1;
-            render();
-          } else {
-            currentIndex += 1;
-            render();
-          }
+          currentIndex += 1;
+          render();
         }, 400);
       });
     });

@@ -7,4 +7,5 @@ import "./app.cvhub.js";
 import "./app.jobs.js";
 import "./app.dashboard.js";
 import "./app.notifications.js";
+import "./app.settings.js";
 import "./app.bootstrap.js";
