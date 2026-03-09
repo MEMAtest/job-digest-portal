@@ -122,14 +122,25 @@ def main() -> None:
         if not is_relevant_title(title):
             continue
 
-        desc_text, posted_detail, detail_location, applicant_text = linkedin_job_details(session, job["job_id"])
-        if detail_location:
-            location = detail_location
+        detail = linkedin_job_details(session, job["job_id"])
+        desc_text = detail.get("description", "")
+        if detail.get("title"):
+            title = detail["title"]
+        if detail.get("company"):
+            company = detail["company"]
+        if detail.get("location"):
+            location = detail["location"]
+        applicant_text = detail.get("applicant_text", "")
+        if not is_relevant_title(title):
+            continue
         if not is_relevant_location(location, desc_text):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(
-            {"posted_text": posted_detail or job.get("posted_text", ""), "posted_date": job.get("posted_date", "")}
+            {
+                "posted_text": detail.get("posted_text", "") or job.get("posted_text", ""),
+                "posted_date": detail.get("posted_date", "") or job.get("posted_date", ""),
+            }
         )
         if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue

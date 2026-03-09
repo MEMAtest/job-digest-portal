@@ -46,6 +46,20 @@ try:
 except Exception:  # noqa: BLE001
     feedparser = None
 
+def _merge_linkedin_card(existing: Dict[str, str], incoming: Dict[str, str]) -> Dict[str, str]:
+    if not existing:
+        return incoming
+    merged = dict(existing)
+    for key in ("title", "company", "location", "link"):
+        if incoming.get(key) and not merged.get(key):
+            merged[key] = incoming[key]
+    if incoming.get("posted_date"):
+        merged["posted_date"] = incoming["posted_date"]
+    if incoming.get("posted_text") and (not merged.get("posted_text") or not merged.get("posted_date")):
+        merged["posted_text"] = incoming["posted_text"]
+    return merged
+
+
 def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
     base_url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
     headers = {"User-Agent": USER_AGENT}
@@ -92,7 +106,7 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                     if company.lower() in EXCLUDE_COMPANIES:
                         continue
 
-                    jobs[job_id] = {
+                    jobs[job_id] = _merge_linkedin_card(jobs.get(job_id, {}), {
                         "job_id": job_id,
                         "title": title,
                         "company": company,
@@ -100,7 +114,7 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                         "posted_text": posted_text,
                         "posted_date": posted_date,
                         "link": clean_link(link),
-                    }
+                    })
 
                 time.sleep(0.3)
 
@@ -148,7 +162,7 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                         if company_name.lower() in EXCLUDE_COMPANIES:
                             continue
 
-                        jobs[job_id] = {
+                        jobs[job_id] = _merge_linkedin_card(jobs.get(job_id, {}), {
                             "job_id": job_id,
                             "title": title,
                             "company": company_name,
@@ -156,29 +170,41 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                             "posted_text": posted_text,
                             "posted_date": posted_date,
                             "link": clean_link(link),
-                        }
+                        })
 
                     time.sleep(0.2)
 
     return list(jobs.values())
 
 
-def linkedin_job_details(session: requests.Session, job_id: str) -> Tuple[str, str, str, str]:
+def linkedin_job_details(session: requests.Session, job_id: str) -> Dict[str, str]:
     detail_url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
     headers = {"User-Agent": USER_AGENT}
     try:
         resp = session.get(detail_url, headers=headers, timeout=20)
     except requests.RequestException:
-        return "", "", "", ""
+        return {}
     if resp.status_code != 200:
-        return "", "", "", ""
+        return {}
 
     soup = BeautifulSoup(resp.text, "html.parser")
     desc_el = soup.select_one("div.show-more-less-html__markup")
     desc_text = normalize_text(desc_el.get_text(" ")) if desc_el else ""
 
+    title_el = soup.select_one("h2.top-card-layout__title, h1.top-card-layout__title, h2.topcard__title")
+    title_text = normalize_text(title_el.get_text(" ")) if title_el else ""
+
+    company_el = soup.select_one("a.topcard__org-name-link")
+    if not company_el:
+        company_el = soup.select_one("span.topcard__flavor a")
+    if not company_el:
+        company_el = soup.select_one("a.topcard__flavor")
+    company_text = normalize_text(company_el.get_text(" ")) if company_el else ""
+
     posted_el = soup.select_one("span.posted-time-ago__text")
     posted_text = normalize_text(posted_el.get_text()) if posted_el else ""
+    posted_time_el = soup.select_one("time")
+    posted_date = posted_time_el.get("datetime") if posted_time_el else ""
 
     loc_el = soup.select_one("span.topcard__flavor--bullet")
     location_text = normalize_text(loc_el.get_text()) if loc_el else ""
@@ -189,7 +215,15 @@ def linkedin_job_details(session: requests.Session, job_id: str) -> Tuple[str, s
     )
     applicant_text = normalize_text(applicant_el.get_text()) if applicant_el else ""
 
-    return desc_text, posted_text, location_text, applicant_text
+    return {
+        "description": desc_text,
+        "title": title_text,
+        "company": company_text,
+        "posted_text": posted_text,
+        "posted_date": posted_date,
+        "location": location_text,
+        "applicant_text": applicant_text,
+    }
 
 
 def greenhouse_search(session: requests.Session) -> List[Dict[str, str]]:

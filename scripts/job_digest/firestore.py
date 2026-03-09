@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -17,6 +18,7 @@ from .llm import (
     parse_gemini_payload,
 )
 from .models import JobRecord
+from .sources import linkedin_job_details
 from .utils import canonicalize_posted_fields, infer_ats_family, infer_source_family, now_utc, parse_applicant_count
 
 try:
@@ -420,23 +422,49 @@ def backfill_posted_dates(limit: Optional[int] = None) -> None:
 
     processed = 0
     updated = 0
+    linkedin_session = requests.Session()
+
+    def extract_linkedin_job_id(link: str) -> str:
+        if not link:
+            return ""
+        match = re.search(r"-at-[^-]+-(\d+)(?:[/?].*)?$", link) or re.search(r"/jobs/view/(?:[^/]+-)?(\d+)(?:[/?].*)?$", link)
+        return match.group(1) if match else ""
 
     try:
         for snapshot in client.collection(config.FIREBASE_COLLECTION).stream():
             data = snapshot.to_dict() or {}
-            posted = data.get("posted") or ""
-            posted_raw = data.get("posted_raw") or ""
-            posted_date = data.get("posted_date") or ""
+            original_posted = data.get("posted") or ""
+            original_posted_raw = data.get("posted_raw") or ""
+            original_posted_date = data.get("posted_date") or ""
+            posted = original_posted
+            posted_raw = original_posted_raw
+            posted_date = original_posted_date
+            source = data.get("source") or ""
+
+            payload = {}
+            if source == "LinkedIn":
+                job_id = extract_linkedin_job_id(data.get("link") or "")
+                if job_id:
+                    detail = linkedin_job_details(linkedin_session, job_id)
+                    if detail.get("title") and detail["title"] != (data.get("role") or ""):
+                        payload["role"] = detail["title"]
+                    if detail.get("company") and detail["company"] != (data.get("company") or ""):
+                        payload["company"] = detail["company"]
+                    if detail.get("location") and detail["location"] != (data.get("location") or ""):
+                        payload["location"] = detail["location"]
+                    posted = detail.get("posted_text") or posted
+                    posted_raw = detail.get("posted_text") or posted_raw
+                    posted_date = detail.get("posted_date") or posted_date
+
             canonical_posted, canonical_raw, canonical_date = canonicalize_posted_fields(
                 posted_raw or posted, posted_date
             )
 
-            payload = {}
-            if canonical_posted and canonical_posted != posted:
+            if canonical_posted and canonical_posted != original_posted:
                 payload["posted"] = canonical_posted
-            if canonical_raw != posted_raw:
+            if canonical_raw != original_posted_raw:
                 payload["posted_raw"] = canonical_raw
-            if canonical_date != posted_date:
+            if canonical_date != original_posted_date:
                 payload["posted_date"] = canonical_date
 
             if payload:
