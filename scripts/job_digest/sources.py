@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import csv
 import json
 import re
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 from urllib.parse import quote_plus, urljoin, urlparse
 
@@ -35,6 +37,7 @@ from .config import (
     SEARCH_COMPANIES,
     SEARCH_KEYWORDS,
     SEARCH_LOCATIONS,
+    UK_FEEDS_PATH,
     USER_AGENT,
     select_company_batch,
 )
@@ -2213,6 +2216,128 @@ def workinstartups_search(session: requests.Session) -> List[Dict[str, str]]:
     return jobs
 
 
+def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
+    if not path.exists():
+        return []
+    try:
+        with path.open(newline="", encoding="utf-8") as handle:
+            rows = list(csv.DictReader(handle))
+    except OSError:
+        return []
+    targets: List[Dict[str, str]] = []
+    seen = set()
+    for row in rows:
+        if (row.get("platform") or "").strip().lower() != "custom":
+            continue
+        careers_url = clean_link((row.get("careers_url") or "").strip())
+        if not careers_url:
+            continue
+        key = ((row.get("firm") or "").strip(), careers_url)
+        if key in seen:
+            continue
+        seen.add(key)
+        targets.append(
+            {
+                "firm": (row.get("firm") or "").strip(),
+                "careers_url": careers_url,
+                "source": (row.get("source") or "CustomCareers").strip() or "CustomCareers",
+            }
+        )
+    return targets
+
+
+def discover_custom_job_hubs(html: str, base_url: str) -> List[str]:
+    soup = BeautifulSoup(html, "html.parser")
+    discovered: List[str] = []
+    seen = set()
+    base_netloc = urlparse(base_url).netloc
+    for anchor in soup.find_all("a", href=True):
+        href = clean_link(urljoin(base_url, anchor.get("href", "")))
+        if not href:
+            continue
+        parsed = urlparse(href)
+        if parsed.netloc and parsed.netloc != base_netloc:
+            continue
+        label = normalize_text(anchor.get_text(" "))
+        haystack = f"{href} {label}".lower()
+        if not any(token in haystack for token in ("job", "career", "vacanc", "opening", "opportunit")):
+            continue
+        if href in seen:
+            continue
+        seen.add(href)
+        discovered.append(href)
+    return discovered[:6]
+
+
+def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
+    jobs: List[Dict[str, str]] = []
+    targets = load_custom_careers_targets(UK_FEEDS_PATH)
+    if not targets:
+        return jobs
+
+    for target in targets:
+        careers_url = target["careers_url"]
+        try:
+            resp = session.get(careers_url, timeout=25)
+        except requests.RequestException:
+            continue
+        if resp.status_code != 200:
+            continue
+
+        pages_to_visit = [careers_url]
+        pages_to_visit.extend(discover_custom_job_hubs(resp.text, careers_url))
+        job_map: Dict[str, Dict[str, str]] = {}
+
+        for page_url in pages_to_visit[:4]:
+            try:
+                page_resp = session.get(page_url, timeout=25)
+            except requests.RequestException:
+                continue
+            if page_resp.status_code != 200:
+                continue
+            for link, title in extract_job_links(page_resp.text, page_url):
+                job_map.setdefault(
+                    link,
+                    {
+                        "title": title,
+                        "company": target["firm"],
+                        "location": "",
+                        "link": link,
+                        "posted_text": "",
+                        "posted_date": "",
+                        "summary": "",
+                        "source": "CustomCareers",
+                    },
+                )
+            time.sleep(0.15)
+
+        for link, job in list(job_map.items())[:20]:
+            try:
+                detail_resp = session.get(link, timeout=25)
+            except requests.RequestException:
+                continue
+            if detail_resp.status_code != 200:
+                continue
+            details = parse_job_detail_jsonld(detail_resp.text, job.get("title", "")) or parse_job_detail_fallback(detail_resp.text)
+            if details.get("title"):
+                job["title"] = details["title"]
+            if details.get("company"):
+                job["company"] = details["company"]
+            if details.get("location"):
+                job["location"] = details["location"]
+            if details.get("posted_date"):
+                job["posted_date"] = details["posted_date"]
+            elif details.get("posted_text"):
+                job["posted_text"] = details["posted_text"]
+            if details.get("summary"):
+                job["summary"] = details["summary"]
+            time.sleep(0.15)
+
+        jobs.extend(job_map.values())
+        time.sleep(0.2)
+    return jobs
+
+
 def job_board_search(session: requests.Session) -> List[Dict[str, str]]:
     jobs: List[Dict[str, str]] = []
     for source in JOB_BOARD_SOURCES:
@@ -2257,6 +2382,8 @@ def job_board_search(session: requests.Session) -> List[Dict[str, str]]:
                 jobs.extend(efinancialcareers_search(session))
             elif source["name"] == "IndeedUK":
                 jobs.extend(indeed_search(session))
+            elif source["name"] == "CustomCareers":
+                jobs.extend(custom_careers_search(session))
             elif source["name"] == "WorkInStartups":
                 jobs.extend(workinstartups_search(session))
         count = len(jobs) - before

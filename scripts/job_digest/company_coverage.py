@@ -56,15 +56,25 @@ CATEGORY_ORDER = {"Bank": 0, "Fintech": 1, "Regtech": 2}
 STATUS_ORDER = {"covered": 0, "partial": 1, "missing": 2, "broken": 3}
 
 CANONICAL_NAME_MAP = {
+    "actimize": "NICE Actimize",
+    "airwallex": "Airwallex",
     "bnpparibas": "BNP Paribas",
     "bnp paribas": "BNP Paribas",
+    "brex": "Brex",
+    "chip": "Chip",
     "checkout": "Checkout.com",
     "checkoutcom": "Checkout.com",
     "clearbank": "ClearBank",
+    "complyadvantage": "ComplyAdvantage",
     "credit agricole": "Crédit Agricole",
+    "curve": "Curve",
     "deutschebank": "Deutsche Bank",
     "dowjones": "Dow Jones",
     "engine by starling": "Engine by Starling",
+    "encompass": "Encompass",
+    "fenergo": "Fenergo",
+    "fundingcircle": "Funding Circle",
+    "gocardless": "GoCardless",
     "goldman sachs": "Goldman Sachs",
     "hsbc": "HSBC",
     "jpmorgan": "JPMorgan Chase",
@@ -74,23 +84,45 @@ CANONICAL_NAME_MAP = {
     "kyckr": "Kyckr",
     "lexisnexis risk": "LexisNexis Risk",
     "lloyds": "Lloyds Banking Group",
+    "mambu": "Mambu",
+    "marqeta": "Marqeta",
     "metro bank": "Metro Bank",
+    "modulr": "Modulr",
+    "monzo": "Monzo",
     "moodys": "Moody's",
     "natwest": "NatWest Group",
+    "napier": "Napier",
     "nice actimize": "NICE Actimize",
     "n26": "N26",
     "northern trust": "Northern Trust",
     "oaknorth": "OakNorth",
+    "onfido": "Onfido",
+    "plaid": "Plaid",
+    "quantexa": "Quantexa",
+    "rapyd": "Rapyd",
+    "revolut": "Revolut",
+    "ripjar": "Ripjar",
     "s&p global": "S&P Global",
+    "s&pglobal": "S&P Global",
     "smartkyc": "smartKYC",
     "societe generale": "Société Générale",
+    "societegenerale": "Société Générale",
+    "snyk": "Snyk",
     "standard chartered": "Standard Chartered",
+    "standardchartered": "Standard Chartered",
     "starling": "Starling Bank",
+    "starlingbank": "Starling Bank",
     "starling bank": "Starling Bank",
+    "sumsub": "Sumsub",
     "tesco bank": "Tesco Bank",
+    "thought machine": "Thought Machine",
     "thoughtmachine": "Thought Machine",
+    "thought-machine": "Thought Machine",
+    "tide": "Tide",
+    "trulioo": "Trulioo",
     "truelayer": "TrueLayer",
     "ubs": "UBS",
+    "veriff": "Veriff",
     "virgin money": "Virgin Money",
     "wise": "Wise",
     "workinstartups": "WorkInStartups",
@@ -150,6 +182,179 @@ CURATED_EXTRA_FIRMS = [
     ("Resistant AI", "Regtech"), ("BioCatch", "Regtech"), ("Fourthline", "Regtech"), ("Salv", "Regtech"),
     ("Strise", "Regtech"), ("Persona", "Regtech"), ("Jumio", "Regtech"), ("Sardine", "Regtech"),
     ("Forter", "Regtech"), ("Quantifind", "Regtech"), ("Hawk", "Regtech"),
+]
+
+CURATED_DIRECT_ENDPOINTS = [
+    {
+        "firm": "Allica Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://careers.allica.bank/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Atom Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.atombank.co.uk/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Banking Circle",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.bankingcircle.com/careers",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Co-operative Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.co-operativebank.co.uk/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Crédit Agricole",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.ca-cib.com/en/careers",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Metro Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.metrobankonline.co.uk/about-us/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "ICBC Standard Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.icbcstandard.com/en/Careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Monument Bank Limited",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.monument.co/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Paragon Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.paragonbank.co.uk/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Secure Trust Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.securetrustbank.com/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Société Générale",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://careers.societegenerale.com/en/job-offers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Tesco Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.tescoplc.com/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Vanquis Bank",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.vanquis.com/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Adyen",
+        "category": "Fintech",
+        "platform": "Custom",
+        "careers_url": "https://careers.adyen.com/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Chainalysis",
+        "category": "Regtech",
+        "platform": "Custom",
+        "careers_url": "https://www.chainalysis.com/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Elliptic",
+        "category": "Regtech",
+        "platform": "Custom",
+        "careers_url": "https://www.elliptic.co/careers",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Featurespace",
+        "category": "Regtech",
+        "platform": "Custom",
+        "careers_url": "https://www.featurespace.com/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
 ]
 
 
@@ -241,6 +446,112 @@ def load_company_targets(path: Path) -> List[str]:
     return lines
 
 
+def seed_supported_feed_rows() -> List[dict]:
+    from . import boards as board_inventory
+
+    rows: List[dict] = []
+
+    def add_row(firm: str, category: str, platform: str, careers_url: str, feed_url: str = "", workday_entry: str = "", notes: str = "", source: str = "") -> None:
+        rows.append(
+            {
+                "firm": firm,
+                "category": category,
+                "platform": platform,
+                "careers_url": careers_url,
+                "feed_url": feed_url,
+                "workday_entry": workday_entry,
+                "notes": notes,
+                "source": source or platform,
+            }
+        )
+
+    for board in board_inventory.GREENHOUSE_BOARDS:
+        firm = canonicalize_name(board.replace("-", " "))
+        add_row(
+            firm=firm,
+            category=infer_category(firm),
+            platform="Greenhouse",
+            careers_url=f"https://boards.greenhouse.io/{board}",
+            feed_url=f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs",
+            notes="ATS feed from internal board list",
+            source="internal_greenhouse_list",
+        )
+    for company in board_inventory.LEVER_BOARDS:
+        firm = canonicalize_name(company.replace("-", " "))
+        add_row(
+            firm=firm,
+            category=infer_category(firm),
+            platform="Lever",
+            careers_url=f"https://jobs.lever.co/{company}",
+            feed_url=f"https://api.lever.co/v0/postings/{company}?mode=json",
+            notes="ATS feed from internal board list",
+            source="internal_lever_list",
+        )
+    for company in board_inventory.SMARTRECRUITERS_COMPANIES:
+        firm = canonicalize_name(company.replace("-", " "))
+        add_row(
+            firm=firm,
+            category=infer_category(firm),
+            platform="SmartRecruiters",
+            careers_url=f"https://jobs.smartrecruiters.com/{company}",
+            feed_url=f"https://api.smartrecruiters.com/v1/companies/{company}/postings",
+            notes="ATS feed from internal company list",
+            source="internal_smartrecruiters_list",
+        )
+    for board in board_inventory.ASHBY_BOARDS:
+        firm = canonicalize_name(board.replace("-", " "))
+        add_row(
+            firm=firm,
+            category=infer_category(firm),
+            platform="Ashby",
+            careers_url=f"https://jobs.ashbyhq.com/{board}",
+            feed_url=f"https://jobs.ashbyhq.com/api/non-user-graphql?op=job-board&board={board}",
+            notes="ATS feed from internal board list",
+            source="internal_ashby_list",
+        )
+    for account in board_inventory.WORKABLE_ACCOUNTS:
+        firm = canonicalize_name(account.replace("-", " "))
+        add_row(
+            firm=firm,
+            category=infer_category(firm),
+            platform="Workable",
+            careers_url=f"https://apply.workable.com/{account}/",
+            feed_url=f"https://www.workable.com/api/accounts/{account}?details=true",
+            notes="ATS feed from internal account list",
+            source="internal_workable_list",
+        )
+    for entry in board_inventory.WORKDAY_SITES:
+        firm_name, _, url = str(entry).partition("|")
+        firm = canonicalize_name(firm_name or url)
+        add_row(
+            firm=firm,
+            category=infer_category(firm),
+            platform="Workday",
+            careers_url=url,
+            workday_entry=f"{firm}|{url}",
+            notes="ATS feed from internal Workday list",
+            source="internal_workday_list",
+        )
+
+    rows.extend(CURATED_DIRECT_ENDPOINTS)
+
+    deduped: List[dict] = []
+    seen = set()
+    for row in rows:
+        key = (
+            canonicalize_name(row.get("firm", "")),
+            (row.get("platform") or "").strip(),
+            (row.get("feed_url") or "").strip(),
+            (row.get("workday_entry") or "").strip(),
+            (row.get("careers_url") or "").strip(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(row)
+    return deduped
+
+
 def existing_source_paths() -> tuple[Path, Path]:
     return LOCAL_FEEDS_PATH, LOCAL_TARGETS_PATH
 
@@ -253,6 +564,22 @@ def runtime_output_paths() -> tuple[Path, Path]:
 def build_registry_rows() -> List[dict]:
     local_feeds_path, local_targets_path = existing_source_paths()
     feed_rows = load_feed_rows(local_feeds_path)
+    feed_rows.extend(seed_supported_feed_rows())
+    deduped_feed_rows: List[dict] = []
+    seen_feed_keys = set()
+    for row in feed_rows:
+        key = (
+            canonicalize_name((row.get("firm") or "").strip()),
+            (row.get("platform") or "").strip(),
+            (row.get("careers_url") or "").strip(),
+            (row.get("feed_url") or "").strip(),
+            (row.get("workday_entry") or "").strip(),
+        )
+        if key in seen_feed_keys:
+            continue
+        seen_feed_keys.add(key)
+        deduped_feed_rows.append(row)
+    feed_rows = deduped_feed_rows
     target_names = set(load_company_targets(local_targets_path))
     target_names.update(kw.SEARCH_COMPANIES)
     for name, _category in CURATED_EXTRA_FIRMS:

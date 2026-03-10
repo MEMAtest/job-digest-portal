@@ -45,6 +45,7 @@ Metro Bank
 Mizuho
 Monument Bank Limited
 Monzo
+monzo
 Morgan Stanley
 MUFG
 Nationwide
@@ -68,12 +69,15 @@ Société Générale
 Societe Generale
 St. James's Place
 Standard Chartered
+StandardChartered
 Starling Bank
 Starling
 Starlingbank
+starlingbank
 State Street
 Tesco Bank
 Tide
+tide
 TSB
 UBS
 UniCredit
@@ -85,18 +89,23 @@ Zopa
 Adclear
 Adyen
 Airwallex
+airwallex
+alloy
 Amazon
 ANNA Money
 Appian
+appian
 Apple
 Arkk Solutions
 Armalytix
 AuditComply
 Avaloq
+azimo
 Azimo
 Blackdot Solutions
 Block
 Brex
+brex
 C365Cloud
 Cambridge Intelligence
 Cashplus
@@ -105,16 +114,18 @@ Checkout.com
 Checkout
 Checkoutcom
 Chip
+chip
 Citi
+clearscore
 Clearscore
 CleverChain
 CMC Markets
-Complyadvantage
 Credit Benchmark
 Creditspring
 CUBE
 Currencycloud
 Curve
+curve
 Cygnetise
 Datactics
 Davies
@@ -125,8 +136,10 @@ DowJones
 Dowjones
 E-Sign
 Engine by Starling
+entrust
 Fable Data
 Finch
+finch
 FinCrime Dynamics
 FIS
 Flagstone
@@ -137,6 +150,7 @@ Forter
 FundApps
 Funding Circle
 Fundingcircle
+fundingcircle
 Gen H
 Global Screening Services
 GoCardless
@@ -149,19 +163,28 @@ iProov
 JPMorgan Chase & Co
 Juni
 Kaizen
+klarna
 Klarna
 Konfir
+kroo
+lendable
 Lendable
 LendingCrowd
 Lexisnexis
+lexisnexis
 Love Finance
 Mambu
+mambu
 Marqeta
+marqeta
 Mastercard
 Mercury
+mercury
 Meta
 Microsoft
 Modulr
+modulr
+mollie
 Mollie
 Monavate
 Monese
@@ -183,6 +206,7 @@ PayPal
 Pega
 Penfold
 Plaid
+plaid
 Pleo
 Plum
 Primer
@@ -194,12 +218,15 @@ Quantifind
 Railsr
 Raisin
 Ramp
+ramp
 Rapyd
+rapyd
 Ravelin
 Recordsure
 Red Flag Alert
 REGnosys
 Revolut
+revolut
 Risk Ledger
 RiskSmart
 Ruleguard
@@ -208,25 +235,31 @@ S&PGlobal
 Salesforce
 Santander
 SAP
+saphyre
 Sardine
 Smartpension
+smartpension
 SmartStream
 Snoop
 Snyk
+snyk
+socure
 Solaris
 Soldo
 Spendesk
 Square
-StandardChartered
 Stripe
+stripe
 SumUp
 Symphonyai
+symphonyai
 TAINA Technology
 Temenos
 Thirdfort
 Thought Machine
 Thoughtmachine
 Tink
+tink
 Token.io
 TrueLayer
 Truelayer
@@ -243,20 +276,24 @@ Wordwatch
 Worldline
 Worldpay
 Worldremit
+worldremit
 Yapily
 Zilch
-Actimize
+zopa
 Alloy
 BioCatch
 Chainalysis
 ComplyAdvantage
+Complyadvantage
 ComplyCube
 Elliptic
 Encompass
+encompass
 Entrust
 Featurespace
 Feedzai
 Fenergo
+fenergo
 FinScan
 Fourthline
 Hawk
@@ -271,13 +308,19 @@ Kyckr
 LexisNexis Risk
 Lucinity
 Napier
+napier
 NICE Actimize
+Actimize
+actimize
 Norbloc
 Onfido
+onfido
 Persona
 Quantexa
+quantexa
 Resistant AI
 Ripjar
+ripjar
 Salv
 Saphyre
 Sigma360
@@ -285,7 +328,10 @@ smartKYC
 Socure
 Strise
 Sumsub
+sumsub
 SymphonyAI
 Trulioo
+trulioo
 Unit21
 Veriff
+veriff

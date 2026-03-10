@@ -216,6 +216,7 @@ JOB_BOARD_SOURCES = [
     {"name": "eFinancialCareers", "type": "html", "url": "https://www.efinancialcareers.co.uk"},
     {"name": "IndeedUK", "type": "html", "url": "https://uk.indeed.com"},
     {"name": "Workday", "type": "api", "url": "workday"},
+    {"name": "CustomCareers", "type": "html", "url": "custom"},
     {"name": "JobServe", "type": "html", "url": "https://jobserve.com/gb/en/Job-Search/"},
     {"name": "WorkInStartups", "type": "html", "url": "https://workinstartups.com"},
 ]
