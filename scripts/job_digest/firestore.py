@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import re
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -17,6 +18,7 @@ from .llm import (
     generate_groq_text,
     parse_gemini_payload,
 )
+from .company_coverage import compute_coverage_summary, read_registry
 from .models import JobRecord
 from .sources import linkedin_job_details
 from .utils import canonicalize_posted_fields, infer_ats_family, infer_source_family, now_utc, parse_applicant_count
@@ -204,8 +206,64 @@ def write_source_stats(records: List[JobRecord]) -> None:
         "ats_family_counts": ats_family_counts,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    registry_rows = read_registry()
+    if registry_rows:
+        payload["company_coverage"] = build_company_coverage_payload(registry_rows, records)
     try:
         client.collection("job_stats").document(today).set(payload, merge=True)
+        if registry_rows:
+            client.collection("coverage_stats").document("latest").set(
+                {
+                    **payload.get("company_coverage", {}),
+                    "date": today,
+                    "updated_at": payload["updated_at"],
+                },
+                merge=True,
+            )
+    except Exception:
+        return
+
+
+def build_company_coverage_payload(registry_rows: List[dict], records: Optional[List[JobRecord]] = None) -> dict:
+    coverage = compute_coverage_summary(registry_rows)
+    seen_companies = Counter(record.company for record in (records or []) if record.company)
+    covered_firms = {row.get("firm_name") for row in registry_rows if row.get("scrape_status") == "covered"}
+    coverage["roles_last_run"] = len(records or [])
+    coverage["companies_with_roles_last_run"] = len(seen_companies)
+    coverage["covered_firms_with_roles_last_run"] = sum(1 for company in seen_companies if company in covered_firms)
+    coverage["top_companies_last_run"] = [
+        {"firm_name": company, "roles": count}
+        for company, count in seen_companies.most_common(10)
+    ]
+    return coverage
+
+
+def write_company_coverage_snapshot() -> None:
+    client = init_firestore_client()
+    if client is None:
+        return
+    registry_rows = read_registry()
+    if not registry_rows:
+        return
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    payload = build_company_coverage_payload(registry_rows)
+    try:
+        client.collection("job_stats").document(today).set(
+            {
+                "date": today,
+                "company_coverage": payload,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            merge=True,
+        )
+        client.collection("coverage_stats").document("latest").set(
+            {
+                **payload,
+                "date": today,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+            merge=True,
+        )
     except Exception:
         return
 

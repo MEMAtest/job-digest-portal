@@ -3,6 +3,7 @@ import {
   dashboardStatsContainer,
   appliedTrackerContainer,
   sourceStatsContainer,
+  companyCoverageContainer,
   searchInput,
   followUpBanner,
   triagePrompt,
@@ -44,6 +45,110 @@ const truncateText = (text, len = 120) => {
   const value = String(text || "").trim();
   if (!value) return "";
   return value.length > len ? `${value.slice(0, len)}…` : value;
+};
+
+const renderCompanyCoverage = (statsDocs) => {
+  if (!companyCoverageContainer) return;
+  const coverage = statsDocs?.[0]?.company_coverage || null;
+  if (!coverage) {
+    companyCoverageContainer.innerHTML = "";
+    return;
+  }
+
+  const cards = [
+    ["Target firms", coverage.target_firms_total || 0, "Canonical UK target universe"],
+    ["Direct coverage", coverage.covered_firms_total || 0, `${coverage.direct_coverage_rate || 0}% directly covered`],
+    ["Partial coverage", coverage.partial_firms_total || 0, "LinkedIn/search fallback only"],
+    ["Tier 1 direct", `${coverage.tier1_direct_coverage_rate || 0}%`, "Priority bank-heavy direct coverage"],
+    ["Roles last run", coverage.roles_last_run || 0, "Yield from latest scrape run"],
+    ["Companies last run", coverage.companies_with_roles_last_run || 0, "Unique firms producing roles"],
+  ];
+
+  const categoryRows = Object.entries(coverage.category_counts || {})
+    .sort((a, b) => (b[1]?.target || 0) - (a[1]?.target || 0))
+    .map(
+      ([name, counts]) => `
+        <div class="company-coverage__table-row">
+          <span>${escapeHtml(name)}</span>
+          <strong>${counts.target || 0}</strong>
+          <span>${counts.covered || 0} direct</span>
+          <span>${counts.partial || 0} partial</span>
+        </div>
+      `
+    )
+    .join("");
+
+  const platformRows = Object.entries(coverage.platform_counts || {})
+    .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+    .slice(0, 8)
+    .map(
+      ([name, count]) => `
+        <div class="company-coverage__pill-row">
+          <span>${escapeHtml(name)}</span>
+          <strong>${count}</strong>
+        </div>
+      `
+    )
+    .join("");
+
+  const missingRows = (coverage.top_missing || [])
+    .map(
+      (row) => `
+        <div class="company-coverage__missing-row">
+          <div>
+            <strong>${escapeHtml(row.firm_name || "")}</strong>
+            <span>${escapeHtml(row.primary_category || "")} · ${escapeHtml(row.priority_tier || "")}</span>
+          </div>
+          <span class="company-coverage__status">${escapeHtml(row.scrape_status || "")}</span>
+        </div>
+      `
+    )
+    .join("");
+
+  companyCoverageContainer.innerHTML = `
+    <section class="company-coverage-card">
+      <div class="company-coverage-card__header">
+        <div>
+          <h3>Company coverage</h3>
+          <p>${coverage.target_firms_total || 0} firms in the target universe. ${coverage.covered_firms_total || 0} have direct ATS/careers coverage right now.</p>
+        </div>
+        <div class="company-coverage-card__meta">Direct coverage ${coverage.direct_coverage_rate || 0}%</div>
+      </div>
+      <div class="company-coverage__grid">
+        ${cards
+          .map(
+            ([label, value, note]) => `
+              <article class="company-coverage__metric">
+                <span>${escapeHtml(label)}</span>
+                <strong>${escapeHtml(String(value))}</strong>
+                <small>${escapeHtml(note)}</small>
+              </article>
+            `
+          )
+          .join("")}
+      </div>
+      <div class="company-coverage__panels">
+        <div class="company-coverage__panel">
+          <h4>By category</h4>
+          <div class="company-coverage__table">
+            ${categoryRows || '<div class="company-coverage__empty">No category data.</div>'}
+          </div>
+        </div>
+        <div class="company-coverage__panel">
+          <h4>Top platforms</h4>
+          <div class="company-coverage__pill-list">
+            ${platformRows || '<div class="company-coverage__empty">No platform data.</div>'}
+          </div>
+        </div>
+        <div class="company-coverage__panel">
+          <h4>Priority firms still partial</h4>
+          <div class="company-coverage__missing-list">
+            ${missingRows || '<div class="company-coverage__empty">No missing firms.</div>'}
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
 };
 
 const CONTRACT_STORAGE_KEY = "contract_calc_v1";
@@ -522,6 +627,7 @@ const renderPrepBoard = () => {
 };
 
 export const renderSourceStats = (statsDocs) => {
+  renderCompanyCoverage(statsDocs);
   if (!statsDocs.length) {
     if (sourceStatsContainer) sourceStatsContainer.innerHTML = "";
     return;

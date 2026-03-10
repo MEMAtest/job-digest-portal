@@ -1777,3 +1777,154 @@ body {
   background: #fef9c3;
   border-color: #fde68a;
   color: #854d0e;
+
+.company-coverage-card {
+  margin-top: 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+}
+
+.company-coverage-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.company-coverage-card__header h3 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.company-coverage-card__header p,
+.company-coverage-card__meta {
+  margin: 0;
+  color: #64748b;
+}
+
+.company-coverage__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.company-coverage__metric,
+.company-coverage__panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #f8fafc;
+}
+
+.company-coverage__metric {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.company-coverage__metric span,
+.company-coverage__metric small,
+.company-coverage__table-row span,
+.company-coverage__pill-row span,
+.company-coverage__missing-row span {
+  color: #64748b;
+}
+
+.company-coverage__metric strong {
+  font-size: 28px;
+  color: #0f172a;
+}
+
+.company-coverage__panels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.company-coverage__panel {
+  padding: 16px;
+  min-width: 0;
+}
+
+.company-coverage__panel h4 {
+  margin: 0 0 12px;
+  font-size: 15px;
+}
+
+.company-coverage__table,
+.company-coverage__pill-list,
+.company-coverage__missing-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.company-coverage__table-row,
+.company-coverage__pill-row,
+.company-coverage__missing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.company-coverage__table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 60px 90px 90px;
+}
+
+.company-coverage__pill-row strong,
+.company-coverage__status {
+  color: #4f46e5;
+  font-weight: 700;
+}
+
+.company-coverage__missing-row {
+  align-items: flex-start;
+}
+
+.company-coverage__missing-row div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.company-coverage__missing-row strong,
+.company-coverage__table-row strong {
+  color: #0f172a;
+}
+
+.company-coverage__empty {
+  color: #64748b;
+  padding: 10px 0;
+}
+
+@media (max-width: 1080px) {
+  .company-coverage__panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .company-coverage-card {
+    padding: 18px;
+  }
+
+  .company-coverage-card__header {
+    flex-direction: column;
+  }
+
+  .company-coverage__table-row {
+    grid-template-columns: 1fr;
+  }
+}

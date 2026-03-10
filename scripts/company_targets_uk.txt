@@ -1,190 +1,291 @@
-Barclays
-HSBC
-NatWest
-Lloyds
-Lloyds Banking Group
-Santander
-Nationwide
-TSB
-Virgin Money
-Metro Bank
-Tesco Bank
-Coutts
-Standard Chartered
-Citi
-JPMorgan
-JPMorgan Chase
-JPMorgan Chase & Co
-Goldman Sachs
-Morgan Stanley
+ABN AMRO
+Abrdn
+AJ Bell
+Aldermore
+Allica Bank
+Atom Bank
 Bank of America
-Deutsche Bank
-UBS
+Banking Circle
+Barclays
+BlackRock
 BNP Paribas
-Société Générale
-Societe Generale
+BNPParibas
+BNY Mellon
+ClearBank
+Clearbank
+Close Brothers
+Co-operative Bank
+Coutts
+Coventry Building Society
 Crédit Agricole
 Credit Agricole
-RBC
-ING
-Rabobank
-ABN AMRO
-UniCredit
-BNY Mellon
-State Street
-Northern Trust
-BlackRock
-Vanguard
+Deutsche Bank
+DeutscheBank
 Fidelity
-Nomura
-Mizuho
-MUFG
-SMBC
-Macquarie
+FNZ
+Goldman Sachs
+Handelsbanken
+Hargreaves Lansdown
+HSBC
+ICBC Standard Bank
+IG Group
+ING
+Investec
 Jefferies
-Rothschild
-LSEG
-Wise
-Revolut
-Monzo
-Starling
-Engine by Starling
-Tide
-Zopa
-OakNorth
-Atom Bank
-ClearBank
+JPMorgan Chase
+JPMorgan
+Julius Baer
 Kroo
-Chip
-Curve
-Checkout.com
-Stripe
+Lloyds Banking Group
+Lloyds
+LSEG
+M&G
+Macquarie
+Metro Bank
+Mizuho
+Monument Bank Limited
+Monzo
+Morgan Stanley
+MUFG
+Nationwide
+NatWest Group
+NatWest
+Nomura
+Northern Trust
+OakNorth
+Oaknorth
+Paragon Bank
+Rabobank
+RBC
+Rothschild
+Santander UK
+Schroders
+Secure Trust Bank
+Shawbrook
+Skipton Building Society
+SMBC
+Société Générale
+Societe Generale
+St. James's Place
+Standard Chartered
+Starling Bank
+Starling
+Starlingbank
+State Street
+Tesco Bank
+Tide
+TSB
+UBS
+UniCredit
+Vanguard
+Vanquis Bank
+Virgin Money
+Yorkshire Building Society
+Zopa
+Adclear
 Adyen
-Worldpay
-GoCardless
-Modulr
-TrueLayer
-Tink
-Plaid
 Airwallex
-Rapyd
-Marqeta
-Mambu
-Thought Machine
-Temenos
+Amazon
+ANNA Money
+Appian
+Apple
+Arkk Solutions
+Armalytix
+AuditComply
 Avaloq
+Azimo
+Blackdot Solutions
+Block
+Brex
+C365Cloud
+Cambridge Intelligence
+Cashplus
+CheckedSafe
+Checkout.com
+Checkout
+Checkoutcom
+Chip
+Citi
+Clearscore
+CleverChain
+CMC Markets
+Complyadvantage
+Credit Benchmark
+Creditspring
+CUBE
+Currencycloud
+Curve
+Cygnetise
+Datactics
+Davies
+Derivitec
+Detected
+Dow Jones
+DowJones
+Dowjones
+E-Sign
+Engine by Starling
+Fable Data
+Finch
+FinCrime Dynamics
+FIS
+Flagstone
+Flow Global
+FNA
+Forensic Analytics
+Forter
+FundApps
 Funding Circle
+Fundingcircle
+Gen H
+Global Screening Services
+GoCardless
+Gocardless
+Google
+Griffin
+Hozah
+Infinian
+iProov
+JPMorgan Chase & Co
+Juni
+Kaizen
+Klarna
+Konfir
 Lendable
-Zilch
+LendingCrowd
+Lexisnexis
+Love Finance
+Mambu
+Marqeta
+Mastercard
+Mercury
+Meta
+Microsoft
+Modulr
+Mollie
+Monavate
+Monese
+Moneybox
+Moody
+Moody's
+Neotas
+NICE
+Nium
+NorthRow
+Novatus
+Nuggets
+OneDome
+OneID
+Oracle
+Paddle
+Payhawk
+PayPal
+Pega
+Penfold
+Plaid
+Pleo
+Plum
+Primer
+Profylr
+ProofID
+Proxymity
+Qonto
+Quantifind
+Railsr
+Raisin
+Ramp
+Rapyd
+Ravelin
+Recordsure
+Red Flag Alert
+REGnosys
+Revolut
+Risk Ledger
+RiskSmart
+Ruleguard
+S&P Global
+S&PGlobal
+Salesforce
+Santander
+SAP
+Sardine
+Smartpension
+SmartStream
+Snoop
+Snyk
 Solaris
 Soldo
-Pleo
-Yapily
-PayPal
-Block
+Spendesk
 Square
-Fenergo
-Quantexa
-ComplyAdvantage
-LexisNexis Risk
-NICE Actimize
-Actimize
-Pega
-FIS
-Moody's
-S&P Global
-Oracle
-Appian
-Dow Jones
-Napier
-Trulioo
-Onfido
-Sumsub
-Veriff
-Feedzai
-Socure
-Kyckr
-KYC360
-Ripjar
-FinScan
-IMTF
-Saphyre
-SymphonyAI
-Alloy
-Incode
-Norbloc
-smartKYC
-KYC Portal
-Encompass
-Sigma360
-Davies
-Google
-Microsoft
-Amazon
-Apple
-Meta
-Salesforce
-SAP
-Monument Bank Limited
-Allica Bank
-LendingCrowd
-OneDome
-Monavate
-Creditspring
-Penfold
-Love Finance
-Flagstone
-Moneybox
-Gen H
-Flow Global
-ANNA Money
-Verto
-Hozah
-C365Cloud
-CleverChain
-Konfir
-Adclear
-Profylr
-RiskSmart
+StandardChartered
+Stripe
+SumUp
+Symphonyai
 TAINA Technology
-Red Flag Alert
-Datactics
-Ravelin
-Proxymity
-Vera
-iProov
-Cygnetise
-REGnosys
-AuditComply
-CheckedSafe
-Forensic Analytics
-Fable Data
-Nuggets
-Detected
-Derivitec
-OneID
-Risk Ledger
-Recordsure
-FNA
-Novatus
-NorthRow
-Cambridge Intelligence
-Elliptic
-Armalytix
-CUBE
-FundApps
-FinCrime Dynamics
-Arkk Solutions
-E-Sign
-SmartStream
-Blackdot Solutions
+Temenos
 Thirdfort
+Thought Machine
+Thoughtmachine
+Tink
+Token.io
+TrueLayer
+Truelayer
+Trust Payments
+Trustly
+Tuum
+Vera
+Verto
+Visa
+Volt
 Voxsmart
+Wise
 Wordwatch
-Ruleguard
-Kaizen
-Infinian
-Global Screening Services
-ProofID
-Credit Benchmark
-Neotas
+Worldline
+Worldpay
+Worldremit
+Yapily
+Zilch
+Actimize
+Alloy
+BioCatch
+Chainalysis
+ComplyAdvantage
+ComplyCube
+Elliptic
+Encompass
+Entrust
+Featurespace
+Feedzai
+Fenergo
+FinScan
+Fourthline
+Hawk
+Hawk AI
+IMTF
+Incode
+Jumio
+KYC Portal
+KYC360
+Kyc360
+Kyckr
+LexisNexis Risk
+Lucinity
+Napier
+NICE Actimize
+Norbloc
+Onfido
+Persona
+Quantexa
+Resistant AI
+Ripjar
+Salv
+Saphyre
+Sigma360
+smartKYC
+Socure
+Strise
+Sumsub
+SymphonyAI
+Trulioo
+Unit21
+Veriff

@@ -31,6 +31,7 @@ export const summaryLine = document.getElementById("summary-line");
 export const jobsContainer = document.getElementById("jobs");
 // topPickContainer removed — unused
 export const sourceStatsContainer = document.getElementById("source-stats");
+export const companyCoverageContainer = document.getElementById("company-coverage");
 export const refreshBtn = document.getElementById("refresh-btn");
 export const runNowBtn = document.getElementById("run-now-btn");
 export const runStatusLine = document.getElementById("run-status-line");
