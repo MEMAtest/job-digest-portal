@@ -34,6 +34,7 @@ Investec
 Jefferies
 JPMorgan Chase
 JPMorgan
+JPMorgan Chase & Co
 Julius Baer
 Kroo
 Lloyds Banking Group
@@ -161,18 +162,17 @@ Griffin
 Hozah
 Infinian
 iProov
-JPMorgan Chase & Co
 Juni
 Kaizen
 klarna
 Klarna
 Konfir
 kroo
-lendable
 Lendable
+lendable
 LendingCrowd
-lexisnexis
 Lexisnexis
+lexisnexis
 Love Finance
 Mambu
 mambu
@@ -249,8 +249,8 @@ socure
 Solaris
 Soldo
 Spendesk
-Stripe
 stripe
+Stripe
 SumUp
 Symphonyai
 symphonyai
@@ -297,8 +297,8 @@ Fenergo
 fenergo
 FinScan
 Fourthline
-Hawk
 Hawk AI
+Hawk
 IMTF
 Incode
 Jumio
