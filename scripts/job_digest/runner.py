@@ -71,10 +71,6 @@ except Exception:  # noqa: BLE001
 
 
 def main() -> None:
-    if not should_run_now():
-        print("Skipping run: outside scheduled run window or already sent today.")
-        return
-
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
 
@@ -115,6 +111,7 @@ def main() -> None:
                         pass
 
     linkedin_jobs = linkedin_search(session)
+    print(f"[LinkedIn] {len(linkedin_jobs)} raw results fetched (before filtering)")
     for job in linkedin_jobs:
         title = job.get("title", "")
         company = job.get("company", "")
@@ -177,6 +174,7 @@ def main() -> None:
         )
 
     greenhouse_jobs = greenhouse_search(session)
+    print(f"[Greenhouse] {len(greenhouse_jobs)} raw results fetched (before filtering)")
     for job in greenhouse_jobs:
         title = job.get("title", "")
         company = job.get("company", "")
@@ -222,6 +220,7 @@ def main() -> None:
         )
 
     lever_jobs = lever_search(session)
+    print(f"[Lever] {len(lever_jobs)} raw results fetched (before filtering)")
     for job in lever_jobs:
         title = job.get("title", "")
         company = job.get("company", "")
@@ -267,6 +266,7 @@ def main() -> None:
         )
 
     smart_jobs = smartrecruiters_search(session)
+    print(f"[SmartRecruiters] {len(smart_jobs)} raw results fetched (before filtering)")
     for job in smart_jobs:
         title = job.get("title", "")
         company = job.get("company", "")
@@ -312,6 +312,7 @@ def main() -> None:
         )
 
     ashby_jobs = ashby_search(session)
+    print(f"[Ashby] {len(ashby_jobs)} raw results fetched (before filtering)")
     for job in ashby_jobs:
         title = job.get("title", "")
         company = job.get("company", "")
@@ -357,6 +358,7 @@ def main() -> None:
         )
 
     workable_jobs = workable_search(session)
+    print(f"[Workable] {len(workable_jobs)} raw results fetched (before filtering)")
     for job in workable_jobs:
         title = job.get("title", "")
         company = job.get("company", "")
@@ -402,7 +404,9 @@ def main() -> None:
             )
         )
 
+    print("[Job boards] scanning...")
     board_jobs = job_board_search(session)
+    print(f"[Job boards] {len(board_jobs)} raw results fetched (before filtering)")
     for job in board_jobs:
         title = job.get("title", "")
         company = job.get("company", "")
@@ -612,6 +616,18 @@ def main() -> None:
 
     print(f"Digest generated: {out_xlsx}")
     print(f"Roles found: {len(records)}")
+
+    source_counts: dict[str, int] = {}
+    for r in records:
+        src = r.source or "Unknown"
+        source_counts[src] = source_counts.get(src, 0) + 1
+    print("\n--- Source Yield in Digest ---")
+    if source_counts:
+        for src, cnt in sorted(source_counts.items(), key=lambda x: -x[1]):
+            print(f"  {src}: {cnt}")
+    else:
+        print("  (no roles in digest this run)")
+    print("--- End Source Summary ---")
 
 
 def cli() -> None:
