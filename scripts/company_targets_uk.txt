@@ -93,15 +93,15 @@ airwallex
 alloy
 Amazon
 ANNA Money
-Appian
 appian
+Appian
 Apple
 Arkk Solutions
 Armalytix
 AuditComply
 Avaloq
-azimo
 Azimo
+azimo
 Blackdot Solutions
 Block
 Brex
@@ -116,8 +116,8 @@ Checkoutcom
 Chip
 chip
 Citi
-clearscore
 Clearscore
+clearscore
 CleverChain
 CMC Markets
 Credit Benchmark
@@ -138,8 +138,8 @@ E-Sign
 Engine by Starling
 entrust
 Fable Data
-Finch
 finch
+Finch
 FinCrime Dynamics
 FIS
 Flagstone
@@ -163,8 +163,8 @@ iProov
 JPMorgan Chase & Co
 Juni
 Kaizen
-klarna
 Klarna
+klarna
 Konfir
 kroo
 lendable
@@ -184,8 +184,8 @@ Meta
 Microsoft
 Modulr
 modulr
-mollie
 Mollie
+mollie
 Monavate
 Monese
 Moneybox
@@ -237,8 +237,8 @@ Santander
 SAP
 saphyre
 Sardine
-Smartpension
 smartpension
+Smartpension
 SmartStream
 Snoop
 Snyk
@@ -248,18 +248,18 @@ Solaris
 Soldo
 Spendesk
 Square
-Stripe
 stripe
+Stripe
 SumUp
-Symphonyai
 symphonyai
+Symphonyai
 TAINA Technology
 Temenos
 Thirdfort
 Thought Machine
 Thoughtmachine
-Tink
 tink
+Tink
 Token.io
 TrueLayer
 Truelayer
@@ -275,8 +275,8 @@ Wise
 Wordwatch
 Worldline
 Worldpay
-Worldremit
 worldremit
+Worldremit
 Yapily
 Zilch
 zopa
