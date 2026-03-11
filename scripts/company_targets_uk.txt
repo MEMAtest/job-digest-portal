@@ -100,8 +100,8 @@ Arkk Solutions
 Armalytix
 AuditComply
 Avaloq
-Azimo
 azimo
+Azimo
 Blackdot Solutions
 Block
 Brex
@@ -138,8 +138,8 @@ E-Sign
 Engine by Starling
 entrust
 Fable Data
-Finch
 finch
+Finch
 FinCrime Dynamics
 FIS
 Flagstone
@@ -217,14 +217,15 @@ Qonto
 Quantifind
 Railsr
 Raisin
-ramp
 Ramp
+ramp
 Rapyd
 rapyd
 Ravelin
 Recordsure
 Red Flag Alert
 REGnosys
+Regnosys
 Revolut
 revolut
 Risk Ledger
@@ -237,8 +238,8 @@ Santander
 SAP
 saphyre
 Sardine
-smartpension
 Smartpension
+smartpension
 SmartStream
 Snoop
 Snyk
@@ -258,8 +259,8 @@ Temenos
 Thirdfort
 Thought Machine
 Thoughtmachine
-Tink
 tink
+Tink
 Token.io
 TrueLayer
 Truelayer
