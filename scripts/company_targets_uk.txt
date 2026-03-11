@@ -94,15 +94,15 @@ airwallex
 alloy
 Amazon
 ANNA Money
-Appian
 appian
+Appian
 Apple
 Arkk Solutions
 Armalytix
 AuditComply
 Avaloq
-Azimo
 azimo
+Azimo
 Blackdot Solutions
 Block
 Square
@@ -140,8 +140,8 @@ E-Sign
 Engine by Starling
 entrust
 Fable Data
-finch
 Finch
+finch
 FinCrime Dynamics
 FIS
 Flagstone
@@ -168,8 +168,8 @@ klarna
 Klarna
 Konfir
 kroo
-Lendable
 lendable
+Lendable
 LendingCrowd
 Lexisnexis
 lexisnexis
@@ -179,8 +179,8 @@ mambu
 Marqeta
 marqeta
 Mastercard
-Mercury
 mercury
+Mercury
 Meta
 Microsoft
 Modulr
@@ -218,8 +218,8 @@ Qonto
 Quantifind
 Railsr
 Raisin
-ramp
 Ramp
+ramp
 Rapyd
 rapyd
 Ravelin
@@ -239,8 +239,8 @@ Santander
 SAP
 saphyre
 Sardine
-smartpension
 Smartpension
+smartpension
 SmartStream
 Snoop
 Snyk
@@ -267,7 +267,6 @@ Truelayer
 Trust Payments
 Trustly
 Tuum
-Vera
 Verto
 Visa
 Volt

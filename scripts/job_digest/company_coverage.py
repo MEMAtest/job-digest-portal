@@ -130,6 +130,8 @@ RAW_CANONICAL_NAME_MAP = {
     "virgin money": "Virgin Money",
     "wise": "Wise",
     "workinstartups": "WorkInStartups",
+    "zempler": "Cashplus",
+    "zempler bank": "Cashplus",
 }
 
 
@@ -194,7 +196,21 @@ CURATED_EXTRA_FIRMS = [
     ("Forter", "Regtech"), ("Quantifind", "Regtech"), ("Hawk", "Regtech"),
 ]
 
+EXCLUDED_TARGET_FIRMS = {
+    "Vera",
+}
+
 CURATED_DIRECT_ENDPOINTS = [
+    {
+        "firm": "ABN AMRO",
+        "category": "Bank",
+        "platform": "Custom",
+        "careers_url": "https://www.abnamro.com/en/home/careers",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
     {
         "firm": "Abrdn",
         "category": "Bank",
@@ -1945,6 +1961,116 @@ CURATED_DIRECT_ENDPOINTS = [
         "notes": "Curated direct careers page",
         "source": "CuratedCustom",
     },
+    {
+        "firm": "Cashplus",
+        "category": "Fintech",
+        "platform": "Custom",
+        "careers_url": "https://www.zemplerbank.com/about/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page; Cashplus rebranded to Zempler Bank",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "E-Sign",
+        "category": "Fintech",
+        "platform": "Custom",
+        "careers_url": "https://www.esigndigital.com/about/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Fable Data",
+        "category": "Fintech",
+        "platform": "Custom",
+        "careers_url": "https://www.fabledata.com/about-us/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct about-us page with vacancies section",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "FinScan",
+        "category": "Regtech",
+        "platform": "Custom",
+        "careers_url": "https://career.innovativesystems.com/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page for FinScan by Innovative Systems",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "IMTF",
+        "category": "Regtech",
+        "platform": "Custom",
+        "careers_url": "https://imtf.com/about-us/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "KYC Portal",
+        "category": "Regtech",
+        "platform": "Custom",
+        "careers_url": "https://www.kycportal.com/product-specialist",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct official hiring page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "LendingCrowd",
+        "category": "Fintech",
+        "platform": "Custom",
+        "careers_url": "https://www.lendingcrowd.com/careers",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Moneybox",
+        "category": "Fintech",
+        "platform": "Custom",
+        "careers_url": "https://support.moneyboxapp.com/careers",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Red Flag Alert",
+        "category": "Fintech",
+        "platform": "Custom",
+        "careers_url": "https://www.redflagalert.com/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct official company site",
+        "source": "CuratedCustom",
+    },
+    {
+        "firm": "Token.io",
+        "category": "Fintech",
+        "platform": "Lever",
+        "careers_url": "https://jobs.lever.co/token/",
+        "feed_url": "https://api.lever.co/v0/postings/token?mode=json",
+        "workday_entry": "",
+        "notes": "Curated direct Lever board",
+        "source": "CuratedLever",
+    },
+    {
+        "firm": "Wordwatch",
+        "category": "Fintech",
+        "platform": "Custom",
+        "careers_url": "https://wordwatch.io/careers/",
+        "feed_url": "",
+        "workday_entry": "",
+        "notes": "Curated direct careers page",
+        "source": "CuratedCustom",
+    },
 ]
 
 
@@ -2190,6 +2316,7 @@ def build_registry_rows() -> List[dict]:
     curated_category = {canonicalize_name(name): category for name, category in CURATED_EXTRA_FIRMS}
 
     all_firms = {canonicalize_name(name) for name in target_names if canonicalize_name(name)} | set(grouped_feed_rows.keys())
+    all_firms = {firm for firm in all_firms if firm not in EXCLUDED_TARGET_FIRMS}
 
     registry_rows: List[dict] = []
     for firm in sorted(all_firms, key=lambda value: (CATEGORY_ORDER.get(infer_category(value), 99), value.lower())):
