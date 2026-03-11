@@ -116,8 +116,8 @@ Checkoutcom
 Chip
 chip
 Citi
-Clearscore
 clearscore
+Clearscore
 CleverChain
 CMC Markets
 Credit Benchmark
@@ -163,8 +163,8 @@ iProov
 JPMorgan Chase & Co
 Juni
 Kaizen
-Klarna
 klarna
+Klarna
 Konfir
 kroo
 lendable
@@ -178,14 +178,14 @@ mambu
 Marqeta
 marqeta
 Mastercard
-Mercury
 mercury
+Mercury
 Meta
 Microsoft
 Modulr
 modulr
-Mollie
 mollie
+Mollie
 Monavate
 Monese
 Moneybox
@@ -217,8 +217,8 @@ Qonto
 Quantifind
 Railsr
 Raisin
-Ramp
 ramp
+Ramp
 Rapyd
 rapyd
 Ravelin
@@ -237,8 +237,8 @@ Santander
 SAP
 saphyre
 Sardine
-smartpension
 Smartpension
+smartpension
 SmartStream
 Snoop
 Snyk
@@ -251,15 +251,15 @@ Square
 stripe
 Stripe
 SumUp
-symphonyai
 Symphonyai
+symphonyai
 TAINA Technology
 Temenos
 Thirdfort
 Thought Machine
 Thoughtmachine
-tink
 Tink
+tink
 Token.io
 TrueLayer
 Truelayer
@@ -275,8 +275,8 @@ Wise
 Wordwatch
 Worldline
 Worldpay
-worldremit
 Worldremit
+worldremit
 Yapily
 Zilch
 zopa
