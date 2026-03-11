@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import time
+from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -29,6 +30,21 @@ def normalize_text(text: str) -> str:
 ATS_FAMILY_SOURCES = {"Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workday", "Workable"}
 AGGREGATOR_SOURCES = {"LinkedIn"}
 MANUAL_SOURCES = {"Manual"}
+RECRUITER_NAME_PATTERNS = (
+    "recruit",
+    "talent",
+    "staff",
+    "staffing",
+    "jobs",
+    "resourcing",
+    "search",
+    "headhunt",
+    "careerwise",
+    "twenty84",
+    "arc it",
+    "wiser",
+    "jack & jill",
+)
 
 
 def infer_ats_family(source: str) -> str:
@@ -47,6 +63,48 @@ def infer_source_family(source: str) -> str:
     if source_value:
         return "JobBoard"
     return ""
+
+
+@lru_cache(maxsize=1)
+def _target_firm_names() -> set[str]:
+    from .company_coverage import read_registry
+
+    return {
+        (row.get("firm_name") or "").strip()
+        for row in read_registry()
+        if (row.get("firm_name") or "").strip()
+    }
+
+
+def canonicalize_company_name(name: str) -> str:
+    from .company_coverage import canonicalize_name
+
+    return canonicalize_name(name or "")
+
+
+def is_target_firm(name: str) -> bool:
+    canonical = canonicalize_company_name(name)
+    return bool(canonical and canonical in _target_firm_names())
+
+
+def looks_like_recruiter(name: str) -> bool:
+    lowered = normalize_text(name or "").lower()
+    if not lowered:
+        return False
+    return any(token in lowered for token in RECRUITER_NAME_PATTERNS)
+
+
+def should_keep_role_company(company: str, source_family: str, source: str) -> bool:
+    canonical = canonicalize_company_name(company)
+    if source_family in {"ATS", "Manual"}:
+        return bool(canonical or normalize_text(company))
+    if not canonical:
+        return False
+    if is_target_firm(canonical):
+        return True
+    if source_family in {"JobBoard", "Aggregator"} and looks_like_recruiter(company):
+        return False
+    return False
 
 
 def trim_summary(text: str) -> str:

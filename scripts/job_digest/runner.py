@@ -46,8 +46,10 @@ from .sources import (
 )
 from .summary import build_email_html, build_sources_summary, send_email
 from .utils import (
+    canonicalize_company_name,
     canonicalize_posted_fields,
     filter_new_records,
+    is_target_firm,
     load_run_state,
     load_seen_cache,
     now_utc,
@@ -56,6 +58,7 @@ from .utils import (
     save_run_state,
     save_seen_cache,
     select_top_pick,
+    should_keep_role_company,
     should_run_now,
     _parse_run_time,
 )
@@ -63,6 +66,11 @@ from .utils import (
 
 def normalize_posted(job: dict) -> tuple[str, str, str]:
     return canonicalize_posted_fields(job.get("posted_text", "") or job.get("posted", ""), job.get("posted_date", ""))
+
+
+def canonical_company(company: str) -> str:
+    canonical = canonicalize_company_name(company)
+    return canonical or (company or "").strip()
 
 try:
     from zoneinfo import ZoneInfo
@@ -114,7 +122,7 @@ def main() -> None:
     print(f"[LinkedIn] {len(linkedin_jobs)} raw results fetched (before filtering)")
     for job in linkedin_jobs:
         title = job.get("title", "")
-        company = job.get("company", "")
+        company = canonical_company(job.get("company", ""))
         location = job.get("location", "")
         if not is_relevant_title(title):
             continue
@@ -127,10 +135,13 @@ def main() -> None:
             company = detail["company"]
         if detail.get("location"):
             location = detail["location"]
+        company = canonical_company(company)
         applicant_text = detail.get("applicant_text", "")
         if not is_relevant_title(title):
             continue
         if not is_relevant_location(location, desc_text):
+            continue
+        if not should_keep_role_company(company, "Aggregator", "LinkedIn"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(
@@ -177,11 +188,13 @@ def main() -> None:
     print(f"[Greenhouse] {len(greenhouse_jobs)} raw results fetched (before filtering)")
     for job in greenhouse_jobs:
         title = job.get("title", "")
-        company = job.get("company", "")
+        company = canonical_company(job.get("company", ""))
         location = job.get("location", "")
         if not is_relevant_title(title):
             continue
         if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "Greenhouse"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
@@ -223,11 +236,13 @@ def main() -> None:
     print(f"[Lever] {len(lever_jobs)} raw results fetched (before filtering)")
     for job in lever_jobs:
         title = job.get("title", "")
-        company = job.get("company", "")
+        company = canonical_company(job.get("company", ""))
         location = job.get("location", "")
         if not is_relevant_title(title):
             continue
         if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "Lever"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
@@ -269,11 +284,13 @@ def main() -> None:
     print(f"[SmartRecruiters] {len(smart_jobs)} raw results fetched (before filtering)")
     for job in smart_jobs:
         title = job.get("title", "")
-        company = job.get("company", "")
+        company = canonical_company(job.get("company", ""))
         location = job.get("location", "")
         if not is_relevant_title(title):
             continue
         if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "SmartRecruiters"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
@@ -315,11 +332,13 @@ def main() -> None:
     print(f"[Ashby] {len(ashby_jobs)} raw results fetched (before filtering)")
     for job in ashby_jobs:
         title = job.get("title", "")
-        company = job.get("company", "")
+        company = canonical_company(job.get("company", ""))
         location = job.get("location", "") or "Remote"
         if not is_relevant_title(title):
             continue
         if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "Ashby"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
@@ -361,11 +380,13 @@ def main() -> None:
     print(f"[Workable] {len(workable_jobs)} raw results fetched (before filtering)")
     for job in workable_jobs:
         title = job.get("title", "")
-        company = job.get("company", "")
+        company = canonical_company(job.get("company", ""))
         location = job.get("location", "") or "Remote"
         if not is_relevant_title(title):
             continue
         if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "Workable"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
@@ -409,12 +430,14 @@ def main() -> None:
     print(f"[Job boards] {len(board_jobs)} raw results fetched (before filtering)")
     for job in board_jobs:
         title = job.get("title", "")
-        company = job.get("company", "")
+        company = canonical_company(job.get("company", ""))
         location = job.get("location", "") or "Remote"
         if not is_relevant_title(title):
             continue
         summary = job.get("summary", "")
         if not is_relevant_location(location, summary):
+            continue
+        if not should_keep_role_company(company, "JobBoard", job.get("source", "Job board")):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
