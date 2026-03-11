@@ -149,6 +149,9 @@ ASHBY_BOARDS = [
 
 WORKABLE_ACCOUNTS = [
     "kroo",
+    "starling-bank",  # 101 live jobs
+    "caxton",         # 27 live jobs (FX/payments)
+    "yapily",         # 10 live jobs (open banking API)
 ]
 
 EXTRA_GREENHOUSE = [x.strip() for x in os.getenv("JOB_DIGEST_GREENHOUSE_BOARDS", "").split(",") if x.strip()]
