@@ -138,8 +138,8 @@ E-Sign
 Engine by Starling
 entrust
 Fable Data
-Finch
 finch
+Finch
 FinCrime Dynamics
 FIS
 Flagstone
@@ -163,12 +163,12 @@ iProov
 JPMorgan Chase & Co
 Juni
 Kaizen
-Klarna
 klarna
+Klarna
 Konfir
 kroo
-lendable
 Lendable
+lendable
 LendingCrowd
 Lexisnexis
 lexisnexis
@@ -184,8 +184,8 @@ Meta
 Microsoft
 Modulr
 modulr
-Mollie
 mollie
+Mollie
 Monavate
 Monese
 Moneybox
@@ -237,8 +237,8 @@ Santander
 SAP
 saphyre
 Sardine
-Smartpension
 smartpension
+Smartpension
 SmartStream
 Snoop
 Snyk
@@ -248,11 +248,11 @@ Solaris
 Soldo
 Spendesk
 Square
-Stripe
 stripe
+Stripe
 SumUp
-symphonyai
 Symphonyai
+symphonyai
 TAINA Technology
 Temenos
 Thirdfort
