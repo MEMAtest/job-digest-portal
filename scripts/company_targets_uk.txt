@@ -93,8 +93,8 @@ airwallex
 alloy
 Amazon
 ANNA Money
-appian
 Appian
+appian
 Apple
 Arkk Solutions
 Armalytix
@@ -116,8 +116,8 @@ Checkoutcom
 Chip
 chip
 Citi
-clearscore
 Clearscore
+clearscore
 CleverChain
 CMC Markets
 Credit Benchmark
@@ -163,23 +163,23 @@ iProov
 JPMorgan Chase & Co
 Juni
 Kaizen
-Klarna
 klarna
+Klarna
 Konfir
 kroo
 Lendable
 lendable
 LendingCrowd
-Lexisnexis
 lexisnexis
+Lexisnexis
 Love Finance
 Mambu
 mambu
 Marqeta
 marqeta
 Mastercard
-Mercury
 mercury
+Mercury
 Meta
 Microsoft
 Modulr
@@ -217,8 +217,8 @@ Qonto
 Quantifind
 Railsr
 Raisin
-Ramp
 ramp
+Ramp
 Rapyd
 rapyd
 Ravelin
@@ -249,8 +249,8 @@ Solaris
 Soldo
 Spendesk
 Square
-Stripe
 stripe
+Stripe
 SumUp
 symphonyai
 Symphonyai
@@ -259,8 +259,8 @@ Temenos
 Thirdfort
 Thought Machine
 Thoughtmachine
-tink
 Tink
+tink
 Token.io
 TrueLayer
 Truelayer
