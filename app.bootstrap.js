@@ -169,9 +169,10 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
   renderTriagePrompt(jobs);
 
   const nowLabel = new Date().toLocaleString();
-  const freshTodayCount = state.jobs.filter(
-    (job) => (job.application_status || "saved").toLowerCase() !== "dismissed" && isPostedToday(job)
-  ).length;
+  const freshTodayCount = state.jobs.filter((job) => {
+    const s = (job.application_status || "saved").toLowerCase();
+    return isPostedToday(job) && (s === "new" || s === "saved");
+  }).length;
   if (summaryLine) summaryLine.textContent = `${jobs.length} roles loaded · ${freshTodayCount} fresh today · Last update ${nowLabel}`;
   if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${nowLabel}`;
   if (lastUpdatedFooter) lastUpdatedFooter.textContent = `Updated: ${nowLabel}`;

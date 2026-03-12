@@ -867,7 +867,7 @@ export const renderDashboardStats = (jobs) => {
 
   const safeStatus = (job) => (job.application_status || "saved").toLowerCase();
   const freshToday = jobs.filter(
-    (job) => safeStatus(job) !== "dismissed" && isPostedToday(job)
+    (job) => isPostedToday(job) && (safeStatus(job) === "new" || safeStatus(job) === "saved")
   ).length;
   const freshLast72 = jobs.filter(
     (job) => safeStatus(job) !== "dismissed" && isFreshWithinHours(job, 72, now)

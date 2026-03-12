@@ -158,9 +158,27 @@ try {
       nonTodayDates.length === 0,
       nonTodayDates.length > 0 ? `past dates: ${[...new Set(nonTodayDates)].join(", ")}` : "all dates OK"
     );
+
+    // Summary count must equal what the filter actually shows
+    const summaryText2 = ((await page.locator("#summary-line").textContent()) || "").trim();
+    const countMatch = summaryText2.match(/(\d+)\s+fresh today/i);
+    const headerCount = countMatch ? parseInt(countMatch[1], 10) : null;
+    record(
+      "Fresh today header count matches filter count",
+      headerCount === null || headerCount === freshJobCount,
+      `header=${headerCount} filter=${freshJobCount}`
+    );
   } else {
     record("Fresh today filter: button found", false, "#quick-today button not present");
   }
+
+  // --- Dashboard funnel chart ---
+  await page.getByRole("button", { name: "Dashboard" }).click();
+  await page.waitForTimeout(2000);
+  const funnelRows = await page.locator("#applied-tracker .funnel__row").count();
+  record("Dashboard funnel chart renders", funnelRows >= 1, `funnel rows=${funnelRows}`);
+  const funnelPills = await page.locator("#applied-tracker .funnel__pill").count();
+  record("Dashboard funnel headline pills render", funnelPills >= 2, `pills=${funnelPills}`);
 
   const triageButton = page.getByRole("button", { name: /Start triaging/i });
   if (await triageButton.count()) {
