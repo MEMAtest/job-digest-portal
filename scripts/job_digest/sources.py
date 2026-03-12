@@ -2294,11 +2294,24 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
     targets = load_custom_careers_targets(UK_FEEDS_PATH)
     if not targets:
         return jobs
+    deadline_seconds = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_DEADLINE_SECONDS", "60") or "60")
+    started = time.monotonic()
+
+    def deadline_reached() -> bool:
+        return deadline_seconds > 0 and (time.monotonic() - started) >= deadline_seconds
+
+    def request_timeout() -> int:
+        if deadline_seconds <= 0:
+            return 25
+        remaining = deadline_seconds - int(time.monotonic() - started)
+        return max(5, min(25, remaining))
 
     for target in targets:
+        if deadline_reached():
+            return jobs
         careers_url = target["careers_url"]
         try:
-            resp = session.get(careers_url, timeout=25)
+            resp = session.get(careers_url, timeout=request_timeout())
         except requests.RequestException:
             continue
         if resp.status_code != 200:
@@ -2309,8 +2322,10 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
         job_map: Dict[str, Dict[str, str]] = {}
 
         for page_url in pages_to_visit[:4]:
+            if deadline_reached():
+                return jobs
             try:
-                page_resp = session.get(page_url, timeout=25)
+                page_resp = session.get(page_url, timeout=request_timeout())
             except requests.RequestException:
                 continue
             if page_resp.status_code != 200:
@@ -2332,8 +2347,10 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
             time.sleep(0.15)
 
         for link, job in list(job_map.items())[:20]:
+            if deadline_reached():
+                return jobs
             try:
-                detail_resp = session.get(link, timeout=25)
+                detail_resp = session.get(link, timeout=request_timeout())
             except requests.RequestException:
                 continue
             if detail_resp.status_code != 200:
@@ -2354,6 +2371,8 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
             time.sleep(0.15)
 
         jobs.extend(job_map.values())
+        if deadline_reached():
+            return jobs
         time.sleep(0.2)
     return jobs
 
