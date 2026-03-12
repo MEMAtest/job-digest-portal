@@ -718,6 +718,9 @@
   overflow-x: hidden;
 }
 
+/* ── Salary Badge ── */
+.badge--salary { background: #ecfdf5; color: #065f46; font-weight: 600; }
+
 /* ── Applicant Badges ── */
 .badge--applicants-red {
   background: #fef2f2;

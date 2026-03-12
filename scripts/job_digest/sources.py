@@ -923,6 +923,8 @@ def adzuna_search(session: requests.Session) -> List[Dict[str, str]]:
                     "posted_date": job.get("created", ""),
                     "summary": trim_summary(job.get("description") or ""),
                     "source": "Adzuna",
+                    "salary_min": int(job.get("salary_min") or 0),
+                    "salary_max": int(job.get("salary_max") or 0),
                 }
             )
         time.sleep(0.2)
@@ -1015,6 +1017,8 @@ def reed_search(session: requests.Session) -> List[Dict[str, str]]:
                     "posted_date": job.get("date", ""),
                     "summary": trim_summary(job.get("jobDescription") or ""),
                     "source": "Reed",
+                    "salary_min": int(job.get("minimumSalary") or 0),
+                    "salary_max": int(job.get("maximumSalary") or 0),
                 }
             )
         time.sleep(0.2)
@@ -1053,6 +1057,17 @@ def cvlibrary_search(session: requests.Session) -> List[Dict[str, str]]:
             title = job.get("title") or job.get("job_title") or ""
             if not title:
                 continue
+            cv_sal_min = int(job.get("salary_min") or 0)
+            cv_sal_max = int(job.get("salary_max") or 0)
+            if not cv_sal_min and not cv_sal_max:
+                sal_str = str(job.get("salary") or "")
+                sal_str = re.sub(r"(\d+)[kK]", lambda m: str(int(m.group(1)) * 1000), sal_str)
+                sal_nums = re.findall(r"\d+", sal_str.replace(",", ""))
+                if len(sal_nums) >= 2:
+                    cv_sal_min = int(sal_nums[0])
+                    cv_sal_max = int(sal_nums[1])
+                elif len(sal_nums) == 1:
+                    cv_sal_max = int(sal_nums[0])
             jobs.append(
                 {
                     "title": title,
@@ -1063,6 +1078,8 @@ def cvlibrary_search(session: requests.Session) -> List[Dict[str, str]]:
                     "posted_date": job.get("date") or job.get("posted") or job.get("date_posted") or "",
                     "summary": trim_summary(job.get("description") or job.get("short_description") or ""),
                     "source": "CVLibrary",
+                    "salary_min": cv_sal_min,
+                    "salary_max": cv_sal_max,
                 }
             )
         time.sleep(0.2)
@@ -1078,17 +1095,23 @@ def extract_job_links(html: str, base_url: str) -> List[Tuple[str, str]]:
     soup = BeautifulSoup(html, "html.parser")
     links: List[Tuple[str, str]] = []
     seen: set[str] = set()
+    job_path_pattern = re.compile(r"/job/|/jobs/|jobid=|vacanc|opening|opportunit|position", re.IGNORECASE)
 
     for anchor in soup.find_all("a", href=True):
         href = anchor.get("href", "")
-        if not re.search(r"/job/|/jobs/|jobid=", href):
+        title = normalize_text(
+            anchor.get_text(" ")
+            or anchor.get("aria-label", "")
+            or anchor.get("title", "")
+        )
+        haystack = f"{href} {title}"
+        if not job_path_pattern.search(haystack):
             continue
         if href.startswith("/"):
             href = urljoin(base_url, href)
         href = clean_link(href)
         if not href or href in seen:
             continue
-        title = normalize_text(anchor.get_text(" "))
         if len(title) < 4:
             continue
         seen.add(href)
@@ -1111,6 +1134,63 @@ def iter_jobposting_nodes(data: object) -> Iterable[Dict[str, object]]:
     elif isinstance(data, list):
         for item in data:
             yield from iter_jobposting_nodes(item)
+
+
+def extract_jobpostings_from_jsonld(html: str, base_url: str, default_company: str = "") -> List[Dict[str, str]]:
+    soup = BeautifulSoup(html, "html.parser")
+    jobs: List[Dict[str, str]] = []
+    seen: set[str] = set()
+    scripts = soup.find_all("script", type="application/ld+json")
+    for script in scripts:
+        payload_text = script.string or script.get_text()
+        if not payload_text:
+            continue
+        try:
+            payload = json.loads(payload_text.strip())
+        except ValueError:
+            continue
+        for node in iter_jobposting_nodes(payload):
+            url_value = node.get("url")
+            title = node.get("title") if isinstance(node.get("title"), str) else ""
+            if not isinstance(url_value, str) or not title:
+                continue
+            link = clean_link(urljoin(base_url, url_value))
+            if not link or link in seen:
+                continue
+            company = default_company
+            hiring_org = node.get("hiringOrganization")
+            if isinstance(hiring_org, dict) and isinstance(hiring_org.get("name"), str):
+                company = hiring_org.get("name") or default_company
+            location = ""
+            job_location = node.get("jobLocation")
+            if isinstance(job_location, list) and job_location:
+                job_location = job_location[0]
+            if isinstance(job_location, dict):
+                address = job_location.get("address")
+                if isinstance(address, dict):
+                    location = ", ".join(
+                        part
+                        for part in [
+                            address.get("addressLocality"),
+                            address.get("addressRegion"),
+                            address.get("addressCountry"),
+                        ]
+                        if part
+                    )
+            jobs.append(
+                {
+                    "title": normalize_text(title),
+                    "company": normalize_text(company or default_company),
+                    "location": normalize_text(location),
+                    "link": link,
+                    "posted_text": "",
+                    "posted_date": node.get("datePosted") if isinstance(node.get("datePosted"), str) else "",
+                    "summary": trim_summary(node.get("description") if isinstance(node.get("description"), str) else ""),
+                    "source": "CustomCareers",
+                }
+            )
+            seen.add(link)
+    return jobs
 
 
 def parse_job_detail_jsonld(html: str, fallback_title: str = "") -> Dict[str, str]:
@@ -1630,6 +1710,18 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
     primary_base_url = JOB_BOARD_URLS.get("IndeedUK")
     if not primary_base_url:
         return jobs
+    deadline_seconds = int(os.getenv("JOB_DIGEST_INDEED_DEADLINE_SECONDS", "45") or "45")
+    started = time.monotonic()
+
+    def deadline_reached() -> bool:
+        return deadline_seconds > 0 and (time.monotonic() - started) >= deadline_seconds
+
+    def request_timeout() -> int:
+        if deadline_seconds <= 0:
+            return 30
+        remaining = deadline_seconds - int(time.monotonic() - started)
+        return max(5, min(30, remaining))
+
     base_urls: List[str] = []
     for candidate in (primary_base_url, "https://www.indeed.co.uk"):
         cleaned = candidate.strip().rstrip("/")
@@ -1661,6 +1753,11 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
             search_terms.append(cleaned)
 
     locations = ["London", "United Kingdom", "Remote"]
+    company_queries: List[Tuple[str, str]] = []
+    for company in select_company_batch(SEARCH_COMPANIES)[:18]:
+        for term in ("product manager", "product owner", "business analyst", "operations strategy"):
+            company_queries.append((f"\"{company}\" {term}", "United Kingdom"))
+            company_queries.append((f"{company} {term}", "London"))
 
     job_map: Dict[str, Dict[str, str]] = {}
 
@@ -1691,8 +1788,12 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
             existing["location"] = normalize_text(payload.get("location", ""))
 
     for base_url in base_urls:
+        if deadline_reached():
+            return list(job_map.values())
         headers["Referer"] = f"{base_url}/"
         for keyword in search_terms[:12]:
+            if deadline_reached():
+                return list(job_map.values())
             for location in locations:
                 rss_urls = [
                     f"{base_url}/jobs?rss=1&q={quote_plus(keyword)}&l={quote_plus(location)}&sort=date&fromage=7",
@@ -1733,18 +1834,60 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
                         )
                     if entries:
                         break
+                if deadline_reached():
+                    return list(job_map.values())
                 time.sleep(0.15)
+
+    for base_url in base_urls:
+        if deadline_reached():
+            return list(job_map.values())
+        headers["Referer"] = f"{base_url}/"
+        for query, location in company_queries:
+            if deadline_reached():
+                return list(job_map.values())
+            rss_url = f"{base_url}/jobs?rss=1&q={quote_plus(query)}&l={quote_plus(location)}&sort=date&fromage=14"
+            entries = fetch_rss_entries(session, rss_url)
+            for entry in entries:
+                if isinstance(entry, dict):
+                    title = entry.get("title", "")
+                    link = entry.get("link", "")
+                    summary = trim_summary(entry.get("summary", "")) if entry.get("summary") else ""
+                    company = entry.get("author", "") or "Indeed"
+                else:
+                    title = ""
+                    link = ""
+                    summary = ""
+                    company = "Indeed"
+                if not title:
+                    continue
+                add_job(
+                    {
+                        "title": title,
+                        "company": company,
+                        "location": location,
+                        "link": link,
+                        "posted_text": "",
+                        "posted_date": parse_entry_date(entry),
+                        "summary": summary,
+                        "source": "IndeedUK",
+                    }
+                )
+            time.sleep(0.1)
 
     if job_map:
         return list(job_map.values())
 
     for base_url in base_urls:
+        if deadline_reached():
+            return list(job_map.values())
         headers["Referer"] = f"{base_url}/"
         for keyword in search_terms[:6]:
+            if deadline_reached():
+                return list(job_map.values())
             for location in locations:
                 params = {"q": keyword, "l": location, "fromage": 7, "sort": "date"}
                 try:
-                    resp = session.get(f"{base_url}/jobs", params=params, headers=headers, timeout=30)
+                    resp = session.get(f"{base_url}/jobs", params=params, headers=headers, timeout=request_timeout())
                 except requests.RequestException:
                     continue
                 if resp.status_code == 403:
@@ -2246,6 +2389,12 @@ def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
         return []
     targets: List[Dict[str, str]] = []
     seen = set()
+    try:
+        from .company_coverage import read_registry
+        registry_rows = read_registry()
+    except Exception:
+        registry_rows = []
+    registry_map = {row.get("firm_name", ""): row for row in registry_rows}
     for row in rows:
         if (row.get("platform") or "").strip().lower() != "custom":
             continue
@@ -2256,14 +2405,34 @@ def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
         if key in seen:
             continue
         seen.add(key)
+        registry_row = registry_map.get((row.get("firm") or "").strip(), {})
         targets.append(
             {
                 "firm": (row.get("firm") or "").strip(),
                 "careers_url": careers_url,
                 "source": (row.get("source") or "CustomCareers").strip() or "CustomCareers",
+                "priority_tier": registry_row.get("priority_tier", "Tier3"),
+                "fit_relevance": registry_row.get("fit_relevance", "Adjacent"),
             }
         )
-    return targets
+    tier_rank = {"Tier1": 0, "Tier2": 1, "Tier3": 2}
+    fit_rank = {"Core": 0, "Adjacent": 1, "Low": 2}
+    targets.sort(key=lambda item: (tier_rank.get(item["priority_tier"], 9), fit_rank.get(item["fit_relevance"], 9), item["firm"].lower()))
+
+    target_limit = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_TARGET_LIMIT", "36") or "36")
+    if target_limit <= 0 or len(targets) <= target_limit:
+        return targets
+
+    tier1_targets = [item for item in targets if item["priority_tier"] == "Tier1"]
+    remaining = [item for item in targets if item["priority_tier"] != "Tier1"]
+    remaining_slots = max(0, target_limit - len(tier1_targets))
+    if remaining_slots == 0:
+        return tier1_targets[:target_limit]
+
+    rotation_seed = int(time.time() // (8 * 3600))
+    offset = rotation_seed % len(remaining) if remaining else 0
+    rotated = remaining[offset:] + remaining[:offset]
+    return tier1_targets + rotated[:remaining_slots]
 
 
 def discover_custom_job_hubs(html: str, base_url: str) -> List[str]:
@@ -2320,6 +2489,8 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
         pages_to_visit = [careers_url]
         pages_to_visit.extend(discover_custom_job_hubs(resp.text, careers_url))
         job_map: Dict[str, Dict[str, str]] = {}
+        for payload in extract_jobpostings_from_jsonld(resp.text, careers_url, target["firm"]):
+            job_map.setdefault(payload["link"], payload)
 
         for page_url in pages_to_visit[:4]:
             if deadline_reached():
@@ -2330,6 +2501,8 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
                 continue
             if page_resp.status_code != 200:
                 continue
+            for payload in extract_jobpostings_from_jsonld(page_resp.text, page_url, target["firm"]):
+                job_map.setdefault(payload["link"], payload)
             for link, title in extract_job_links(page_resp.text, page_url):
                 job_map.setdefault(
                     link,

@@ -35,6 +35,8 @@ class JobRecord:
     scorecard: List[str] = field(default_factory=list)
     apply_tips: str = ""
     tailored_cv_sections: dict = field(default_factory=dict)
+    salary_min: int = 0
+    salary_max: int = 0
     applicant_count: str = ""
     job_status: str = ""
     ats_family: str = ""

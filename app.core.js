@@ -56,6 +56,8 @@ export const sourceFamilySelect = document.getElementById("sourceFamily");
 export const locationSelect = document.getElementById("location");
 export const statusSelect = document.getElementById("status");
 export const ukOnlyCheckbox = document.getElementById("ukOnly");
+export const maxApplicantsSelect = document.getElementById("maxApplicants");
+export const sortBySelect = document.getElementById("sortBy");
 export const searchSummary = document.getElementById("search-summary");
 
 export let db = null;
@@ -535,6 +537,13 @@ export const parseApplicantCount = (value) => {
   return Number(match[1].replace(/,/g, ""));
 };
 
+export const formatSalaryDisplay = (min, max) => {
+  if (!min && !max) return "";
+  const fmt = (n) => n >= 1000 ? `${Math.round(n / 1000)}k` : String(n);
+  if (min && max && min !== max) return `\u00A3${fmt(min)}\u2013\u00A3${fmt(max)}`;
+  return `\u00A3${fmt(max || min)}`;
+};
+
 export const formatApplicantBadge = (text) => {
   if (!text) return "";
   const match = text.match(/(\d+)/);
@@ -566,6 +575,8 @@ export const resetFilters = ({ keepStatus = false, skipRender = false } = {}) =>
   if (locationSelect) locationSelect.value = "";
   if (!keepStatus && statusSelect) statusSelect.value = "";
   if (ukOnlyCheckbox) ukOnlyCheckbox.checked = false;
+  if (maxApplicantsSelect) maxApplicantsSelect.value = "0";
+  if (sortBySelect) sortBySelect.value = "fit_score";
   clearQuickFilter({ skipRender });
 };
 

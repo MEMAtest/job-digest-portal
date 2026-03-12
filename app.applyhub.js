@@ -38,6 +38,31 @@ const saveHubSort = (sort) => {
 
 state.hubSort = loadHubSort();
 
+const tailoringInFlight = new Set();
+
+export const autoTailorCv = async (job) => {
+  if (hasCvTailoredChanges(job)) return;
+  if (tailoringInFlight.has(job.id)) return;
+  tailoringInFlight.add(job.id);
+  if (state.handlers.renderApplyHub) state.handlers.renderApplyHub();
+  try {
+    const res = await fetch("/.netlify/functions/generate-cv", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobId: job.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Generation failed");
+    job.tailored_cv_sections = data.sections;
+    showToast(`CV tailored for ${job.company}`);
+  } catch (err) {
+    showToast(`CV tailoring failed for ${job.company}`);
+  } finally {
+    tailoringInFlight.delete(job.id);
+    if (state.handlers.renderApplyHub) state.handlers.renderApplyHub();
+  }
+};
+
 export const hasCvTailoredChanges = (job) => {
   const tailored = job.tailored_cv_sections || {};
   const sections = ["summary", "key_achievements", "vistra_bullets", "ebury_bullets"];
@@ -301,14 +326,15 @@ export const renderApplyHub = () => {
     const requirementsPreview = buildPreviewText((job.key_requirements || []).map((req) => String(req)).join(" · "));
     const noteText = job.application_notes || "";
     const noteCount = Math.min(noteText.length, 500);
+    const isTailoring = tailoringInFlight.has(job.id);
     const actionLabel =
       statusValue === "applied" || statusValue === "interview" || statusValue === "offer"
         ? "Re-copy & Open"
         : allReady
-        ? "Ready — Apply now"
+        ? "Apply Now"
         : "Copy & View";
     return `
-      <div class="hub-card${isApplied ? " hub-card--applied" : ""}" data-job-id="${escapeHtml(job.id)}">
+      <div class="hub-card${isApplied ? " hub-card--applied" : ""}${isTailoring ? " hub-card--tailoring" : ""}" data-job-id="${escapeHtml(job.id)}">
         <div class="hub-card__header">
           <div>
             <h3>${escapeHtml(job.role)}</h3>
@@ -384,7 +410,7 @@ export const renderApplyHub = () => {
 
         <div class="hub-card__actions">
           <button class="btn btn-primary btn-quick-apply ${allReady ? "btn-quick-apply--ready" : ""}" data-job-id="${escapeHtml(job.id)}">${actionLabel}</button>
-          ${!hasCvTailoredChanges(job) ? `<button class="btn btn-secondary generate-cv-btn" data-job-id="${escapeHtml(job.id)}">Generate Tailored CV</button>` : ""}
+          ${isTailoring ? `<button class="btn btn-secondary generate-cv-btn" disabled><span class="tailoring-spinner"></span> Tailoring CV…</button>` : !hasCvTailoredChanges(job) ? `<button class="btn btn-secondary generate-cv-btn" data-job-id="${escapeHtml(job.id)}">Generate Tailored CV</button>` : ""}
           <button class="btn btn-secondary download-cv-btn" data-job-id="${escapeHtml(job.id)}">Download CV PDF</button>
           <button class="btn btn-tertiary copy-cv-text-btn" data-job-id="${escapeHtml(job.id)}">Copy CV text</button>
         </div>

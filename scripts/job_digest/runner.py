@@ -605,6 +605,8 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                 why_fit=build_reasons(full_text),
                 cv_gap=build_gaps(full_text),
                 notes=summary,
+                salary_min=job.get("salary_min", 0),
+                salary_max=job.get("salary_max", 0),
             )
         )
     return records

@@ -1,96 +1,111 @@
-ABN AMRO
-Abrdn
-AJ Bell
-Aldermore
 Allica Bank
 Atom Bank
 Bank of America
 Banking Circle
 Barclays
-BlackRock
 BNP Paribas
 BNPParibas
-BNY Mellon
 ClearBank
 Clearbank
-Close Brothers
 Co-operative Bank
-Coutts
-Coventry Building Society
 Crédit Agricole
 Credit Agricole
 Deutsche Bank
 DeutscheBank
-Fidelity
-FNZ
 Goldman Sachs
-Handelsbanken
-Hargreaves Lansdown
 HSBC
 ICBC Standard Bank
-IG Group
-ING
-Investec
-Jefferies
 JPMorgan Chase
 JPMorgan
 JPMorgan Chase & Co
-Julius Baer
 Kroo
 Lloyds Banking Group
 Lloyds
 LSEG
-M&G
-Macquarie
 Metro Bank
-Mizuho
 Monument Bank Limited
 Monzo
 monzo
 Morgan Stanley
-MUFG
-Nationwide
 NatWest Group
 NatWest
-Nomura
-Northern Trust
 OakNorth
 Oaknorth
 Paragon Bank
-Rabobank
-RBC
-Rothschild
 Santander UK
-Schroders
 Secure Trust Bank
-Shawbrook
-Skipton Building Society
-SMBC
 Société Générale
 Societe Generale
-St. James's Place
 Standard Chartered
 StandardChartered
 Starling Bank
 Starling
 Starlingbank
 starlingbank
-State Street
 Tesco Bank
 Tide
 tide
-TSB
 UBS
+Vanquis Bank
+Zopa
+ABN AMRO
+Abrdn
+AJ Bell
+Aldermore
+BlackRock
+BNY Mellon
+Close Brothers
+CMC Markets
+Coutts
+Coventry Building Society
+Fidelity
+FNZ
+Handelsbanken
+Hargreaves Lansdown
+IG Group
+ING
+Investec
+Jefferies
+Julius Baer
+M&G
+Macquarie
+Mizuho
+MUFG
+Nationwide
+Nomura
+Northern Trust
+Rabobank
+RBC
+Rothschild
+Schroders
+Shawbrook
+Skipton Building Society
+SMBC
+St. James's Place
+State Street
+TSB
 UniCredit
 Vanguard
-Vanquis Bank
 Virgin Money
 Yorkshire Building Society
-Zopa
-Adclear
 Adyen
 Airwallex
 airwallex
+Checkout.com
+Checkout
+Checkoutcom
+Citi
+GoCardless
+Gocardless
+Modulr
+modulr
+Revolut
+revolut
+Stripe
+TrueLayer
+Truelayer
+Wise
+Adclear
 alloy
 Amazon
 ANNA Money
@@ -112,16 +127,11 @@ C365Cloud
 Cambridge Intelligence
 Cashplus
 CheckedSafe
-Checkout.com
-Checkout
-Checkoutcom
 Chip
 chip
-Citi
 clearscore
 Clearscore
 CleverChain
-CMC Markets
 Credit Benchmark
 Creditspring
 CUBE
@@ -155,8 +165,6 @@ Fundingcircle
 fundingcircle
 Gen H
 Global Screening Services
-GoCardless
-Gocardless
 Google
 Griffin
 Hozah
@@ -183,8 +191,6 @@ mercury
 Mercury
 Meta
 Microsoft
-Modulr
-modulr
 Mollie
 mollie
 Monavate
@@ -227,8 +233,6 @@ Recordsure
 Red Flag Alert
 Regnosys
 REGnosys
-Revolut
-revolut
 Risk Ledger
 RiskSmart
 Ruleguard
@@ -250,7 +254,6 @@ Solaris
 Soldo
 Spendesk
 stripe
-Stripe
 SumUp
 Symphonyai
 symphonyai
@@ -262,8 +265,6 @@ Thoughtmachine
 Tink
 tink
 Token.io
-TrueLayer
-Truelayer
 Trust Payments
 Trustly
 Tuum
@@ -271,7 +272,6 @@ Verto
 Visa
 Volt
 Voxsmart
-Wise
 Wordwatch
 Worldline
 Worldpay
@@ -280,20 +280,37 @@ worldremit
 Yapily
 Zilch
 zopa
-Alloy
-BioCatch
 Chainalysis
 ComplyAdvantage
 Complyadvantage
-ComplyCube
 Elliptic
+Featurespace
+Fenergo
+fenergo
+Napier
+napier
+NICE Actimize
+Actimize
+actimize
+Onfido
+onfido
+Quantexa
+quantexa
+Ripjar
+ripjar
+Sumsub
+sumsub
+Trulioo
+trulioo
+Veriff
+veriff
+Alloy
+BioCatch
+ComplyCube
 Encompass
 encompass
 Entrust
-Featurespace
 Feedzai
-Fenergo
-fenergo
 FinScan
 Fourthline
 Hawk AI
@@ -307,31 +324,14 @@ Kyc360
 Kyckr
 LexisNexis Risk
 Lucinity
-Napier
-napier
-NICE Actimize
-Actimize
-actimize
 Norbloc
-Onfido
-onfido
 Persona
-Quantexa
-quantexa
 Resistant AI
-Ripjar
-ripjar
 Salv
 Saphyre
 Sigma360
 smartKYC
 Socure
 Strise
-Sumsub
-sumsub
 SymphonyAI
-Trulioo
-trulioo
 Unit21
-Veriff
-veriff

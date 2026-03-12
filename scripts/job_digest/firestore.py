@@ -45,15 +45,18 @@ except ImportError:
 def init_firestore_client() -> Optional["firestore.Client"]:
     if firebase_admin is None or credentials is None or firestore is None:
         return None
-    if not config.FIREBASE_SERVICE_ACCOUNT_JSON and not config.FIREBASE_SERVICE_ACCOUNT_B64:
+    if not config.FIREBASE_SERVICE_ACCOUNT_JSON and not config.FIREBASE_SERVICE_ACCOUNT_B64 and not config.FIREBASE_SERVICE_ACCOUNT_PATH:
         return None
 
     try:
         if config.FIREBASE_SERVICE_ACCOUNT_JSON:
             service_data = json.loads(config.FIREBASE_SERVICE_ACCOUNT_JSON)
-        else:
+        elif config.FIREBASE_SERVICE_ACCOUNT_B64:
             decoded = base64.b64decode(config.FIREBASE_SERVICE_ACCOUNT_B64).decode("utf-8")
             service_data = json.loads(decoded)
+        else:
+            with open(config.FIREBASE_SERVICE_ACCOUNT_PATH, encoding="utf-8") as fh:
+                service_data = json.load(fh)
     except (ValueError, json.JSONDecodeError, OSError):
         return None
 
@@ -125,6 +128,10 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             data["application_status"] = "shortlisted"
         elif not existing_status:
             data["application_status"] = "saved"
+        if record.salary_min:
+            data["salary_min"] = record.salary_min
+        if record.salary_max:
+            data["salary_max"] = record.salary_max
         optional_fields = {
             "role_summary": record.role_summary,
             "tailored_summary": record.tailored_summary,

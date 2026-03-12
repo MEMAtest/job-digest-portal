@@ -26,6 +26,10 @@ import {
   showToast,
   showConfirmToast,
   formatApplicantBadge,
+  formatSalaryDisplay,
+  parseApplicantCount,
+  maxApplicantsSelect,
+  sortBySelect,
   quickFilterPredicate,
   uniqueCompanyOnly,
   applyQuickFilter,
@@ -386,6 +390,7 @@ export const getFilteredJobs = () => {
   const locationFilter = locationSelect.value;
   const statusFilter = statusSelect.value;
   const ukOnly = ukOnlyCheckbox.checked;
+  const maxApplicants = Number(maxApplicantsSelect?.value || 0);
 
   let filtered = state.jobs.filter((job) => {
     const jobStatus = (job.application_status || "saved").toLowerCase();
@@ -398,6 +403,10 @@ export const getFilteredJobs = () => {
     const matchesUkOnly = !ukOnly || isUkOrRemote(job.location);
     const matchesQuick = !quickFilterPredicate || quickFilterPredicate(job);
     const matchesDismissed = statusFilter === "dismissed" || jobStatus !== "dismissed";
+    const matchesApplicants = !maxApplicants || (() => {
+      const count = parseApplicantCount(job.applicant_count);
+      return count === null || count < maxApplicants;
+    })();
 
     return (
       matchesFit &&
@@ -407,7 +416,8 @@ export const getFilteredJobs = () => {
       matchesStatus &&
       matchesUkOnly &&
       matchesQuick &&
-      matchesDismissed
+      matchesDismissed &&
+      matchesApplicants
     );
   });
 
@@ -436,6 +446,16 @@ export const getFilteredJobs = () => {
     .sort((left, right) => {
       const scoreDelta = (right.__searchScore || 0) - (left.__searchScore || 0);
       if (scoreDelta !== 0) return scoreDelta;
+      const sortMode = sortBySelect?.value || "fit_score";
+      if (sortMode === "salary") {
+        const salDelta = Number(right.salary_max || 0) - Number(left.salary_max || 0);
+        if (salDelta !== 0) return salDelta;
+      }
+      if (sortMode === "posted") {
+        const rightDate = parseDateValue(right.posted_date || right.updated_at)?.getTime() || 0;
+        const leftDate = parseDateValue(left.posted_date || left.updated_at)?.getTime() || 0;
+        if (rightDate !== leftDate) return rightDate - leftDate;
+      }
       const fitDelta = Number(right.fit_score || 0) - Number(left.fit_score || 0);
       if (fitDelta !== 0) return fitDelta;
       const rightDate = parseDateValue(right.posted_date || right.updated_at)?.getTime() || 0;
@@ -609,6 +629,7 @@ const renderJobDetail = (job, detailEl) => {
           ${manualBadge}
           ${job.apply_method ? `<span class="badge badge--method">${escapeHtml(job.apply_method)}</span>` : ""}
           ${formatApplicantBadge(job.applicant_count)}
+          ${formatSalaryDisplay(job.salary_min, job.salary_max) ? `<span class="badge badge--salary">${escapeHtml(formatSalaryDisplay(job.salary_min, job.salary_max))}</span>` : ""}
         </div>
       </div>
       <div class="job-detail-actions">
@@ -1178,6 +1199,8 @@ export const renderJobs = () => {
     const statusLabel = formatStatusLabel(statusValue);
     const postedDisplay = formatPostedMeta(job);
     const applicantDisplay = job.applicant_count ? ` · ${job.applicant_count} applicants` : "";
+    const salaryDisplay = formatSalaryDisplay(job.salary_min, job.salary_max);
+    const salaryMeta = salaryDisplay ? ` · ${salaryDisplay}` : "";
     const openStatus =
       job.job_status ||
       (job.is_open === true ? "Open" : "") ||
@@ -1202,7 +1225,7 @@ export const renderJobs = () => {
       <div class="job-list-main">
         <div class="job-list-title">${escapeHtml(job.role)}</div>
         <div class="job-list-company">${escapeHtml(job.company || "Company not listed")}</div>
-        <div class="job-list-meta">${escapeHtml(postedDisplay)} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
+        <div class="job-list-meta">${escapeHtml(postedDisplay)} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(salaryMeta)}${escapeHtml(statusSuffix)}</div>
         <div class="job-list-meta"><span class="status-badge ${getStatusBadgeClass(statusValue)}">${escapeHtml(buildStatusLine(job))}</span></div>
         ${matchPills ? `<div class="job-list-match-pills">${matchPills}</div>` : ""}
       </div>

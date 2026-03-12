@@ -33,7 +33,7 @@ def score_fit(text: str, company: str) -> Tuple[int, List[str], List[str]]:
         score += 2
     company_l = company.lower()
     if any(v in company_l for v in config.VENDOR_COMPANIES):
-        score += 12
+        score += 15
     if any(f in company_l for f in config.FINTECH_COMPANIES):
         score += 8
     if any(b in company_l for b in config.BANK_COMPANIES):

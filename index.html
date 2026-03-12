@@ -189,6 +189,23 @@
                 <option value="dismissed">Dismissed</option>
               </select>
             </div>
+            <div class="filter">
+              <label for="maxApplicants">Max applicants</label>
+              <select id="maxApplicants">
+                <option value="0">Any</option>
+                <option value="50">&lt; 50</option>
+                <option value="100">&lt; 100</option>
+                <option value="200">&lt; 200</option>
+              </select>
+            </div>
+            <div class="filter">
+              <label for="sortBy">Sort by</label>
+              <select id="sortBy">
+                <option value="fit_score">Fit score</option>
+                <option value="posted">Date posted</option>
+                <option value="salary">Salary (high first)</option>
+              </select>
+            </div>
             <div class="filter filter--toggle">
               <label class="toggle-label">
                 <input id="ukOnly" type="checkbox" />

@@ -15,6 +15,7 @@ import {
   getTodayKey,
   formatApplicantBadge,
 } from "./app.core.js";
+import { autoTailorCv } from "./app.applyhub.js";
 
 const triageOverlay = document.getElementById("triage-overlay");
 const triageContent = document.getElementById("triage-content");
@@ -233,6 +234,10 @@ export const handleTriageAction = async (action) => {
     }
   }
   job.application_status = newStatus;
+
+  if (action === "apply") {
+    autoTailorCv(job);
+  }
 
   if (action === "dismiss") state.triageStats.dismissed++;
   else if (action === "shortlist") state.triageStats.shortlisted++;

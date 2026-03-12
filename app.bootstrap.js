@@ -12,6 +12,8 @@ import {
   locationSelect,
   statusSelect,
   ukOnlyCheckbox,
+  maxApplicantsSelect,
+  sortBySelect,
   prepCloseBtn,
   state,
   setDb,
@@ -533,6 +535,8 @@ if (sourceFamilySelect) sourceFamilySelect.addEventListener("change", renderJobs
 if (locationSelect) locationSelect.addEventListener("change", renderJobs);
 if (statusSelect) statusSelect.addEventListener("change", renderJobs);
 if (ukOnlyCheckbox) ukOnlyCheckbox.addEventListener("change", renderJobs);
+if (maxApplicantsSelect) maxApplicantsSelect.addEventListener("change", renderJobs);
+if (sortBySelect) sortBySelect.addEventListener("change", renderJobs);
 
 if (runNowBtn) runNowBtn.addEventListener("click", async () => {
   runNowBtn.disabled = true;
