@@ -345,7 +345,10 @@ if (quickToday) {
   quickToday.addEventListener("click", () => {
     applyQuickFilter({
       label: "Fresh today",
-      predicate: (job) => isPostedToday(job),
+      predicate: (job) => {
+        const s = (job.application_status || "saved").toLowerCase();
+        return isPostedToday(job) && (s === "new" || s === "saved");
+      },
       status: "",
       resetFilters: true,
     });

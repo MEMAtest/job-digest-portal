@@ -960,7 +960,7 @@ export const renderDashboardStats = (jobs) => {
       if (stat === "freshToday") {
         applyQuickFilter({
           label: "Fresh today",
-          predicate: (job) => isPostedToday(job),
+          predicate: (job) => isPostedToday(job) && (safeStatus(job) === "new" || safeStatus(job) === "saved"),
           resetFilters: true,
         });
         return;
@@ -1068,6 +1068,25 @@ export const renderAppliedTracker = (jobs) => {
       .join("");
   };
 
+  const rejectedInTracker = jobs.filter((job) => (job.application_status || "").toLowerCase() === "rejected");
+  const appliedCount = applied.length + interview.length + offer.length + rejectedInTracker.length;
+  const respondedCount = interview.length + offer.length + rejectedInTracker.length;
+  const responseRate = appliedCount > 0 ? Math.round((respondedCount / appliedCount) * 100) : 0;
+  const offerRate = appliedCount > 0 ? Math.round((offer.length / appliedCount) * 100) : 0;
+
+  const funnelBar = (count, label) => {
+    const pct = appliedCount > 0 ? Math.round((count / appliedCount) * 100) : 0;
+    return `
+      <div class="funnel__row">
+        <div class="funnel__label">${label}</div>
+        <div class="funnel__bar-wrap">
+          <div class="source-mix__bar funnel__bar"><span style="width:${Math.max(pct, pct > 0 ? 2 : 0)}%"></span></div>
+        </div>
+        <div class="funnel__meta">${count} <span class="funnel__pct">${pct}%</span></div>
+      </div>
+    `;
+  };
+
   appliedTrackerContainer.innerHTML = `
     <div class="applied-tracker">
       <div class="applied-tracker__header">
@@ -1076,6 +1095,16 @@ export const renderAppliedTracker = (jobs) => {
           <p>Quick view of what you already applied for and what needs follow-up.</p>
         </div>
         <button class="btn btn-tertiary applied-tracker__open-hub">Open Apply Hub</button>
+      </div>
+      <div class="funnel">
+        <div class="funnel__headlines">
+          <div class="funnel__pill">Response rate <strong>${responseRate}%</strong></div>
+          <div class="funnel__pill">Offer rate <strong>${offerRate}%</strong></div>
+        </div>
+        ${funnelBar(appliedCount, "Applied")}
+        ${funnelBar(respondedCount, "Responses")}
+        ${funnelBar(interview.length, "Interviews")}
+        ${funnelBar(offer.length, "Offers")}
       </div>
       <div class="applied-tracker__stats">
         <div class="applied-tracker__stat">

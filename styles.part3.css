@@ -570,6 +570,28 @@
   }
 }
 
+/* ── Tailoring In-Flight State ── */
+.hub-card--tailoring {
+  border-color: #c7d2fe;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.tailoring-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #94a3b8;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: tailorSpin 0.7s linear infinite;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+
+@keyframes tailorSpin {
+  to { transform: rotate(360deg); }
+}
+
 .hub-card__notes {
   margin-top: 16px;
   padding: 12px;
@@ -1485,3 +1507,73 @@
   border-radius: 10px;
   text-align: center;
 }
+
+/* ── Application funnel chart ───────────────────────────────────── */
+.funnel {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.funnel__headlines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.funnel__pill {
+  font-size: 13px;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+.funnel__pill strong {
+  color: #0f172a;
+  margin-left: 4px;
+}
+.funnel__row {
+  display: grid;
+  grid-template-columns: 100px 1fr 56px;
+  align-items: center;
+  gap: 10px;
+}
+.funnel__label {
+  font-size: 13px;
+  color: #475569;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.funnel__bar {
+  margin-top: 0;
+}
+.funnel__meta {
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+.funnel__pct {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 400;
+  margin-left: 4px;
+}
+@media (max-width: 700px) {
+  .funnel__row {
+    grid-template-columns: 80px 1fr 48px;
+    gap: 6px;
+  }
+  .funnel__label,
+  .funnel__meta {
+    font-size: 12px;
+  }
+  .funnel__pill {
+    font-size: 12px;
+    padding: 3px 10px;
+  }
+}
+/* ─────────────────────────────────────────────────────────────── */
