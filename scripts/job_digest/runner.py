@@ -133,10 +133,10 @@ def run_source_stage(label: str, fn):
         signal.signal(signal.SIGALRM, previous_handler)
 
 
-def write_digest_outputs(records: list[JobRecord]) -> tuple[Path, Path]:
+def write_digest_outputs(records: list[JobRecord], *, suffix: str = "") -> tuple[Path, Path]:
     today = datetime.now().strftime("%Y-%m-%d")
-    out_xlsx = config.DIGEST_DIR / f"digest_{today}.xlsx"
-    out_csv = config.DIGEST_DIR / f"digest_{today}.csv"
+    out_xlsx = config.DIGEST_DIR / f"digest_{today}{suffix}.xlsx"
+    out_csv = config.DIGEST_DIR / f"digest_{today}{suffix}.csv"
 
     df = pd.DataFrame([
         {
@@ -606,7 +606,11 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
         records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
-    out_xlsx, out_csv = run_step("write_digest_outputs", lambda: write_digest_outputs(records))
+    digest_suffix = "_scrape_only" if scrape_only else ""
+    out_xlsx, out_csv = run_step(
+        "write_digest_outputs",
+        lambda: write_digest_outputs(records, suffix=digest_suffix),
+    )
 
     if not scrape_only:
         run_step("write_records_to_firestore", lambda: write_records_to_firestore(records))
