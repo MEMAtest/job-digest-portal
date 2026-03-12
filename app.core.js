@@ -547,7 +547,7 @@ export const formatApplicantBadge = (text) => {
   return "";
 };
 
-export const clearQuickFilter = () => {
+export const clearQuickFilter = ({ skipRender = false } = {}) => {
   quickFilterPredicate = null;
   quickFilterLabel = "";
   uniqueCompanyOnly = false;
@@ -555,10 +555,10 @@ export const clearQuickFilter = () => {
     quickFilterBar.classList.add("hidden");
     quickFilterBar.innerHTML = "";
   }
-  if (state.handlers.renderJobs) state.handlers.renderJobs();
+  if (!skipRender && state.handlers.renderJobs) state.handlers.renderJobs();
 };
 
-export const resetFilters = ({ keepStatus = false } = {}) => {
+export const resetFilters = ({ keepStatus = false, skipRender = false } = {}) => {
   if (searchInput) searchInput.value = "";
   if (minFitSelect) minFitSelect.value = "0";
   if (sourceSelect) sourceSelect.value = "";
@@ -566,12 +566,12 @@ export const resetFilters = ({ keepStatus = false } = {}) => {
   if (locationSelect) locationSelect.value = "";
   if (!keepStatus && statusSelect) statusSelect.value = "";
   if (ukOnlyCheckbox) ukOnlyCheckbox.checked = false;
-  clearQuickFilter();
+  clearQuickFilter({ skipRender });
 };
 
 export const applyQuickFilter = ({ label, predicate, status, uniqueCompanies, resetFilters: shouldReset } = {}) => {
   if (shouldReset) {
-    resetFilters({ keepStatus: false });
+    resetFilters({ keepStatus: false, skipRender: true });
   }
   quickFilterPredicate = predicate || null;
   quickFilterLabel = label || "";
