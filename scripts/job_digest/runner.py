@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import os
+import signal
+import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pandas as pd
 import requests
@@ -72,13 +76,478 @@ def canonical_company(company: str) -> str:
     canonical = canonicalize_company_name(company)
     return canonical or (company or "").strip()
 
+
+SOURCE_STAGE_TIMEOUT_SECONDS = int(os.getenv("JOB_DIGEST_SOURCE_STAGE_TIMEOUT", "180"))
+RUNNER_TRACE_LOG = config.DIGEST_DIR / "runner_trace.log"
+
+
+class SourceStageTimeoutError(TimeoutError):
+    pass
+
+
+def log_trace(message: str) -> None:
+    line = f"{datetime.now(timezone.utc).isoformat()} {message}"
+    print(line)
+    try:
+        with RUNNER_TRACE_LOG.open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+    except Exception:
+        pass
+
+
+def run_step(label: str, fn):
+    started = time.perf_counter()
+    log_trace(f"[step] {label}...")
+    result = fn()
+    elapsed = time.perf_counter() - started
+    log_trace(f"[step] {label} complete in {elapsed:.1f}s")
+    return result
+
+
+def _timeout_handler(_signum, _frame):
+    raise SourceStageTimeoutError
+
+
+def run_source_stage(label: str, fn):
+    started = time.perf_counter()
+    log_trace(f"[source] {label} starting...")
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    try:
+        if SOURCE_STAGE_TIMEOUT_SECONDS > 0:
+            signal.signal(signal.SIGALRM, _timeout_handler)
+            signal.alarm(SOURCE_STAGE_TIMEOUT_SECONDS)
+        records = fn()
+        elapsed = time.perf_counter() - started
+        log_trace(f"[source] {label} complete in {elapsed:.1f}s with {len(records)} kept roles")
+        return records
+    except SourceStageTimeoutError:
+        elapsed = time.perf_counter() - started
+        log_trace(f"[source] {label} timed out after {elapsed:.1f}s; skipping")
+        return []
+    except Exception as exc:  # noqa: BLE001
+        elapsed = time.perf_counter() - started
+        log_trace(f"[source] {label} failed after {elapsed:.1f}s: {type(exc).__name__}: {exc}")
+        return []
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
+def write_digest_outputs(records: list[JobRecord]) -> tuple[Path, Path]:
+    today = datetime.now().strftime("%Y-%m-%d")
+    out_xlsx = config.DIGEST_DIR / f"digest_{today}.xlsx"
+    out_csv = config.DIGEST_DIR / f"digest_{today}.csv"
+
+    df = pd.DataFrame([
+        {
+            "Role": r.role,
+            "Company": r.company,
+            "Location": r.location,
+            "Link": r.link,
+            "Posted": r.posted,
+            "Source": r.source,
+            "Fit_Score_%": r.fit_score,
+            "Preference_Match": r.preference_match,
+            "Why_Fit": r.why_fit,
+            "CV_Gap": r.cv_gap,
+            "Role_Summary": r.role_summary,
+            "Tailored_Summary": r.tailored_summary,
+            "Tailored_CV_Bullets": " | ".join(r.tailored_cv_bullets),
+            "Key_Requirements": " | ".join(r.key_requirements),
+            "Match_Notes": r.match_notes,
+            "Company_Insights": r.company_insights,
+            "Cover_Letter": r.cover_letter,
+            "Key_Talking_Points": " | ".join(r.key_talking_points),
+            "STAR_Stories": " | ".join(r.star_stories),
+            "Quick_Pitch": r.quick_pitch,
+            "Interview_Focus": r.interview_focus,
+            "Prep_Questions": " | ".join(r.prep_questions),
+            "Prep_Answers": " | ".join(r.prep_answers),
+            "Scorecard": " | ".join(r.scorecard),
+            "Apply_Tips": r.apply_tips,
+            "Notes": r.notes,
+        }
+        for r in records
+    ])
+
+    df.to_excel(out_xlsx, index=False)
+    df.to_csv(out_csv, index=False)
+    return out_xlsx, out_csv
+
+
+def print_source_yield(records: list[JobRecord]) -> None:
+    source_counts: dict[str, int] = {}
+    for record in records:
+        src = record.source or "Unknown"
+        source_counts[src] = source_counts.get(src, 0) + 1
+    print("\n--- Source Yield in Digest ---")
+    if source_counts:
+        for src, cnt in sorted(source_counts.items(), key=lambda item: -item[1]):
+            print(f"  {src}: {cnt}")
+    else:
+        print("  (no roles in digest this run)")
+    print("--- End Source Summary ---")
+
+
+def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    linkedin_jobs = linkedin_search(session)
+    print(f"[LinkedIn] {len(linkedin_jobs)} raw results fetched (before filtering)")
+    for job in linkedin_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "")
+        if not is_relevant_title(title):
+            continue
+
+        detail = linkedin_job_details(session, job["job_id"])
+        desc_text = detail.get("description", "")
+        if detail.get("title"):
+            title = detail["title"]
+        if detail.get("company"):
+            company = detail["company"]
+        if detail.get("location"):
+            location = detail["location"]
+        company = canonical_company(company)
+        applicant_text = detail.get("applicant_text", "")
+        if not is_relevant_title(title):
+            continue
+        if not is_relevant_location(location, desc_text):
+            continue
+        if not should_keep_role_company(company, "Aggregator", "LinkedIn"):
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(
+            {
+                "posted_text": detail.get("posted_text", "") or job.get("posted_text", ""),
+                "posted_date": detail.get("posted_date", "") or job.get("posted_date", ""),
+            }
+        )
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            continue
+
+        summary = desc_text[:500]
+        full_text = f"{title} {company} {summary}"
+        score, _, _ = score_fit(full_text, company)
+        if score < config.MIN_SCORE:
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="LinkedIn",
+                source_family="Aggregator",
+                fit_score=score,
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+                applicant_count=applicant_text,
+            )
+        )
+    return records
+
+
+def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    greenhouse_jobs = greenhouse_search(session)
+    print(f"[Greenhouse] {len(greenhouse_jobs)} raw results fetched (before filtering)")
+    for job in greenhouse_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "")
+        if not is_relevant_title(title):
+            continue
+        if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "Greenhouse"):
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            continue
+
+        summary = job.get("summary", "")
+        full_text = f"{title} {company} {summary}"
+        score, _, _ = score_fit(full_text, company)
+        if score < config.MIN_SCORE:
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="Greenhouse",
+                source_family="ATS",
+                ats_family="Greenhouse",
+                ats_account=job.get("ats_account", ""),
+                fit_score=score,
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+            )
+        )
+    return records
+
+
+def collect_lever_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    lever_jobs = lever_search(session)
+    print(f"[Lever] {len(lever_jobs)} raw results fetched (before filtering)")
+    for job in lever_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "")
+        if not is_relevant_title(title):
+            continue
+        if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "Lever"):
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            continue
+
+        summary = job.get("summary", "")
+        full_text = f"{title} {company} {summary}"
+        score, _, _ = score_fit(full_text, company)
+        if score < config.MIN_SCORE:
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="Lever",
+                source_family="ATS",
+                ats_family="Lever",
+                ats_account=job.get("ats_account", ""),
+                fit_score=score,
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+            )
+        )
+    return records
+
+
+def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    smart_jobs = smartrecruiters_search(session)
+    print(f"[SmartRecruiters] {len(smart_jobs)} raw results fetched (before filtering)")
+    for job in smart_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "")
+        if not is_relevant_title(title):
+            continue
+        if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "SmartRecruiters"):
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            continue
+
+        summary = job.get("summary", "")
+        full_text = f"{title} {company} {summary}"
+        score, _, _ = score_fit(full_text, company)
+        if score < config.MIN_SCORE:
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="SmartRecruiters",
+                source_family="ATS",
+                ats_family="SmartRecruiters",
+                ats_account=job.get("ats_account", ""),
+                fit_score=score,
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+            )
+        )
+    return records
+
+
+def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    ashby_jobs = ashby_search(session)
+    print(f"[Ashby] {len(ashby_jobs)} raw results fetched (before filtering)")
+    for job in ashby_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "") or "Remote"
+        if not is_relevant_title(title):
+            continue
+        if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "Ashby"):
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            continue
+
+        summary = job.get("summary", "")
+        full_text = f"{title} {company} {summary}"
+        score, _, _ = score_fit(full_text, company)
+        if score < config.MIN_SCORE:
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="Ashby",
+                source_family="ATS",
+                ats_family="Ashby",
+                ats_account=job.get("ats_account", ""),
+                fit_score=score,
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+            )
+        )
+    return records
+
+
+def collect_workable_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    workable_jobs = workable_search(session)
+    print(f"[Workable] {len(workable_jobs)} raw results fetched (before filtering)")
+    for job in workable_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "") or "Remote"
+        if not is_relevant_title(title):
+            continue
+        if not is_relevant_location(location):
+            continue
+        if not should_keep_role_company(company, "ATS", "Workable"):
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            continue
+
+        summary = job.get("summary", "")
+        full_text = f"{title} {company} {summary}"
+        score, _, _ = score_fit(full_text, company)
+        if score < config.MIN_SCORE:
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="Workable",
+                source_family="ATS",
+                ats_family="Workable",
+                ats_account=job.get("ats_account", ""),
+                fit_score=score,
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+                job_status=job.get("job_status", ""),
+            )
+        )
+    return records
+
+
+def collect_job_board_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    print("[Job boards] scanning...")
+    board_jobs = job_board_search(session)
+    print(f"[Job boards] {len(board_jobs)} raw results fetched (before filtering)")
+    for job in board_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "") or "Remote"
+        if not is_relevant_title(title):
+            continue
+        summary = job.get("summary", "")
+        if not is_relevant_location(location, summary):
+            continue
+        if not should_keep_role_company(company, "JobBoard", job.get("source", "Job board")):
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            continue
+
+        full_text = f"{title} {company} {summary}"
+        score, _, _ = score_fit(full_text, company)
+        if score < config.MIN_SCORE:
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source=job.get("source", "Job board"),
+                source_family="JobBoard",
+                fit_score=score,
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+            )
+        )
+    return records
+
 try:
     from zoneinfo import ZoneInfo
 except Exception:  # noqa: BLE001
     ZoneInfo = None
 
 
-def main() -> None:
+def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape_only: bool = False) -> None:
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
 
@@ -118,419 +587,42 @@ def main() -> None:
                     except Exception:
                         pass
 
-    linkedin_jobs = linkedin_search(session)
-    print(f"[LinkedIn] {len(linkedin_jobs)} raw results fetched (before filtering)")
-    for job in linkedin_jobs:
-        title = job.get("title", "")
-        company = canonical_company(job.get("company", ""))
-        location = job.get("location", "")
-        if not is_relevant_title(title):
-            continue
+    all_jobs.extend(run_source_stage("linkedin", lambda: collect_linkedin_records(session)))
+    all_jobs.extend(run_source_stage("greenhouse", lambda: collect_greenhouse_records(session)))
+    all_jobs.extend(run_source_stage("lever", lambda: collect_lever_records(session)))
+    all_jobs.extend(run_source_stage("smartrecruiters", lambda: collect_smartrecruiters_records(session)))
+    all_jobs.extend(run_source_stage("ashby", lambda: collect_ashby_records(session)))
+    all_jobs.extend(run_source_stage("workable", lambda: collect_workable_records(session)))
+    all_jobs.extend(run_source_stage("job_boards", lambda: collect_job_board_records(session)))
 
-        detail = linkedin_job_details(session, job["job_id"])
-        desc_text = detail.get("description", "")
-        if detail.get("title"):
-            title = detail["title"]
-        if detail.get("company"):
-            company = detail["company"]
-        if detail.get("location"):
-            location = detail["location"]
-        company = canonical_company(company)
-        applicant_text = detail.get("applicant_text", "")
-        if not is_relevant_title(title):
-            continue
-        if not is_relevant_location(location, desc_text):
-            continue
-        if not should_keep_role_company(company, "Aggregator", "LinkedIn"):
-            continue
-
-        posted_display, posted_raw, posted_date = normalize_posted(
-            {
-                "posted_text": detail.get("posted_text", "") or job.get("posted_text", ""),
-                "posted_date": detail.get("posted_date", "") or job.get("posted_date", ""),
-            }
-        )
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
-            continue
-
-        summary = desc_text[:500]
-        full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-
-        if score < config.MIN_SCORE:
-            continue
-
-        why_fit = build_reasons(full_text)
-        cv_gap = build_gaps(full_text)
-        preference_match = build_preference_match(full_text, company, location)
-
-        all_jobs.append(
-            JobRecord(
-                role=title,
-                company=company,
-                location=location,
-                link=job.get("link", ""),
-                posted=posted_display,
-                posted_raw=posted_raw,
-                posted_date=posted_date,
-                source="LinkedIn",
-                source_family="Aggregator",
-                fit_score=score,
-                preference_match=preference_match,
-                why_fit=why_fit,
-                cv_gap=cv_gap,
-                notes=summary,
-                applicant_count=applicant_text,
-            )
-        )
-
-    greenhouse_jobs = greenhouse_search(session)
-    print(f"[Greenhouse] {len(greenhouse_jobs)} raw results fetched (before filtering)")
-    for job in greenhouse_jobs:
-        title = job.get("title", "")
-        company = canonical_company(job.get("company", ""))
-        location = job.get("location", "")
-        if not is_relevant_title(title):
-            continue
-        if not is_relevant_location(location):
-            continue
-        if not should_keep_role_company(company, "ATS", "Greenhouse"):
-            continue
-
-        posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
-            continue
-
-        summary = job.get("summary", "")
-        full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
-            continue
-
-        why_fit = build_reasons(full_text)
-        cv_gap = build_gaps(full_text)
-        preference_match = build_preference_match(full_text, company, location)
-
-        all_jobs.append(
-            JobRecord(
-                role=title,
-                company=company,
-                location=location,
-                link=job.get("link", ""),
-                posted=posted_display,
-                posted_raw=posted_raw,
-                posted_date=posted_date,
-                source="Greenhouse",
-                source_family="ATS",
-                ats_family="Greenhouse",
-                ats_account=job.get("ats_account", ""),
-                fit_score=score,
-                preference_match=preference_match,
-                why_fit=why_fit,
-                cv_gap=cv_gap,
-                notes=summary,
-            )
-        )
-
-    lever_jobs = lever_search(session)
-    print(f"[Lever] {len(lever_jobs)} raw results fetched (before filtering)")
-    for job in lever_jobs:
-        title = job.get("title", "")
-        company = canonical_company(job.get("company", ""))
-        location = job.get("location", "")
-        if not is_relevant_title(title):
-            continue
-        if not is_relevant_location(location):
-            continue
-        if not should_keep_role_company(company, "ATS", "Lever"):
-            continue
-
-        posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
-            continue
-
-        summary = job.get("summary", "")
-        full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
-            continue
-
-        why_fit = build_reasons(full_text)
-        cv_gap = build_gaps(full_text)
-        preference_match = build_preference_match(full_text, company, location)
-
-        all_jobs.append(
-            JobRecord(
-                role=title,
-                company=company,
-                location=location,
-                link=job.get("link", ""),
-                posted=posted_display,
-                posted_raw=posted_raw,
-                posted_date=posted_date,
-                source="Lever",
-                source_family="ATS",
-                ats_family="Lever",
-                ats_account=job.get("ats_account", ""),
-                fit_score=score,
-                preference_match=preference_match,
-                why_fit=why_fit,
-                cv_gap=cv_gap,
-                notes=summary,
-            )
-        )
-
-    smart_jobs = smartrecruiters_search(session)
-    print(f"[SmartRecruiters] {len(smart_jobs)} raw results fetched (before filtering)")
-    for job in smart_jobs:
-        title = job.get("title", "")
-        company = canonical_company(job.get("company", ""))
-        location = job.get("location", "")
-        if not is_relevant_title(title):
-            continue
-        if not is_relevant_location(location):
-            continue
-        if not should_keep_role_company(company, "ATS", "SmartRecruiters"):
-            continue
-
-        posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
-            continue
-
-        summary = job.get("summary", "")
-        full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
-            continue
-
-        why_fit = build_reasons(full_text)
-        cv_gap = build_gaps(full_text)
-        preference_match = build_preference_match(full_text, company, location)
-
-        all_jobs.append(
-            JobRecord(
-                role=title,
-                company=company,
-                location=location,
-                link=job.get("link", ""),
-                posted=posted_display,
-                posted_raw=posted_raw,
-                posted_date=posted_date,
-                source="SmartRecruiters",
-                source_family="ATS",
-                ats_family="SmartRecruiters",
-                ats_account=job.get("ats_account", ""),
-                fit_score=score,
-                preference_match=preference_match,
-                why_fit=why_fit,
-                cv_gap=cv_gap,
-                notes=summary,
-            )
-        )
-
-    ashby_jobs = ashby_search(session)
-    print(f"[Ashby] {len(ashby_jobs)} raw results fetched (before filtering)")
-    for job in ashby_jobs:
-        title = job.get("title", "")
-        company = canonical_company(job.get("company", ""))
-        location = job.get("location", "") or "Remote"
-        if not is_relevant_title(title):
-            continue
-        if not is_relevant_location(location):
-            continue
-        if not should_keep_role_company(company, "ATS", "Ashby"):
-            continue
-
-        posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
-            continue
-
-        summary = job.get("summary", "")
-        full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
-            continue
-
-        why_fit = build_reasons(full_text)
-        cv_gap = build_gaps(full_text)
-        preference_match = build_preference_match(full_text, company, location)
-
-        all_jobs.append(
-            JobRecord(
-                role=title,
-                company=company,
-                location=location,
-                link=job.get("link", ""),
-                posted=posted_display,
-                posted_raw=posted_raw,
-                posted_date=posted_date,
-                source="Ashby",
-                source_family="ATS",
-                ats_family="Ashby",
-                ats_account=job.get("ats_account", ""),
-                fit_score=score,
-                preference_match=preference_match,
-                why_fit=why_fit,
-                cv_gap=cv_gap,
-                notes=summary,
-            )
-        )
-
-    workable_jobs = workable_search(session)
-    print(f"[Workable] {len(workable_jobs)} raw results fetched (before filtering)")
-    for job in workable_jobs:
-        title = job.get("title", "")
-        company = canonical_company(job.get("company", ""))
-        location = job.get("location", "") or "Remote"
-        if not is_relevant_title(title):
-            continue
-        if not is_relevant_location(location):
-            continue
-        if not should_keep_role_company(company, "ATS", "Workable"):
-            continue
-
-        posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
-            continue
-
-        summary = job.get("summary", "")
-        full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
-            continue
-
-        why_fit = build_reasons(full_text)
-        cv_gap = build_gaps(full_text)
-        preference_match = build_preference_match(full_text, company, location)
-
-        all_jobs.append(
-            JobRecord(
-                role=title,
-                company=company,
-                location=location,
-                link=job.get("link", ""),
-                posted=posted_display,
-                posted_raw=posted_raw,
-                posted_date=posted_date,
-                source="Workable",
-                source_family="ATS",
-                ats_family="Workable",
-                ats_account=job.get("ats_account", ""),
-                fit_score=score,
-                preference_match=preference_match,
-                why_fit=why_fit,
-                cv_gap=cv_gap,
-                notes=summary,
-                job_status=job.get("job_status", ""),
-            )
-        )
-
-    print("[Job boards] scanning...")
-    board_jobs = job_board_search(session)
-    print(f"[Job boards] {len(board_jobs)} raw results fetched (before filtering)")
-    for job in board_jobs:
-        title = job.get("title", "")
-        company = canonical_company(job.get("company", ""))
-        location = job.get("location", "") or "Remote"
-        if not is_relevant_title(title):
-            continue
-        summary = job.get("summary", "")
-        if not is_relevant_location(location, summary):
-            continue
-        if not should_keep_role_company(company, "JobBoard", job.get("source", "Job board")):
-            continue
-
-        posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
-            continue
-
-        full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
-            continue
-
-        why_fit = build_reasons(full_text)
-        cv_gap = build_gaps(full_text)
-        preference_match = build_preference_match(full_text, company, location)
-
-        all_jobs.append(
-            JobRecord(
-                role=title,
-                company=company,
-                location=location,
-                link=job.get("link", ""),
-                posted=posted_display,
-                posted_raw=posted_raw,
-                posted_date=posted_date,
-                source=job.get("source", "Job board"),
-                source_family="JobBoard",
-                fit_score=score,
-                preference_match=preference_match,
-                why_fit=why_fit,
-                cv_gap=cv_gap,
-                notes=summary,
-            )
-        )
-
-    records = dedupe_records(sorted(all_jobs, key=lambda x: x.fit_score, reverse=True))
+    records = run_step("dedupe_records", lambda: dedupe_records(sorted(all_jobs, key=lambda x: x.fit_score, reverse=True)))
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
     seen_cache = prune_seen_cache(load_seen_cache(config.SEEN_CACHE_PATH), config.SEEN_CACHE_DAYS)
     records = filter_new_records(records, seen_cache)
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
-    records = enhance_records_with_groq(records)
-    records = sorted(records, key=lambda record: record.fit_score, reverse=True)
+    if not skip_enrichment:
+        records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
+        records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
-    write_records_to_firestore(records)
-    write_notifications(records)
-    write_source_stats(records)
-    write_role_suggestions()
-    write_candidate_prep()
-    cleanup_stale_jobs()
+    out_xlsx, out_csv = run_step("write_digest_outputs", lambda: write_digest_outputs(records))
 
-    today = datetime.now().strftime("%Y-%m-%d")
-    out_xlsx = config.DIGEST_DIR / f"digest_{today}.xlsx"
-    out_csv = config.DIGEST_DIR / f"digest_{today}.csv"
+    if not scrape_only:
+        run_step("write_records_to_firestore", lambda: write_records_to_firestore(records))
+        run_step("write_notifications", lambda: write_notifications(records))
+        run_step("write_source_stats", lambda: write_source_stats(records))
 
-    df = pd.DataFrame([
-        {
-            "Role": r.role,
-            "Company": r.company,
-            "Location": r.location,
-            "Link": r.link,
-            "Posted": r.posted,
-            "Source": r.source,
-            "Fit_Score_%": r.fit_score,
-            "Preference_Match": r.preference_match,
-            "Why_Fit": r.why_fit,
-            "CV_Gap": r.cv_gap,
-            "Role_Summary": r.role_summary,
-            "Tailored_Summary": r.tailored_summary,
-            "Tailored_CV_Bullets": " | ".join(r.tailored_cv_bullets),
-            "Key_Requirements": " | ".join(r.key_requirements),
-            "Match_Notes": r.match_notes,
-            "Company_Insights": r.company_insights,
-            "Cover_Letter": r.cover_letter,
-            "Key_Talking_Points": " | ".join(r.key_talking_points),
-            "STAR_Stories": " | ".join(r.star_stories),
-            "Quick_Pitch": r.quick_pitch,
-            "Interview_Focus": r.interview_focus,
-            "Prep_Questions": " | ".join(r.prep_questions),
-            "Prep_Answers": " | ".join(r.prep_answers),
-            "Scorecard": " | ".join(r.scorecard),
-            "Apply_Tips": r.apply_tips,
-            "Notes": r.notes,
-        }
-        for r in records
-    ])
+    if not scrape_only and not skip_post_hooks:
+        run_step("write_role_suggestions", write_role_suggestions)
+        run_step("write_candidate_prep", write_candidate_prep)
+        run_step("cleanup_stale_jobs", cleanup_stale_jobs)
 
-    if not df.empty:
-        df.to_excel(out_xlsx, index=False)
-        df.to_csv(out_csv, index=False)
-    else:
-        df.to_excel(out_xlsx, index=False)
-        df.to_csv(out_csv, index=False)
+    if scrape_only:
+        print(f"Digest generated: {out_xlsx}")
+        print(f"Roles found: {len(records)}")
+        print_source_yield(records)
+        return
 
     pipeline_summary_html = ""
     try:
@@ -639,18 +731,7 @@ def main() -> None:
 
     print(f"Digest generated: {out_xlsx}")
     print(f"Roles found: {len(records)}")
-
-    source_counts: dict[str, int] = {}
-    for r in records:
-        src = r.source or "Unknown"
-        source_counts[src] = source_counts.get(src, 0) + 1
-    print("\n--- Source Yield in Digest ---")
-    if source_counts:
-        for src, cnt in sorted(source_counts.items(), key=lambda x: -x[1]):
-            print(f"  {src}: {cnt}")
-    else:
-        print("  (no roles in digest this run)")
-    print("--- End Source Summary ---")
+    print_source_yield(records)
 
 
 def cli() -> None:
@@ -678,6 +759,21 @@ def cli() -> None:
         action="store_true",
         help="Normalize posted fields for existing Firestore jobs",
     )
+    parser.add_argument(
+        "--skip-enrichment",
+        action="store_true",
+        help="Skip LLM enhancement and write the digest after scrape/dedupe only",
+    )
+    parser.add_argument(
+        "--skip-post-hooks",
+        action="store_true",
+        help="Skip role suggestions, candidate prep, and stale cleanup",
+    )
+    parser.add_argument(
+        "--scrape-only",
+        action="store_true",
+        help="Only scrape/filter/dedupe and write digest outputs; skip Firestore writes and post-hooks",
+    )
     args = parser.parse_args()
 
     if args.smoke_test:
@@ -692,7 +788,11 @@ def cli() -> None:
         if not should_run_now(force=args.force):
             print("Skipping run: outside scheduled run window or already sent for this slot.")
             raise SystemExit(0)
-        main()
+        main(
+            skip_enrichment=args.skip_enrichment or args.scrape_only,
+            skip_post_hooks=args.skip_post_hooks or args.scrape_only,
+            scrape_only=args.scrape_only,
+        )
 
 
 if __name__ == "__main__":
