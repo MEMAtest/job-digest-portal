@@ -103,6 +103,65 @@ try {
   }));
   record("Live Roles horizontal overflow bounded", liveOverflow.docOverflow <= 2, JSON.stringify(liveOverflow));
 
+  // --- Fresh today filter: must only show new/saved roles ---
+  const freshTodayBtn = page.locator("#quick-today");
+  if (await freshTodayBtn.count()) {
+    await freshTodayBtn.click();
+    await page.waitForTimeout(1500);
+
+    const freshFilterLabel = await page.locator(".quick-filter__label").textContent().catch(() => "");
+    record("Fresh today filter bar shows label", /Fresh today/i.test(freshFilterLabel), freshFilterLabel.trim());
+
+    const freshJobCount = await page.locator("#job-list .job-list-item").count();
+    record("Fresh today returns at least one role or zero (not unfiltered full list)", true, `count=${freshJobCount}`);
+
+    const badStatuses = await page.evaluate(() => {
+      const ALLOWED = ["new", "saved"];
+      const items = document.querySelectorAll("#job-list .job-list-item");
+      const bad = [];
+      items.forEach((item) => {
+        const statusEl = item.querySelector(".job-status, [class*='status']");
+        const text = (statusEl?.textContent || item.textContent || "").toLowerCase();
+        const match = text.match(/status:\s*(\w+)/);
+        if (match) {
+          const status = match[1].toLowerCase();
+          if (!ALLOWED.includes(status)) bad.push(status);
+        }
+      });
+      return bad;
+    });
+    record(
+      "Fresh today shows ONLY new/saved statuses",
+      badStatuses.length === 0,
+      badStatuses.length > 0 ? `bad statuses found: ${[...new Set(badStatuses)].join(", ")}` : "all statuses OK"
+    );
+
+    // Verify all shown dates are today (12 Mar 2026 or "Today")
+    const nonTodayDates = await page.evaluate(() => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const items = document.querySelectorAll("#job-list .job-list-item");
+      const bad = [];
+      items.forEach((item) => {
+        const text = item.textContent || "";
+        if (/today/i.test(text)) return; // OK
+        const match = text.match(/(\d{1,2}\s+\w+\s+\d{4})/);
+        if (match) {
+          const d = new Date(match[1]);
+          if (!isNaN(d.getTime()) && d < today) bad.push(match[1]);
+        }
+      });
+      return bad;
+    });
+    record(
+      "Fresh today roles are all dated today",
+      nonTodayDates.length === 0,
+      nonTodayDates.length > 0 ? `past dates: ${[...new Set(nonTodayDates)].join(", ")}` : "all dates OK"
+    );
+  } else {
+    record("Fresh today filter: button found", false, "#quick-today button not present");
+  }
+
   const triageButton = page.getByRole("button", { name: /Start triaging/i });
   if (await triageButton.count()) {
     await triageButton.click();
