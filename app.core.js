@@ -366,6 +366,11 @@ export const getJobSourceFamily = (job) => {
 
 export const parseDateValue = (value) => {
   if (!value) return null;
+  // Handle Firestore Timestamp serialised as { _seconds, _nanoseconds } or { seconds, nanoseconds }
+  if (typeof value === "object" && value !== null) {
+    const secs = value._seconds ?? value.seconds;
+    if (typeof secs === "number") return new Date(secs * 1000);
+  }
   const date = new Date(value);
   if (!Number.isNaN(date.getTime())) return date;
   return null;
