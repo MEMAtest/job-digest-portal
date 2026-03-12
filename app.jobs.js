@@ -37,7 +37,7 @@ import {
   safeHref,
 } from "./app.core.js";
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
-import { quickApply } from "./app.applyhub.js";
+import { quickApply, autoTailorCv } from "./app.applyhub.js";
 import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
 
 let mobileNavObserver = null;
@@ -342,6 +342,13 @@ const handleBulkAction = async (action) => {
     }
   }
 
+  if (action === "ready_to_apply") {
+    for (const jobId of ids) {
+      const job = state.jobs.find((j) => j.id === jobId);
+      if (job) autoTailorCv(job);
+    }
+  }
+
   state.selectedJobs.clear();
   updateBulkBar();
   renderJobs();
@@ -482,6 +489,13 @@ const buildStatusLine = (job) => {
   return `Status: ${statusLabel}${dateSuffix}`;
 };
 
+const getStatusBadgeClass = (statusValue) => {
+  if (statusValue === "new" || statusValue === "saved") return "status-badge--new";
+  if (statusValue === "shortlisted") return "status-badge--shortlisted";
+  if (statusValue === "applied" || statusValue === "interview" || statusValue === "offer" || statusValue === "ready_to_apply") return "status-badge--applied";
+  return "status-badge--dismissed";
+};
+
 const ensureJobsCvModal = () => {
   if (document.getElementById("jobs-cv-modal")) return;
   const modal = document.createElement("div");
@@ -586,7 +600,7 @@ const renderJobDetail = (job, detailEl) => {
           <div class="job-detail-title">${escapeHtml(job.role)}</div>
           <div class="job-detail-company">${escapeHtml(job.company || "Company not listed")}</div>
           <div class="job-detail-meta">${escapeHtml(metaLine || "")}</div>
-          <div class="job-detail-meta">${escapeHtml(buildStatusLine(job))}${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
+          <div class="job-detail-meta"><span class="status-badge ${getStatusBadgeClass(statusValue)}">${escapeHtml(buildStatusLine(job))}</span>${dismissNote ? ` · ${escapeHtml(dismissNote)}` : ""}</div>
         </div>
         <div class="job-detail-badges">
           <div class="${formatFitBadge(job.fit_score)}">${job.fit_score}% fit</div>
@@ -983,6 +997,9 @@ const renderJobDetail = (job, detailEl) => {
       try {
         await updateDoc(doc(db, collectionName, job.id), payload);
         Object.assign(job, payload);
+        if (statusEl.value === "ready_to_apply") {
+          autoTailorCv(job);
+        }
         refreshJobViews(job, {
           tab: "apply",
           onComplete: (el) => {
@@ -1186,7 +1203,7 @@ export const renderJobs = () => {
         <div class="job-list-title">${escapeHtml(job.role)}</div>
         <div class="job-list-company">${escapeHtml(job.company || "Company not listed")}</div>
         <div class="job-list-meta">${escapeHtml(postedDisplay)} · ${escapeHtml(job.source)}${escapeHtml(applicantDisplay)}${escapeHtml(statusSuffix)}</div>
-        <div class="job-list-meta">${escapeHtml(buildStatusLine(job))}</div>
+        <div class="job-list-meta"><span class="status-badge ${getStatusBadgeClass(statusValue)}">${escapeHtml(buildStatusLine(job))}</span></div>
         ${matchPills ? `<div class="job-list-match-pills">${matchPills}</div>` : ""}
       </div>
       <div class="job-list-badges">
