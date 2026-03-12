@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 import time
 import xml.etree.ElementTree as ET
@@ -67,10 +68,23 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
     base_url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
     headers = {"User-Agent": USER_AGENT}
     jobs: Dict[str, Dict[str, str]] = {}
+    deadline_seconds = int(os.getenv("JOB_DIGEST_LINKEDIN_DEADLINE_SECONDS", "120") or "120")
+    started = time.monotonic()
+
+    def deadline_reached() -> bool:
+        return deadline_seconds > 0 and (time.monotonic() - started) >= deadline_seconds
+
+    def request_timeout() -> int:
+        if deadline_seconds <= 0:
+            return 20
+        remaining = deadline_seconds - int(time.monotonic() - started)
+        return max(5, min(20, remaining))
 
     for keywords in SEARCH_KEYWORDS:
         for location in SEARCH_LOCATIONS:
             for start in [0, 25]:
+                if deadline_reached():
+                    return list(jobs.values())
                 params = {
                     "keywords": keywords,
                     "location": location,
@@ -78,7 +92,7 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                     "start": start,
                 }
                 try:
-                    resp = session.get(base_url, params=params, headers=headers, timeout=20)
+                    resp = session.get(base_url, params=params, headers=headers, timeout=request_timeout())
                 except requests.RequestException:
                     continue
                 if resp.status_code != 200:
@@ -119,6 +133,8 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                         "link": clean_link(link),
                     })
 
+                if deadline_reached():
+                    return list(jobs.values())
                 time.sleep(0.3)
 
     # Company-focused searches (narrower paging to reduce load)
@@ -127,6 +143,8 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
             keywords = f"{base_term} {company}"
             for location in SEARCH_LOCATIONS:
                 for start in [0]:
+                    if deadline_reached():
+                        return list(jobs.values())
                     params = {
                         "keywords": keywords,
                         "location": location,
@@ -134,7 +152,7 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                         "start": start,
                     }
                     try:
-                        resp = session.get(base_url, params=params, headers=headers, timeout=20)
+                        resp = session.get(base_url, params=params, headers=headers, timeout=request_timeout())
                     except requests.RequestException:
                         continue
                     if resp.status_code != 200:
@@ -175,6 +193,8 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                             "link": clean_link(link),
                         })
 
+                    if deadline_reached():
+                        return list(jobs.values())
                     time.sleep(0.2)
 
     return list(jobs.values())

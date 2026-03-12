@@ -11,6 +11,7 @@ import pandas as pd
 import requests
 
 from . import config
+from .boards import JOB_BOARD_SOURCES
 from .firestore import (
     backfill_posted_dates,
     backfill_role_summaries,
@@ -38,15 +39,34 @@ from .scoring import (
     score_fit,
 )
 from .sources import (
+    adzuna_search,
     ashby_search,
     build_manual_record,
+    builtin_london_search,
+    custom_careers_search,
+    cvlibrary_search,
+    efinancialcareers_search,
     greenhouse_search,
+    html_board_search,
+    indeed_search,
     job_board_search,
+    jobicy_search,
+    jobserve_search,
+    jooble_search,
     lever_search,
     linkedin_job_details,
     linkedin_search,
+    meetfrank_search,
+    reed_search,
+    remotive_search,
+    remoteok_search,
+    rss_search,
     smartrecruiters_search,
+    technojobs_search,
+    weloveproduct_search,
     workable_search,
+    workday_search,
+    workinstartups_search,
 )
 from .summary import build_email_html, build_sources_summary, send_email
 from .utils import (
@@ -495,11 +515,59 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
     return records
 
 
-def collect_job_board_records(session: requests.Session) -> list[JobRecord]:
+def collect_job_board_source(session: requests.Session, source: dict) -> list[dict]:
+    jobs: list[dict] = []
+    if source["type"] == "rss":
+        jobs.extend(rss_search(session, source["url"], source["name"]))
+    elif source["type"] == "api":
+        if source["name"] == "Remotive":
+            jobs.extend(remotive_search(session))
+        elif source["name"] == "RemoteOK":
+            jobs.extend(remoteok_search(session))
+        elif source["name"] == "Jobicy":
+            jobs.extend(jobicy_search(session))
+        elif source["name"] == "MeetFrank":
+            jobs.extend(meetfrank_search(session))
+        elif source["name"] == "Adzuna":
+            jobs.extend(adzuna_search(session))
+        elif source["name"] == "Jooble":
+            jobs.extend(jooble_search(session))
+        elif source["name"] == "Reed":
+            jobs.extend(reed_search(session))
+        elif source["name"] == "CVLibrary":
+            jobs.extend(cvlibrary_search(session))
+        elif source["name"] == "Workday":
+            jobs.extend(workday_search(session))
+    elif source["type"] == "html":
+        if source["name"] == "JobServe":
+            jobs.extend(jobserve_search(session))
+        elif source["name"] == "WeLoveProduct":
+            jobs.extend(weloveproduct_search(session))
+        elif source["name"] == "Totaljobs":
+            jobs.extend(html_board_search(session, "Totaljobs", source["url"]))
+        elif source["name"] == "CWJobs":
+            jobs.extend(html_board_search(session, "CWJobs", source["url"]))
+        elif source["name"] == "Jobsite":
+            jobs.extend(html_board_search(session, "Jobsite", source["url"]))
+        elif source["name"] == "Technojobs":
+            jobs.extend(technojobs_search(session))
+        elif source["name"] == "BuiltInLondon":
+            jobs.extend(builtin_london_search(session))
+        elif source["name"] == "eFinancialCareers":
+            jobs.extend(efinancialcareers_search(session))
+        elif source["name"] == "IndeedUK":
+            jobs.extend(indeed_search(session))
+        elif source["name"] == "CustomCareers":
+            jobs.extend(custom_careers_search(session))
+        elif source["name"] == "WorkInStartups":
+            jobs.extend(workinstartups_search(session))
+    return jobs
+
+
+def collect_job_board_records(session: requests.Session, source: dict) -> list[JobRecord]:
     records: list[JobRecord] = []
-    print("[Job boards] scanning...")
-    board_jobs = job_board_search(session)
-    print(f"[Job boards] {len(board_jobs)} raw results fetched (before filtering)")
+    board_jobs = collect_job_board_source(session, source)
+    print(f"[Job boards:{source['name']}] {len(board_jobs)} raw results fetched (before filtering)")
     for job in board_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -593,7 +661,13 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
     all_jobs.extend(run_source_stage("smartrecruiters", lambda: collect_smartrecruiters_records(session)))
     all_jobs.extend(run_source_stage("ashby", lambda: collect_ashby_records(session)))
     all_jobs.extend(run_source_stage("workable", lambda: collect_workable_records(session)))
-    all_jobs.extend(run_source_stage("job_boards", lambda: collect_job_board_records(session)))
+    for source in JOB_BOARD_SOURCES:
+        all_jobs.extend(
+            run_source_stage(
+                f"job_board:{source['name']}",
+                lambda source=source: collect_job_board_records(session, source),
+            )
+        )
 
     records = run_step("dedupe_records", lambda: dedupe_records(sorted(all_jobs, key=lambda x: x.fit_score, reverse=True)))
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
