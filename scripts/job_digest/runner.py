@@ -127,6 +127,20 @@ CUSTOM_CAREERS_TITLE_HINTS = (
     "governance",
 )
 
+CUSTOM_CAREERS_GENERIC_TITLE_TERMS = (
+    "job openings at",
+    "job opportunities at",
+    "search & apply",
+    "search and apply",
+    "careers",
+    "career opportunities",
+    "campus events",
+    "join our team",
+    "join us",
+    "military spouses",
+    "veterans",
+)
+
 
 class SourceStageTimeoutError(TimeoutError):
     pass
@@ -188,6 +202,9 @@ def write_source_diagnostics(suffix: str = "") -> Path | None:
 
 
 def is_custom_careers_relevant_title(title: str, company: str, summary: str = "") -> bool:
+    title_l = (title or "").lower()
+    if any(term in title_l for term in CUSTOM_CAREERS_GENERIC_TITLE_TERMS):
+        return False
     if is_relevant_title(title):
         return True
     if not is_target_firm(company):
