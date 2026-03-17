@@ -4,6 +4,8 @@ import csv
 import json
 import os
 import re
+import subprocess
+import tempfile
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -14,6 +16,10 @@ from urllib.parse import quote_plus, urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+try:
+    from google.cloud.firestore_v1.base_query import FieldFilter
+except Exception:  # noqa: BLE001
+    FieldFilter = None
 
 from .boards import (
     ASHBY_BOARDS,
@@ -487,6 +493,8 @@ def workable_search(session: requests.Session) -> List[Dict[str, str]]:
                 continue
             seen_links.add(link)
 
+            city = str(job.get("city") or "").strip()
+            country = str(job.get("country") or "").strip()
             location = (
                 _workable_text(job.get("location"))
                 or _workable_text(job.get("locations"))
@@ -494,6 +502,7 @@ def workable_search(session: requests.Session) -> List[Dict[str, str]]:
                 or _workable_text(job.get("locationName"))
                 or _workable_text(job.get("workplaceType"))
                 or _workable_text(job.get("workplace_type"))
+                or ", ".join(p for p in [city, country] if p)
                 or ""
             )
             posted_date = (
@@ -1096,6 +1105,10 @@ def extract_job_links(html: str, base_url: str) -> List[Tuple[str, str]]:
     links: List[Tuple[str, str]] = []
     seen: set[str] = set()
     job_path_pattern = re.compile(r"/job/|/jobs/|jobid=|vacanc|opening|opportunit|position", re.IGNORECASE)
+    generic_title_pattern = re.compile(
+        r"job openings at|job opportunities at|search\s*&\s*apply|careers?$|campus events|all jobs|open roles|join our team|join us",
+        re.IGNORECASE,
+    )
 
     for anchor in soup.find_all("a", href=True):
         href = anchor.get("href", "")
@@ -1113,6 +1126,8 @@ def extract_job_links(html: str, base_url: str) -> List[Tuple[str, str]]:
         if not href or href in seen:
             continue
         if len(title) < 4:
+            continue
+        if generic_title_pattern.search(title):
             continue
         seen.add(href)
         links.append((href, title))
@@ -1280,8 +1295,8 @@ def fetch_manual_link_requests(client: "firestore.Client") -> List[Dict[str, str
     try:
         docs = (
             client.collection(RUN_REQUESTS_COLLECTION)
-            .where("type", "==", "manual_link")
-            .where("status", "==", "pending")
+            .where(filter=FieldFilter("type", "==", "manual_link"))
+            .where(filter=FieldFilter("status", "==", "pending"))
             .limit(MANUAL_LINK_LIMIT)
             .stream()
         )
@@ -1646,10 +1661,12 @@ def technojobs_search(session: requests.Session) -> List[Dict[str, str]]:
             ]
             for search_url in search_urls:
                 try:
-                    resp = session.get(search_url, timeout=30)
+                    resp = session.get(search_url, timeout=8)
                 except requests.exceptions.SSLError:
                     try:
-                        resp = session.get(search_url, timeout=30, verify=False)
+                        import urllib3
+                        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                        resp = session.get(search_url, timeout=8, verify=False)
                     except requests.RequestException:
                         continue
                 except requests.RequestException:
@@ -1706,6 +1723,11 @@ def technojobs_search(session: requests.Session) -> List[Dict[str, str]]:
 
 
 def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
+    mode = (os.getenv("JOB_DIGEST_INDEED_MODE", "browser") or "browser").strip().lower()
+    if mode == "browser":
+        browser_jobs = indeed_browser_search()
+        if browser_jobs:
+            return browser_jobs
     jobs: List[Dict[str, str]] = []
     primary_base_url = JOB_BOARD_URLS.get("IndeedUK")
     if not primary_base_url:
@@ -1992,6 +2014,110 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
                 time.sleep(0.2)
 
     jobs.extend(job_map.values())
+    return jobs
+
+
+def indeed_browser_search() -> List[Dict[str, str]]:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "job_digest" / "indeed_browser.mjs"
+    if not script_path.exists():
+        return []
+
+    company_limit = int(os.getenv("JOB_DIGEST_INDEED_COMPANY_LIMIT", "10") or "10")
+    page_limit = int(os.getenv("JOB_DIGEST_INDEED_PAGE_LIMIT", "1") or "1")
+    browser_timeout = int(os.getenv("JOB_DIGEST_INDEED_BROWSER_TIMEOUT_SECONDS", "60") or "60")
+
+    queries: List[Dict[str, str]] = []
+    seen_queries = set()
+    for company in select_company_batch(SEARCH_COMPANIES)[:company_limit]:
+        for term in ("product manager", "product owner", "business analyst"):
+            for location in ("United Kingdom", "London"):
+                q = f"{company} {term}"
+                key = (q.lower(), location.lower())
+                if key in seen_queries:
+                    continue
+                seen_queries.add(key)
+                queries.append({"q": q, "l": location})
+    for term in (
+        "client lifecycle management",
+        "lead business analyst",
+        "business analyst onboarding",
+        "operations strategy",
+        "financial crime transformation",
+    ):
+        key = (term.lower(), "united kingdom")
+        if key in seen_queries:
+            continue
+        seen_queries.add(key)
+        queries.append({"q": term, "l": "United Kingdom"})
+
+    payload = {
+        "baseUrl": JOB_BOARD_URLS.get("IndeedUK", "https://uk.indeed.com"),
+        "queries": queries[: max(8, company_limit * 4)],
+        "pageLimit": page_limit,
+        "timeoutMs": browser_timeout * 1000,
+        "headless": os.getenv("JOB_DIGEST_INDEED_HEADLESS", "true").lower() != "false",
+        "proxyUrl": os.getenv("JOB_DIGEST_INDEED_PROXY_URL", "").strip(),
+        "userAgent": USER_AGENT,
+    }
+
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
+        json.dump(payload, handle)
+        input_path = Path(handle.name)
+
+    try:
+        result = subprocess.run(
+            ["node", str(script_path), str(input_path)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=max(browser_timeout + 20, 45),
+            env=os.environ.copy(),
+        )
+    except Exception:
+        return []
+    finally:
+        try:
+            input_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    if result.returncode != 0:
+        return []
+
+    try:
+        payload = json.loads(result.stdout.strip() or "{}")
+    except json.JSONDecodeError:
+        return []
+
+    blocked_pages = int(payload.get("blockedPages", 0) or 0)
+    attempted_queries = int(payload.get("attemptedQueries", 0) or 0)
+    if blocked_pages or attempted_queries:
+        print(
+            f"[IndeedUK browser] attempted_queries={attempted_queries} "
+            f"blocked_pages={blocked_pages} raw_jobs={len(payload.get('jobs', []))}"
+        )
+
+    jobs: List[Dict[str, str]] = []
+    seen_links = set()
+    for item in payload.get("jobs", []):
+        title = normalize_text(item.get("title", ""))
+        link = clean_link(item.get("link", ""))
+        if not title or not link or link in seen_links:
+            continue
+        seen_links.add(link)
+        jobs.append(
+            {
+                "title": title,
+                "company": normalize_text(item.get("company", "") or "Indeed"),
+                "location": normalize_text(item.get("location", "") or "United Kingdom"),
+                "link": link,
+                "posted_text": normalize_text(item.get("posted_text", "")),
+                "posted_date": normalize_text(item.get("posted_date", "")),
+                "summary": trim_summary(item.get("summary", "")),
+                "source": "IndeedUK",
+            }
+        )
     return jobs
 
 

@@ -305,6 +305,8 @@ def should_run_now(force: bool = False) -> bool:
 
 def parse_posted_within_window(posted_text: str, posted_date: str, window_hours: int) -> bool:
     text = (posted_text or "").lower().strip()
+    if text == "new" or "newly posted" in text:
+        return True
     if "just now" in text or "today" in text:
         return True
     if "yesterday" in text:

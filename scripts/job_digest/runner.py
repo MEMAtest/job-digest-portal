@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import signal
 import time
@@ -99,6 +100,32 @@ def canonical_company(company: str) -> str:
 
 SOURCE_STAGE_TIMEOUT_SECONDS = int(os.getenv("JOB_DIGEST_SOURCE_STAGE_TIMEOUT", "180"))
 RUNNER_TRACE_LOG = config.DIGEST_DIR / "runner_trace.log"
+CUSTOM_CAREERS_MIN_SCORE = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_MIN_SCORE", "60") or "60")
+SOURCE_DIAGNOSTICS_ENABLED = os.getenv("JOB_DIGEST_CUSTOM_DIAGNOSTICS", "false").lower() == "true"
+SOURCE_DIAGNOSTICS_LIMIT = int(os.getenv("JOB_DIGEST_CUSTOM_DIAGNOSTICS_LIMIT", "100") or "100")
+SOURCE_DIAGNOSTICS: dict[str, dict] = {}
+
+CUSTOM_CAREERS_TITLE_HINTS = (
+    "product",
+    "onboarding",
+    "kyc",
+    "aml",
+    "screening",
+    "financial crime",
+    "fraud",
+    "compliance",
+    "risk",
+    "business analyst",
+    "operations",
+    "strategy",
+    "transformation",
+    "implementation",
+    "lifecycle",
+    "process owner",
+    "product operations",
+    "controls",
+    "governance",
+)
 
 
 class SourceStageTimeoutError(TimeoutError):
@@ -113,6 +140,71 @@ def log_trace(message: str) -> None:
             handle.write(line + "\n")
     except Exception:
         pass
+
+
+def _diagnostic_enabled_for(source_name: str) -> bool:
+    if not SOURCE_DIAGNOSTICS_ENABLED:
+        return False
+    return source_name in {"CustomCareers", "IndeedUK"}
+
+
+def reset_source_diagnostics() -> None:
+    SOURCE_DIAGNOSTICS.clear()
+
+
+def init_source_diagnostic(source_name: str, raw_count: int) -> dict:
+    diag = SOURCE_DIAGNOSTICS.setdefault(
+        source_name,
+        {
+            "raw": 0,
+            "kept": 0,
+            "dropped": {"title": 0, "location": 0, "company": 0, "window": 0, "score": 0},
+            "examples": {"title": [], "location": [], "company": [], "window": [], "score": [], "kept": []},
+        },
+    )
+    diag["raw"] = raw_count
+    return diag
+
+
+def add_source_diagnostic_example(diag: dict, category: str, payload: dict) -> None:
+    examples = diag["examples"].setdefault(category, [])
+    if len(examples) < SOURCE_DIAGNOSTICS_LIMIT:
+        examples.append(payload)
+
+
+def write_source_diagnostics(suffix: str = "") -> Path | None:
+    if not SOURCE_DIAGNOSTICS:
+        return None
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    output_path = config.DIGEST_DIR / f"source_diagnostics_{today}{suffix}.json"
+    try:
+        with output_path.open("w", encoding="utf-8") as handle:
+            json.dump(SOURCE_DIAGNOSTICS, handle, indent=2, ensure_ascii=False)
+        log_trace(f"[step] source diagnostics written to {output_path}")
+        return output_path
+    except Exception as exc:
+        log_trace(f"[step] source diagnostics write failed: {exc}")
+        return None
+
+
+def is_custom_careers_relevant_title(title: str, company: str, summary: str = "") -> bool:
+    if is_relevant_title(title):
+        return True
+    if not is_target_firm(company):
+        return False
+    combined = f"{title} {summary}".lower()
+    return any(term in combined for term in CUSTOM_CAREERS_TITLE_HINTS)
+
+
+def is_custom_careers_relevant_location(location: str, summary: str, company: str) -> bool:
+    if is_relevant_location(location, summary):
+        return True
+    if not is_target_firm(company):
+        return False
+    combined = f"{location} {summary}".lower()
+    return not location.strip() or any(
+        term in combined for term in ("remote", "hybrid", "uk", "united kingdom", "england", "scotland", "wales", "london")
+    )
 
 
 def run_step(label: str, fn):
@@ -434,7 +526,7 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, 30 * 24):
             continue
 
         summary = job.get("summary", "")
@@ -482,7 +574,7 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, 30 * 24):
             continue
 
         summary = job.get("summary", "")
@@ -566,27 +658,102 @@ def collect_job_board_source(session: requests.Session, source: dict) -> list[di
 
 def collect_job_board_records(session: requests.Session, source: dict) -> list[JobRecord]:
     records: list[JobRecord] = []
+    source_name = source["name"]
     board_jobs = collect_job_board_source(session, source)
-    print(f"[Job boards:{source['name']}] {len(board_jobs)} raw results fetched (before filtering)")
+    print(f"[Job boards:{source_name}] {len(board_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic(source_name, len(board_jobs)) if _diagnostic_enabled_for(source_name) else None
     for job in board_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
-        location = job.get("location", "") or "Remote"
-        if not is_relevant_title(title):
-            continue
+        raw_location = (job.get("location", "") or "").strip()
+        location = raw_location or "Remote"
         summary = job.get("summary", "")
-        if not is_relevant_location(location, summary):
+        effective_source_name = job.get("source", "Job board")
+
+        title_ok = (
+            is_custom_careers_relevant_title(title, company, summary)
+            if effective_source_name == "CustomCareers"
+            else is_relevant_title(title)
+        )
+        if not title_ok:
+            if diag:
+                diag["dropped"]["title"] += 1
+                add_source_diagnostic_example(
+                    diag,
+                    "title",
+                    {"company": company, "title": title, "location": location, "summary": summary[:200]},
+                )
             continue
-        if not should_keep_role_company(company, "JobBoard", job.get("source", "Job board")):
+
+        location_ok = (
+            is_custom_careers_relevant_location(raw_location, summary, company)
+            if effective_source_name == "CustomCareers"
+            else is_relevant_location(location, summary)
+        )
+        if not location_ok:
+            if diag:
+                diag["dropped"]["location"] += 1
+                add_source_diagnostic_example(
+                    diag,
+                    "location",
+                    {"company": company, "title": title, "location": raw_location, "summary": summary[:200]},
+                )
+            continue
+
+        company_ok = should_keep_role_company(company, "JobBoard", effective_source_name)
+        if effective_source_name == "CustomCareers" and is_target_firm(company):
+            company_ok = True
+        if not company_ok:
+            if diag:
+                diag["dropped"]["company"] += 1
+                add_source_diagnostic_example(
+                    diag,
+                    "company",
+                    {"company": company, "title": title, "location": location, "raw_company": job.get("company", "")},
+                )
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        within_window = parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS)
+        if effective_source_name == "CustomCareers" and not posted_raw and not posted_date:
+            within_window = True
+        if not within_window:
+            if diag:
+                diag["dropped"]["window"] += 1
+                add_source_diagnostic_example(
+                    diag,
+                    "window",
+                    {
+                        "company": company,
+                        "title": title,
+                        "location": location,
+                        "posted_display": posted_display,
+                        "posted_raw": posted_raw,
+                        "posted_date": posted_date,
+                    },
+                )
             continue
 
         full_text = f"{title} {company} {summary}"
         score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
+        min_score = config.MIN_SCORE
+        if effective_source_name == "CustomCareers" and is_target_firm(company):
+            min_score = CUSTOM_CAREERS_MIN_SCORE
+        if score < min_score:
+            if diag:
+                diag["dropped"]["score"] += 1
+                add_source_diagnostic_example(
+                    diag,
+                    "score",
+                    {
+                        "company": company,
+                        "title": title,
+                        "location": location,
+                        "score": score,
+                        "min_score": min_score,
+                        "summary": summary[:200],
+                    },
+                )
             continue
 
         records.append(
@@ -598,7 +765,7 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                 posted=posted_display,
                 posted_raw=posted_raw,
                 posted_date=posted_date,
-                source=job.get("source", "Job board"),
+                source=effective_source_name,
                 source_family="JobBoard",
                 fit_score=score,
                 preference_match=build_preference_match(full_text, company, location),
@@ -608,6 +775,32 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                 salary_min=job.get("salary_min", 0),
                 salary_max=job.get("salary_max", 0),
             )
+        )
+        if diag:
+            diag["kept"] += 1
+            add_source_diagnostic_example(
+                diag,
+                "kept",
+                {
+                    "company": company,
+                    "title": title,
+                    "location": location,
+                    "score": score,
+                    "posted_display": posted_display,
+                    "posted_raw": posted_raw,
+                    "posted_date": posted_date,
+                    "link": job.get("link", ""),
+                },
+            )
+    if diag:
+        log_trace(
+            "[diag] "
+            f"{source_name} raw={diag['raw']} kept={diag['kept']} "
+            f"dropped_title={diag['dropped']['title']} "
+            f"dropped_location={diag['dropped']['location']} "
+            f"dropped_company={diag['dropped']['company']} "
+            f"dropped_window={diag['dropped']['window']} "
+            f"dropped_score={diag['dropped']['score']}"
         )
     return records
 
@@ -620,6 +813,7 @@ except Exception:  # noqa: BLE001
 def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape_only: bool = False) -> None:
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
+    reset_source_diagnostics()
 
     all_jobs: list[JobRecord] = []
     firestore_client = init_firestore_client()
@@ -687,6 +881,7 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
         "write_digest_outputs",
         lambda: write_digest_outputs(records, suffix=digest_suffix),
     )
+    diagnostics_path = write_source_diagnostics(suffix=digest_suffix)
 
     if not scrape_only:
         run_step("write_records_to_firestore", lambda: write_records_to_firestore(records))
@@ -702,6 +897,8 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
         print(f"Digest generated: {out_xlsx}")
         print(f"Roles found: {len(records)}")
         print_source_yield(records)
+        if diagnostics_path is not None:
+            print(f"Source diagnostics: {diagnostics_path}")
         return
 
     pipeline_summary_html = ""
@@ -778,36 +975,36 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
         text_lines.append("")
     text_body = "\n".join(text_lines)
 
+    today = datetime.now().strftime("%Y-%m-%d")
     subject = f"Daily Job Digest - {today}"
     email_sent = send_email(subject, html_body, text_body)
 
-    if email_sent:
-        for record in records:
-            if record.link:
-                seen_cache[record.link] = now_utc().isoformat()
-            for alt in record.alternate_links:
-                link = alt.get("link") if isinstance(alt, dict) else ""
-                if link:
-                    seen_cache[link] = now_utc().isoformat()
-        save_seen_cache(config.SEEN_CACHE_PATH, seen_cache)
-        if config.RUN_AT or config.RUN_ATS:
-            state = load_run_state(config.RUN_STATE_PATH)
-            now_local = datetime.now(ZoneInfo(config.TZ_NAME)) if ZoneInfo else datetime.now()
-            run_times = [t for t in config.RUN_ATS if _parse_run_time(t)] or ([config.RUN_AT] if config.RUN_AT else [])
-            last_slots = state.get("last_run_slots", [])
-            if not isinstance(last_slots, list):
-                last_slots = []
-            for run_time in run_times or ["manual"]:
-                parsed = _parse_run_time(run_time) if run_time != "manual" else None
-                if parsed:
-                    hour, minute = parsed
-                    slot_key = f"{now_local.strftime('%Y-%m-%d')}-{hour:02d}:{minute:02d}"
-                else:
-                    slot_key = f"{now_local.strftime('%Y-%m-%d')}-manual"
-                if slot_key not in last_slots:
-                    last_slots.append(slot_key)
-            state["last_run_slots"] = last_slots[-50:]
-            save_run_state(config.RUN_STATE_PATH, state)
+    for record in records:
+        if record.link:
+            seen_cache[record.link] = now_utc().isoformat()
+        for alt in record.alternate_links:
+            link = alt.get("link") if isinstance(alt, dict) else ""
+            if link:
+                seen_cache[link] = now_utc().isoformat()
+    save_seen_cache(config.SEEN_CACHE_PATH, seen_cache)
+    if config.RUN_AT or config.RUN_ATS:
+        state = load_run_state(config.RUN_STATE_PATH)
+        now_local = datetime.now(ZoneInfo(config.TZ_NAME)) if ZoneInfo else datetime.now()
+        run_times = [t for t in config.RUN_ATS if _parse_run_time(t)] or ([config.RUN_AT] if config.RUN_AT else [])
+        last_slots = state.get("last_run_slots", [])
+        if not isinstance(last_slots, list):
+            last_slots = []
+        for run_time in run_times or ["manual"]:
+            parsed = _parse_run_time(run_time) if run_time != "manual" else None
+            if parsed:
+                hour, minute = parsed
+                slot_key = f"{now_local.strftime('%Y-%m-%d')}-{hour:02d}:{minute:02d}"
+            else:
+                slot_key = f"{now_local.strftime('%Y-%m-%d')}-manual"
+            if slot_key not in last_slots:
+                last_slots.append(slot_key)
+        state["last_run_slots"] = last_slots[-50:]
+        save_run_state(config.RUN_STATE_PATH, state)
 
     print(f"Digest generated: {out_xlsx}")
     print(f"Roles found: {len(records)}")
