@@ -61,7 +61,17 @@ SOURCE_RUNTIME_EVENTS: Dict[str, Dict[str, object]] = {}
 CUSTOM_CAREERS_HEALTH_PATH = config.DIGEST_DIR / "custom_careers_health.json"
 CUSTOM_CAREERS_GENERIC_PAGE_PATTERN = re.compile(
     r"job openings at|job opportunities at|search\s*&\s*apply|search and apply|careers?$|career opportunities|"
-    r"campus events|all jobs|open roles|join our team|join us|students|graduates|internships|military spouses|veterans",
+    r"campus events|all jobs|open roles|join our team|join us|students|graduates|internships|military spouses|veterans|"
+    r"vacant positions|share on facebook|share on linkedin|share on x|opens a new window|disabilities in the workplace|"
+    r"be you\. be valued\. belong",
+    re.IGNORECASE,
+)
+CUSTOM_CAREERS_SKIP_PATH_PATTERN = re.compile(
+    r"/events?/|/event-|/students|/graduates|/intern|/veteran|/disabilit|/benefit|/culture|/life-at-|/share|facebook|linkedin|twitter|x\\.com",
+    re.IGNORECASE,
+)
+CUSTOM_CAREERS_NON_UK_PATH_PATTERN = re.compile(
+    r"/(pune|noida|chennai|tokyo|tel-aviv|gurugram|mumbai|hyderabad|bangalore|bengaluru|india|singapore|sydney|melbourne|hong-kong|hongkong|japan|israel)/",
     re.IGNORECASE,
 )
 
@@ -131,6 +141,39 @@ def save_custom_careers_health_state(state: Dict[str, Dict[str, object]]) -> Non
 
 def is_generic_custom_careers_title(title: str) -> bool:
     return bool(CUSTOM_CAREERS_GENERIC_PAGE_PATTERN.search(normalize_text(title or "")))
+
+
+def should_skip_custom_careers_page(title: str, link: str = "", summary: str = "") -> bool:
+    title_norm = normalize_text(title or "")
+    summary_norm = normalize_text(summary or "")
+    link_norm = (link or "").lower()
+    if is_generic_custom_careers_title(title_norm):
+        return True
+    if link_norm and CUSTOM_CAREERS_SKIP_PATH_PATTERN.search(link_norm):
+        return True
+    generic_summary_markers = (
+        "search and apply for jobs directly",
+        "supporting people with disabilities",
+        "community where you'll truly belong",
+        "start your unobvious career",
+    )
+    return any(marker in summary_norm.lower() for marker in generic_summary_markers)
+
+
+def custom_careers_url_penalty(careers_url: str) -> int:
+    url = (careers_url or "").lower()
+    penalty = 0
+    if any(token in url for token in ("/usa/", "/us/", "/united-states/", "/india/", "/australia/", "/singapore/", "/japan/")):
+        penalty += 2
+    if any(token in url for token in ("/global/", "/worldwide/", "/international/")):
+        penalty += 1
+    if any(token in url for token in (".co.uk", "/uk/", "united-kingdom", "london")):
+        penalty -= 1
+    return penalty
+
+
+def is_obvious_non_uk_custom_link(link: str) -> bool:
+    return bool(CUSTOM_CAREERS_NON_UK_PATH_PATTERN.search((link or "").lower()))
 
 def _merge_linkedin_card(existing: Dict[str, str], incoming: Dict[str, str]) -> Dict[str, str]:
     if not existing:
@@ -2652,21 +2695,29 @@ def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
                 "priority_tier": registry_row.get("priority_tier", "Tier3"),
                 "fit_relevance": registry_row.get("fit_relevance", "Adjacent"),
                 "primary_category": registry_row.get("primary_category", ""),
+                "uk_relevance": registry_row.get("uk_relevance", ""),
                 "last_status": str((health_state.get(careers_url, {}) or {}).get("last_status", "")),
                 "last_raw": int((health_state.get(careers_url, {}) or {}).get("last_raw", 0) or 0),
                 "last_kept": int((health_state.get(careers_url, {}) or {}).get("last_kept", 0) or 0),
+                "last_dropped_location": int((((health_state.get(careers_url, {}) or {}).get("dropped", {}) or {}).get("location", 0) or 0)),
+                "last_dropped_title": int((((health_state.get(careers_url, {}) or {}).get("dropped", {}) or {}).get("title", 0) or 0)),
             }
         )
     tier_rank = {"Tier1": 0, "Tier2": 1, "Tier3": 2}
     fit_rank = {"Core": 0, "Adjacent": 1, "Low": 2}
     status_rank = {"healthy": 0, "weak_yield": 1, "empty": 2, "timed_out": 3, "broken": 4, "blocked": 5}
+    uk_rank = {"UK-HQ": 0, "UK-Presence": 1, "UK-Hiring-Remote": 2}
     targets.sort(
         key=lambda item: (
             tier_rank.get(item["priority_tier"], 9),
             0 if item.get("primary_category") == "Bank" else 1,
+            uk_rank.get(item.get("uk_relevance", ""), 3),
+            custom_careers_url_penalty(item.get("careers_url", "")),
             status_rank.get(item.get("last_status", ""), 6),
             -int(item.get("last_kept", 0) or 0),
             -int(item.get("last_raw", 0) or 0),
+            int(item.get("last_dropped_location", 0) or 0),
+            int(item.get("last_dropped_title", 0) or 0),
             fit_rank.get(item["fit_relevance"], 9),
             item["firm"].lower(),
         )
@@ -2717,6 +2768,9 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
     if not targets:
         return jobs
     deadline_seconds = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_DEADLINE_SECONDS", "60") or "60")
+    target_timeout_seconds = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_TARGET_TIMEOUT_SECONDS", "8") or "8")
+    max_pages_per_target = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_MAX_PAGES_PER_TARGET", "3") or "3")
+    max_detail_links_per_target = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_MAX_DETAIL_LINKS_PER_TARGET", "10") or "10")
     started = time.monotonic()
 
     def deadline_reached() -> bool:
@@ -2732,6 +2786,11 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
         if deadline_reached():
             mark_source_runtime_event("CustomCareers", timed_out=1, note="custom careers deadline reached")
             return jobs
+        target_started = time.monotonic()
+        def target_deadline_reached() -> bool:
+            if target_timeout_seconds <= 0:
+                return False
+            return (time.monotonic() - target_started) >= target_timeout_seconds
         careers_url = target["careers_url"]
         target_raw = 0
         try:
@@ -2750,17 +2809,20 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
         pages_to_visit.extend(discover_custom_job_hubs(resp.text, careers_url))
         job_map: Dict[str, Dict[str, str]] = {}
         for payload in extract_jobpostings_from_jsonld(resp.text, careers_url, target["firm"]):
-            if is_generic_custom_careers_title(payload.get("title", "")):
+            if should_skip_custom_careers_page(payload.get("title", ""), payload.get("link", ""), payload.get("summary", "")):
                 continue
             payload["target_firm"] = target["firm"]
             payload["target_careers_url"] = careers_url
             payload["target_category"] = target.get("primary_category", "")
             job_map.setdefault(payload["link"], payload)
 
-        for page_url in pages_to_visit[:4]:
+        for page_url in pages_to_visit[:max_pages_per_target]:
             if deadline_reached():
                 mark_source_runtime_event("CustomCareers", timed_out=1, note="custom careers deadline reached")
                 return jobs
+            if target_deadline_reached():
+                mark_source_runtime_event("CustomCareers", timed_out=1, note=f"{target['firm']} target time slice exhausted")
+                break
             try:
                 page_resp = session.get(page_url, timeout=request_timeout())
             except requests.RequestException:
@@ -2768,14 +2830,16 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
             if page_resp.status_code != 200:
                 continue
             for payload in extract_jobpostings_from_jsonld(page_resp.text, page_url, target["firm"]):
-                if is_generic_custom_careers_title(payload.get("title", "")):
+                if should_skip_custom_careers_page(payload.get("title", ""), payload.get("link", ""), payload.get("summary", "")):
                     continue
                 payload["target_firm"] = target["firm"]
                 payload["target_careers_url"] = careers_url
                 payload["target_category"] = target.get("primary_category", "")
                 job_map.setdefault(payload["link"], payload)
             for link, title in extract_job_links(page_resp.text, page_url):
-                if is_generic_custom_careers_title(title):
+                if should_skip_custom_careers_page(title, link, ""):
+                    continue
+                if is_obvious_non_uk_custom_link(link):
                     continue
                 job_map.setdefault(
                     link,
@@ -2795,10 +2859,16 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
                 )
             time.sleep(0.15)
 
-        for link, job in list(job_map.items())[:20]:
+        for link, job in list(job_map.items())[:max_detail_links_per_target]:
             if deadline_reached():
                 mark_source_runtime_event("CustomCareers", timed_out=1, note="custom careers deadline reached")
                 return jobs
+            if target_deadline_reached():
+                mark_source_runtime_event("CustomCareers", timed_out=1, note=f"{target['firm']} target time slice exhausted")
+                break
+            if is_obvious_non_uk_custom_link(link):
+                job_map.pop(link, None)
+                continue
             try:
                 detail_resp = session.get(link, timeout=request_timeout())
             except requests.RequestException:
@@ -2818,7 +2888,7 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
                 job["posted_text"] = details["posted_text"]
             if details.get("summary"):
                 job["summary"] = details["summary"]
-            if is_generic_custom_careers_title(job.get("title", "")):
+            if should_skip_custom_careers_page(job.get("title", ""), link, job.get("summary", "")):
                 job_map.pop(link, None)
                 continue
             time.sleep(0.15)
