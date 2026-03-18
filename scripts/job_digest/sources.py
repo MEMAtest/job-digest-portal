@@ -31,6 +31,7 @@ from .boards import (
     WORKABLE_ACCOUNTS,
     WORKDAY_SITES,
 )
+from . import config
 from .config import (
     ADZUNA_APP_ID,
     ADZUNA_APP_KEY,
@@ -55,6 +56,81 @@ try:
     import feedparser
 except Exception:  # noqa: BLE001
     feedparser = None
+
+SOURCE_RUNTIME_EVENTS: Dict[str, Dict[str, object]] = {}
+CUSTOM_CAREERS_HEALTH_PATH = config.DIGEST_DIR / "custom_careers_health.json"
+CUSTOM_CAREERS_GENERIC_PAGE_PATTERN = re.compile(
+    r"job openings at|job opportunities at|search\s*&\s*apply|search and apply|careers?$|career opportunities|"
+    r"campus events|all jobs|open roles|join our team|join us|students|graduates|internships|military spouses|veterans",
+    re.IGNORECASE,
+)
+
+
+def reset_source_runtime_events() -> None:
+    SOURCE_RUNTIME_EVENTS.clear()
+
+
+def mark_source_runtime_event(
+    source_name: str,
+    *,
+    blocked: int = 0,
+    timed_out: int = 0,
+    failed: int = 0,
+    raw: int | None = None,
+    note: str = "",
+) -> None:
+    state = SOURCE_RUNTIME_EVENTS.setdefault(
+        source_name,
+        {"blocked": 0, "timed_out": 0, "failed": 0, "raw": 0, "notes": []},
+    )
+    state["blocked"] = int(state.get("blocked", 0) or 0) + blocked
+    state["timed_out"] = int(state.get("timed_out", 0) or 0) + timed_out
+    state["failed"] = int(state.get("failed", 0) or 0) + failed
+    if raw is not None:
+        state["raw"] = max(int(state.get("raw", 0) or 0), int(raw))
+    if note:
+        notes = state.setdefault("notes", [])
+        if note not in notes:
+            notes.append(note)
+
+
+def get_source_runtime_events() -> Dict[str, Dict[str, object]]:
+    return {
+        name: {
+            "blocked": int(payload.get("blocked", 0) or 0),
+            "timed_out": int(payload.get("timed_out", 0) or 0),
+            "failed": int(payload.get("failed", 0) or 0),
+            "raw": int(payload.get("raw", 0) or 0),
+            "notes": list(payload.get("notes", []) or []),
+        }
+        for name, payload in SOURCE_RUNTIME_EVENTS.items()
+    }
+
+
+def load_custom_careers_health_state() -> Dict[str, Dict[str, object]]:
+    if not CUSTOM_CAREERS_HEALTH_PATH.exists():
+        return {}
+    try:
+        payload = json.loads(CUSTOM_CAREERS_HEALTH_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def save_custom_careers_health_state(state: Dict[str, Dict[str, object]]) -> None:
+    if not state:
+        return
+    existing = load_custom_careers_health_state()
+    merged = dict(existing)
+    merged.update(state)
+    try:
+        CUSTOM_CAREERS_HEALTH_PATH.write_text(json.dumps(merged, indent=2, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        return
+
+
+def is_generic_custom_careers_title(title: str) -> bool:
+    return bool(CUSTOM_CAREERS_GENERIC_PAGE_PATTERN.search(normalize_text(title or "")))
 
 def _merge_linkedin_card(existing: Dict[str, str], incoming: Dict[str, str]) -> Dict[str, str]:
     if not existing:
@@ -1255,6 +1331,9 @@ def parse_job_detail_jsonld(html: str, fallback_title: str = "") -> Dict[str, st
 def parse_job_detail_fallback(html: str) -> Dict[str, str]:
     soup = BeautifulSoup(html, "html.parser")
     title = ""
+    h1 = soup.find("h1")
+    if h1:
+        title = normalize_text(h1.get_text(" "))
     og_title = soup.find("meta", property="og:title")
     if og_title and og_title.get("content"):
         title = og_title.get("content", "")
@@ -1277,11 +1356,21 @@ def parse_job_detail_fallback(html: str) -> Dict[str, str]:
 
     text_blob = normalize_text(soup.get_text(" "))
     posted_text = extract_relative_posted_text(text_blob)
+    location = ""
+    location_patterns = [
+        r"\b([A-Z][a-z]+(?:,\s*[A-Z][a-z]+)*,\s*United Kingdom)\b",
+        r"\b(Remote\s*\(UK\)|Remote UK|London,\s*England,\s*United Kingdom|London,\s*United Kingdom)\b",
+    ]
+    for pattern in location_patterns:
+        match = re.search(pattern, text_blob)
+        if match:
+            location = normalize_text(match.group(1))
+            break
 
     return {
         "title": title,
         "company": company,
-        "location": "",
+        "location": location,
         "posted_date": "",
         "posted_text": posted_text,
         "summary": trim_summary(description),
@@ -1811,10 +1900,12 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
 
     for base_url in base_urls:
         if deadline_reached():
+            mark_source_runtime_event("IndeedUK", timed_out=1, note="Indeed RSS pass timed out")
             return list(job_map.values())
         headers["Referer"] = f"{base_url}/"
         for keyword in search_terms[:12]:
             if deadline_reached():
+                mark_source_runtime_event("IndeedUK", timed_out=1, note="Indeed RSS pass timed out")
                 return list(job_map.values())
             for location in locations:
                 rss_urls = [
@@ -1857,15 +1948,18 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
                     if entries:
                         break
                 if deadline_reached():
+                    mark_source_runtime_event("IndeedUK", timed_out=1, note="Indeed RSS pass timed out")
                     return list(job_map.values())
                 time.sleep(0.15)
 
     for base_url in base_urls:
         if deadline_reached():
+            mark_source_runtime_event("IndeedUK", timed_out=1, note="Indeed company-query pass timed out")
             return list(job_map.values())
         headers["Referer"] = f"{base_url}/"
         for query, location in company_queries:
             if deadline_reached():
+                mark_source_runtime_event("IndeedUK", timed_out=1, note="Indeed company-query pass timed out")
                 return list(job_map.values())
             rss_url = f"{base_url}/jobs?rss=1&q={quote_plus(query)}&l={quote_plus(location)}&sort=date&fromage=14"
             entries = fetch_rss_entries(session, rss_url)
@@ -1897,14 +1991,17 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
             time.sleep(0.1)
 
     if job_map:
+        mark_source_runtime_event("IndeedUK", raw=len(job_map), note="Indeed RSS/company query yielded jobs")
         return list(job_map.values())
 
     for base_url in base_urls:
         if deadline_reached():
+            mark_source_runtime_event("IndeedUK", timed_out=1, note="Indeed HTML pass timed out")
             return list(job_map.values())
         headers["Referer"] = f"{base_url}/"
         for keyword in search_terms[:6]:
             if deadline_reached():
+                mark_source_runtime_event("IndeedUK", timed_out=1, note="Indeed HTML pass timed out")
                 return list(job_map.values())
             for location in locations:
                 params = {"q": keyword, "l": location, "fromage": 7, "sort": "date"}
@@ -1913,8 +2010,12 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
                 except requests.RequestException:
                     continue
                 if resp.status_code == 403:
+                    mark_source_runtime_event("IndeedUK", blocked=1, note=f"Indeed HTML blocked at {base_url}")
                     continue
                 if resp.status_code != 200:
+                    continue
+                if "Security Check - Indeed.com" in resp.text or "Additional Verification Required" in resp.text:
+                    mark_source_runtime_event("IndeedUK", blocked=1, note=f"Indeed security check at {base_url}")
                     continue
 
                 soup = BeautifulSoup(resp.text, "html.parser")
@@ -2014,6 +2115,7 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
                 time.sleep(0.2)
 
     jobs.extend(job_map.values())
+    mark_source_runtime_event("IndeedUK", raw=len(jobs), note="Indeed completed without yielded jobs" if not jobs else "Indeed HTML yielded jobs")
     return jobs
 
 
@@ -2075,6 +2177,7 @@ def indeed_browser_search() -> List[Dict[str, str]]:
             env=os.environ.copy(),
         )
     except Exception:
+        mark_source_runtime_event("IndeedUK", failed=1, note="Indeed browser launch failed")
         return []
     finally:
         try:
@@ -2083,6 +2186,7 @@ def indeed_browser_search() -> List[Dict[str, str]]:
             pass
 
     if result.returncode != 0:
+        mark_source_runtime_event("IndeedUK", failed=1, note="Indeed browser command failed")
         return []
 
     try:
@@ -2092,11 +2196,16 @@ def indeed_browser_search() -> List[Dict[str, str]]:
 
     blocked_pages = int(payload.get("blockedPages", 0) or 0)
     attempted_queries = int(payload.get("attemptedQueries", 0) or 0)
+    raw_jobs = len(payload.get("jobs", []))
     if blocked_pages or attempted_queries:
         print(
             f"[IndeedUK browser] attempted_queries={attempted_queries} "
-            f"blocked_pages={blocked_pages} raw_jobs={len(payload.get('jobs', []))}"
+            f"blocked_pages={blocked_pages} raw_jobs={raw_jobs}"
         )
+    if blocked_pages:
+        mark_source_runtime_event("IndeedUK", blocked=blocked_pages, raw=raw_jobs, note="Indeed browser blocked by anti-bot")
+    elif attempted_queries and raw_jobs == 0:
+        mark_source_runtime_event("IndeedUK", raw=0, note="Indeed browser returned no jobs")
 
     jobs: List[Dict[str, str]] = []
     seen_links = set()
@@ -2118,6 +2227,8 @@ def indeed_browser_search() -> List[Dict[str, str]]:
                 "source": "IndeedUK",
             }
         )
+    if jobs:
+        mark_source_runtime_event("IndeedUK", raw=len(jobs), note="Indeed browser yielded jobs")
     return jobs
 
 
@@ -2515,6 +2626,7 @@ def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
         return []
     targets: List[Dict[str, str]] = []
     seen = set()
+    health_state = load_custom_careers_health_state()
     try:
         from .company_coverage import read_registry
         registry_rows = read_registry()
@@ -2539,11 +2651,26 @@ def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
                 "source": (row.get("source") or "CustomCareers").strip() or "CustomCareers",
                 "priority_tier": registry_row.get("priority_tier", "Tier3"),
                 "fit_relevance": registry_row.get("fit_relevance", "Adjacent"),
+                "primary_category": registry_row.get("primary_category", ""),
+                "last_status": str((health_state.get(careers_url, {}) or {}).get("last_status", "")),
+                "last_raw": int((health_state.get(careers_url, {}) or {}).get("last_raw", 0) or 0),
+                "last_kept": int((health_state.get(careers_url, {}) or {}).get("last_kept", 0) or 0),
             }
         )
     tier_rank = {"Tier1": 0, "Tier2": 1, "Tier3": 2}
     fit_rank = {"Core": 0, "Adjacent": 1, "Low": 2}
-    targets.sort(key=lambda item: (tier_rank.get(item["priority_tier"], 9), fit_rank.get(item["fit_relevance"], 9), item["firm"].lower()))
+    status_rank = {"healthy": 0, "weak_yield": 1, "empty": 2, "timed_out": 3, "broken": 4, "blocked": 5}
+    targets.sort(
+        key=lambda item: (
+            tier_rank.get(item["priority_tier"], 9),
+            0 if item.get("primary_category") == "Bank" else 1,
+            status_rank.get(item.get("last_status", ""), 6),
+            -int(item.get("last_kept", 0) or 0),
+            -int(item.get("last_raw", 0) or 0),
+            fit_rank.get(item["fit_relevance"], 9),
+            item["firm"].lower(),
+        )
+    )
 
     target_limit = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_TARGET_LIMIT", "36") or "36")
     if target_limit <= 0 or len(targets) <= target_limit:
@@ -2603,23 +2730,36 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
 
     for target in targets:
         if deadline_reached():
+            mark_source_runtime_event("CustomCareers", timed_out=1, note="custom careers deadline reached")
             return jobs
         careers_url = target["careers_url"]
+        target_raw = 0
         try:
             resp = session.get(careers_url, timeout=request_timeout())
         except requests.RequestException:
+            mark_source_runtime_event("CustomCareers", failed=1, note=f"request failed for {target['firm']}")
             continue
         if resp.status_code != 200:
+            if resp.status_code in {403, 429}:
+                mark_source_runtime_event("CustomCareers", blocked=1, note=f"{target['firm']} returned {resp.status_code}")
+            else:
+                mark_source_runtime_event("CustomCareers", failed=1, note=f"{target['firm']} returned {resp.status_code}")
             continue
 
         pages_to_visit = [careers_url]
         pages_to_visit.extend(discover_custom_job_hubs(resp.text, careers_url))
         job_map: Dict[str, Dict[str, str]] = {}
         for payload in extract_jobpostings_from_jsonld(resp.text, careers_url, target["firm"]):
+            if is_generic_custom_careers_title(payload.get("title", "")):
+                continue
+            payload["target_firm"] = target["firm"]
+            payload["target_careers_url"] = careers_url
+            payload["target_category"] = target.get("primary_category", "")
             job_map.setdefault(payload["link"], payload)
 
         for page_url in pages_to_visit[:4]:
             if deadline_reached():
+                mark_source_runtime_event("CustomCareers", timed_out=1, note="custom careers deadline reached")
                 return jobs
             try:
                 page_resp = session.get(page_url, timeout=request_timeout())
@@ -2628,8 +2768,15 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
             if page_resp.status_code != 200:
                 continue
             for payload in extract_jobpostings_from_jsonld(page_resp.text, page_url, target["firm"]):
+                if is_generic_custom_careers_title(payload.get("title", "")):
+                    continue
+                payload["target_firm"] = target["firm"]
+                payload["target_careers_url"] = careers_url
+                payload["target_category"] = target.get("primary_category", "")
                 job_map.setdefault(payload["link"], payload)
             for link, title in extract_job_links(page_resp.text, page_url):
+                if is_generic_custom_careers_title(title):
+                    continue
                 job_map.setdefault(
                     link,
                     {
@@ -2641,12 +2788,16 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
                         "posted_date": "",
                         "summary": "",
                         "source": "CustomCareers",
+                        "target_firm": target["firm"],
+                        "target_careers_url": careers_url,
+                        "target_category": target.get("primary_category", ""),
                     },
                 )
             time.sleep(0.15)
 
         for link, job in list(job_map.items())[:20]:
             if deadline_reached():
+                mark_source_runtime_event("CustomCareers", timed_out=1, note="custom careers deadline reached")
                 return jobs
             try:
                 detail_resp = session.get(link, timeout=request_timeout())
@@ -2667,10 +2818,16 @@ def custom_careers_search(session: requests.Session) -> List[Dict[str, str]]:
                 job["posted_text"] = details["posted_text"]
             if details.get("summary"):
                 job["summary"] = details["summary"]
+            if is_generic_custom_careers_title(job.get("title", "")):
+                job_map.pop(link, None)
+                continue
             time.sleep(0.15)
 
+        target_raw = len(job_map)
+        mark_source_runtime_event("CustomCareers", raw=len(jobs) + target_raw)
         jobs.extend(job_map.values())
         if deadline_reached():
+            mark_source_runtime_event("CustomCareers", timed_out=1, note="custom careers deadline reached")
             return jobs
         time.sleep(0.2)
     return jobs

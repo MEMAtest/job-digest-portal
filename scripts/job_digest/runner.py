@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import signal
+import statistics
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,6 +16,7 @@ import requests
 
 from . import config
 from .boards import JOB_BOARD_SOURCES
+from .company_coverage import read_registry
 from .firestore import (
     backfill_posted_dates,
     backfill_role_summaries,
@@ -58,10 +62,13 @@ from .sources import (
     linkedin_job_details,
     linkedin_search,
     meetfrank_search,
+    get_source_runtime_events,
     reed_search,
     remotive_search,
+    reset_source_runtime_events,
     remoteok_search,
     rss_search,
+    save_custom_careers_health_state,
     smartrecruiters_search,
     technojobs_search,
     weloveproduct_search,
@@ -103,7 +110,11 @@ RUNNER_TRACE_LOG = config.DIGEST_DIR / "runner_trace.log"
 CUSTOM_CAREERS_MIN_SCORE = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_MIN_SCORE", "60") or "60")
 SOURCE_DIAGNOSTICS_ENABLED = os.getenv("JOB_DIGEST_CUSTOM_DIAGNOSTICS", "false").lower() == "true"
 SOURCE_DIAGNOSTICS_LIMIT = int(os.getenv("JOB_DIGEST_CUSTOM_DIAGNOSTICS_LIMIT", "100") or "100")
+SOURCE_HEALTH_WEAK_YIELD_MIN_RAW = int(os.getenv("JOB_DIGEST_WEAK_YIELD_MIN_RAW", "10") or "10")
+SOURCE_HEALTH_WEAK_YIELD_RATIO = float(os.getenv("JOB_DIGEST_WEAK_YIELD_RATIO", "0.15") or "0.15")
+RECENT_DIGEST_SAMPLE_SIZE = int(os.getenv("JOB_DIGEST_FORECAST_SAMPLE_SIZE", "10") or "10")
 SOURCE_DIAGNOSTICS: dict[str, dict] = {}
+CUSTOM_CAREERS_TARGET_DIAGNOSTICS: dict[str, dict] = {}
 
 CUSTOM_CAREERS_TITLE_HINTS = (
     "product",
@@ -141,6 +152,15 @@ CUSTOM_CAREERS_GENERIC_TITLE_TERMS = (
     "veterans",
 )
 
+SOURCE_STAGE_NAME_MAP = {
+    "linkedin": "LinkedIn",
+    "greenhouse": "Greenhouse",
+    "lever": "Lever",
+    "smartrecruiters": "SmartRecruiters",
+    "ashby": "Ashby",
+    "workable": "Workable",
+}
+
 
 class SourceStageTimeoutError(TimeoutError):
     pass
@@ -157,21 +177,28 @@ def log_trace(message: str) -> None:
 
 
 def _diagnostic_enabled_for(source_name: str) -> bool:
-    if not SOURCE_DIAGNOSTICS_ENABLED:
-        return False
+    if SOURCE_DIAGNOSTICS_ENABLED:
+        return True
     return source_name in {"CustomCareers", "IndeedUK"}
 
 
 def reset_source_diagnostics() -> None:
     SOURCE_DIAGNOSTICS.clear()
+    CUSTOM_CAREERS_TARGET_DIAGNOSTICS.clear()
 
 
 def init_source_diagnostic(source_name: str, raw_count: int) -> dict:
     diag = SOURCE_DIAGNOSTICS.setdefault(
         source_name,
         {
+            "source_name": source_name,
             "raw": 0,
             "kept": 0,
+            "blocked": 0,
+            "timed_out": 0,
+            "failed": 0,
+            "status": "empty",
+            "notes": [],
             "dropped": {"title": 0, "location": 0, "company": 0, "window": 0, "score": 0},
             "examples": {"title": [], "location": [], "company": [], "window": [], "score": [], "kept": []},
         },
@@ -181,12 +208,183 @@ def init_source_diagnostic(source_name: str, raw_count: int) -> dict:
 
 
 def add_source_diagnostic_example(diag: dict, category: str, payload: dict) -> None:
+    if not _diagnostic_enabled_for(diag.get("source_name", "")):
+        return
     examples = diag["examples"].setdefault(category, [])
     if len(examples) < SOURCE_DIAGNOSTICS_LIMIT:
         examples.append(payload)
 
 
+def add_source_note(diag: dict, note: str) -> None:
+    notes = diag.setdefault("notes", [])
+    if note and note not in notes:
+        notes.append(note)
+
+
+def normalize_source_name(label: str) -> str:
+    if label.startswith("job_board:"):
+        return label.split(":", 1)[1]
+    return SOURCE_STAGE_NAME_MAP.get(label, label)
+
+
+def classify_source_diagnostic(diag: dict) -> str:
+    raw = int(diag.get("raw", 0) or 0)
+    kept = int(diag.get("kept", 0) or 0)
+    blocked = int(diag.get("blocked", 0) or 0)
+    timed_out = int(diag.get("timed_out", 0) or 0)
+    failed = int(diag.get("failed", 0) or 0)
+    if blocked > 0:
+        return "blocked"
+    if timed_out > 0:
+        return "timed_out"
+    if failed > 0:
+        return "broken"
+    if raw <= 0 and kept <= 0:
+        return "empty"
+    if raw >= SOURCE_HEALTH_WEAK_YIELD_MIN_RAW and raw > 0 and (kept / raw) < SOURCE_HEALTH_WEAK_YIELD_RATIO:
+        return "weak_yield"
+    return "healthy"
+
+
+def merge_runtime_source_events() -> None:
+    runtime_events = get_source_runtime_events()
+    for source_name, event in runtime_events.items():
+        diag = init_source_diagnostic(source_name, int(event.get("raw", 0) or 0))
+        diag["blocked"] = max(int(diag.get("blocked", 0) or 0), int(event.get("blocked", 0) or 0))
+        diag["timed_out"] = max(int(diag.get("timed_out", 0) or 0), int(event.get("timed_out", 0) or 0))
+        diag["failed"] = max(int(diag.get("failed", 0) or 0), int(event.get("failed", 0) or 0))
+        diag["raw"] = max(int(diag.get("raw", 0) or 0), int(event.get("raw", 0) or 0))
+        for note in event.get("notes", []) or []:
+            add_source_note(diag, note)
+    for source_name, diag in SOURCE_DIAGNOSTICS.items():
+        diag["source_name"] = source_name
+        diag["status"] = classify_source_diagnostic(diag)
+
+
+def _init_custom_target_diagnostic(job: dict, company: str) -> dict | None:
+    careers_url = (job.get("target_careers_url") or "").strip()
+    if not careers_url:
+        return None
+    stats = CUSTOM_CAREERS_TARGET_DIAGNOSTICS.setdefault(
+        careers_url,
+        {
+            "firm": (job.get("target_firm") or company or "").strip(),
+            "careers_url": careers_url,
+            "primary_category": (job.get("target_category") or "").strip(),
+            "raw": 0,
+            "kept": 0,
+            "dropped": {"title": 0, "location": 0, "company": 0, "window": 0, "score": 0},
+        },
+    )
+    if company and not stats.get("firm"):
+        stats["firm"] = company
+    return stats
+
+
+def finalize_custom_target_diagnostics() -> dict[str, dict]:
+    finalized: dict[str, dict] = {}
+    stamped_at = datetime.now(timezone.utc).isoformat()
+    for careers_url, stats in CUSTOM_CAREERS_TARGET_DIAGNOSTICS.items():
+        raw = int(stats.get("raw", 0) or 0)
+        kept = int(stats.get("kept", 0) or 0)
+        if raw <= 0:
+            status = "empty"
+        elif raw >= SOURCE_HEALTH_WEAK_YIELD_MIN_RAW and (kept / raw) < SOURCE_HEALTH_WEAK_YIELD_RATIO:
+            status = "weak_yield"
+        elif kept > 0:
+            status = "healthy"
+        else:
+            status = "empty"
+        finalized[careers_url] = {
+            **stats,
+            "last_status": status,
+            "last_seen_at": stamped_at,
+            "last_raw": raw,
+            "last_kept": kept,
+        }
+    return finalized
+
+
+def print_source_health_summary() -> None:
+    merge_runtime_source_events()
+    order = {"blocked": 0, "timed_out": 1, "broken": 2, "weak_yield": 3, "healthy": 4, "empty": 5}
+    print("\n--- Source Health ---")
+    if not SOURCE_DIAGNOSTICS:
+        print("  (no source diagnostics recorded)")
+        print("--- End Source Health ---")
+        return
+    for source_name, diag in sorted(
+        SOURCE_DIAGNOSTICS.items(),
+        key=lambda item: (order.get(item[1].get("status", "empty"), 9), item[0].lower()),
+    ):
+        parts = [f"raw={int(diag.get('raw', 0) or 0)}", f"kept={int(diag.get('kept', 0) or 0)}"]
+        if diag.get("blocked"):
+            parts.append(f"blocked={diag['blocked']}")
+        if diag.get("timed_out"):
+            parts.append(f"timed_out={diag['timed_out']}")
+        dropped = diag.get("dropped", {})
+        for key in ("title", "location", "company", "window", "score"):
+            value = int(dropped.get(key, 0) or 0)
+            if value:
+                parts.append(f"{key}={value}")
+        print(f"  {source_name:<18} {diag.get('status', 'empty'):<10} {' '.join(parts)}")
+        log_trace(f"[health] {source_name} status={diag.get('status', 'empty')} {' '.join(parts)}")
+    print("--- End Source Health ---")
+
+
+def build_recent_digest_forecast() -> dict:
+    digest_files = sorted(
+        p for p in config.DIGEST_DIR.glob("digest_*.csv") if "scrape_only" not in p.name
+    )[-RECENT_DIGEST_SAMPLE_SIZE:]
+    counts: list[int] = []
+    category_totals: Counter[str] = Counter()
+    registry = {canonicalize_company_name(row.get("firm_name", "")): row for row in read_registry()}
+    for path in digest_files:
+        try:
+            with path.open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+        except OSError:
+            continue
+        counts.append(len(rows))
+        for row in rows:
+            company = canonicalize_company_name(row.get("Company", "") or "")
+            category = (registry.get(company, {}) or {}).get("primary_category") or "Unknown"
+            category_totals[category] += 1
+    if not counts:
+        return {"runs": 0}
+    runs = len(counts)
+    return {
+        "runs": runs,
+        "average": round(statistics.mean(counts), 1),
+        "median": round(statistics.median(counts), 1),
+        "min": min(counts),
+        "max": max(counts),
+        "category_daily_average": {
+            key: round(value / runs, 1) for key, value in category_totals.items() if key in {"Bank", "Fintech", "Regtech"}
+        },
+    }
+
+
+def print_recent_digest_forecast() -> None:
+    forecast = build_recent_digest_forecast()
+    if not forecast.get("runs"):
+        return
+    print("\n--- Expected Roles ---")
+    print(
+        f"  rolling {forecast['runs']} runs: avg={forecast['average']} median={forecast['median']} "
+        f"min={forecast['min']} max={forecast['max']}"
+    )
+    category_parts = [
+        f"{category.lower()}={value}/day"
+        for category, value in sorted(forecast.get("category_daily_average", {}).items())
+    ]
+    if category_parts:
+        print(f"  category mix: {' | '.join(category_parts)}")
+    print("--- End Expected Roles ---")
+
+
 def write_source_diagnostics(suffix: str = "") -> Path | None:
+    merge_runtime_source_events()
     if not SOURCE_DIAGNOSTICS:
         return None
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -240,6 +438,7 @@ def _timeout_handler(_signum, _frame):
 def run_source_stage(label: str, fn):
     started = time.perf_counter()
     log_trace(f"[source] {label} starting...")
+    source_name = normalize_source_name(label)
     previous_handler = signal.getsignal(signal.SIGALRM)
     try:
         if SOURCE_STAGE_TIMEOUT_SECONDS > 0:
@@ -247,14 +446,22 @@ def run_source_stage(label: str, fn):
             signal.alarm(SOURCE_STAGE_TIMEOUT_SECONDS)
         records = fn()
         elapsed = time.perf_counter() - started
+        diag = init_source_diagnostic(source_name, SOURCE_DIAGNOSTICS.get(source_name, {}).get("raw", 0))
+        diag["kept"] = max(int(diag.get("kept", 0) or 0), len(records))
         log_trace(f"[source] {label} complete in {elapsed:.1f}s with {len(records)} kept roles")
         return records
     except SourceStageTimeoutError:
         elapsed = time.perf_counter() - started
+        diag = init_source_diagnostic(source_name, SOURCE_DIAGNOSTICS.get(source_name, {}).get("raw", 0))
+        diag["timed_out"] += 1
+        add_source_note(diag, f"{label} exceeded source stage timeout")
         log_trace(f"[source] {label} timed out after {elapsed:.1f}s; skipping")
         return []
     except Exception as exc:  # noqa: BLE001
         elapsed = time.perf_counter() - started
+        diag = init_source_diagnostic(source_name, SOURCE_DIAGNOSTICS.get(source_name, {}).get("raw", 0))
+        diag["failed"] += 1
+        add_source_note(diag, f"{label} failed: {type(exc).__name__}")
         log_trace(f"[source] {label} failed after {elapsed:.1f}s: {type(exc).__name__}: {exc}")
         return []
     finally:
@@ -322,6 +529,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
     records: list[JobRecord] = []
     linkedin_jobs = linkedin_search(session)
     print(f"[LinkedIn] {len(linkedin_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("LinkedIn", len(linkedin_jobs))
     for job in linkedin_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -380,6 +588,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
                 applicant_count=applicant_text,
             )
         )
+        diag["kept"] += 1
     return records
 
 
@@ -387,6 +596,7 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
     records: list[JobRecord] = []
     greenhouse_jobs = greenhouse_search(session)
     print(f"[Greenhouse] {len(greenhouse_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("Greenhouse", len(greenhouse_jobs))
     for job in greenhouse_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -428,6 +638,7 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
                 notes=summary,
             )
         )
+        diag["kept"] += 1
     return records
 
 
@@ -435,6 +646,7 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
     records: list[JobRecord] = []
     lever_jobs = lever_search(session)
     print(f"[Lever] {len(lever_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("Lever", len(lever_jobs))
     for job in lever_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -476,6 +688,7 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
                 notes=summary,
             )
         )
+        diag["kept"] += 1
     return records
 
 
@@ -483,6 +696,7 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
     records: list[JobRecord] = []
     smart_jobs = smartrecruiters_search(session)
     print(f"[SmartRecruiters] {len(smart_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("SmartRecruiters", len(smart_jobs))
     for job in smart_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -524,6 +738,7 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
                 notes=summary,
             )
         )
+        diag["kept"] += 1
     return records
 
 
@@ -531,6 +746,7 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
     records: list[JobRecord] = []
     ashby_jobs = ashby_search(session)
     print(f"[Ashby] {len(ashby_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("Ashby", len(ashby_jobs))
     for job in ashby_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -572,6 +788,7 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
                 notes=summary,
             )
         )
+        diag["kept"] += 1
     return records
 
 
@@ -579,6 +796,7 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
     records: list[JobRecord] = []
     workable_jobs = workable_search(session)
     print(f"[Workable] {len(workable_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("Workable", len(workable_jobs))
     for job in workable_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -621,6 +839,7 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
                 job_status=job.get("job_status", ""),
             )
         )
+        diag["kept"] += 1
     return records
 
 
@@ -678,7 +897,7 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
     source_name = source["name"]
     board_jobs = collect_job_board_source(session, source)
     print(f"[Job boards:{source_name}] {len(board_jobs)} raw results fetched (before filtering)")
-    diag = init_source_diagnostic(source_name, len(board_jobs)) if _diagnostic_enabled_for(source_name) else None
+    diag = init_source_diagnostic(source_name, len(board_jobs))
     for job in board_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -686,6 +905,11 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
         location = raw_location or "Remote"
         summary = job.get("summary", "")
         effective_source_name = job.get("source", "Job board")
+        target_stats = None
+        if effective_source_name == "CustomCareers":
+            target_stats = _init_custom_target_diagnostic(job, company)
+            if target_stats:
+                target_stats["raw"] += 1
 
         title_ok = (
             is_custom_careers_relevant_title(title, company, summary)
@@ -700,6 +924,8 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                     "title",
                     {"company": company, "title": title, "location": location, "summary": summary[:200]},
                 )
+            if target_stats:
+                target_stats["dropped"]["title"] += 1
             continue
 
         location_ok = (
@@ -715,6 +941,8 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                     "location",
                     {"company": company, "title": title, "location": raw_location, "summary": summary[:200]},
                 )
+            if target_stats:
+                target_stats["dropped"]["location"] += 1
             continue
 
         company_ok = should_keep_role_company(company, "JobBoard", effective_source_name)
@@ -728,6 +956,8 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                     "company",
                     {"company": company, "title": title, "location": location, "raw_company": job.get("company", "")},
                 )
+            if target_stats:
+                target_stats["dropped"]["company"] += 1
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
@@ -749,6 +979,8 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                         "posted_date": posted_date,
                     },
                 )
+            if target_stats:
+                target_stats["dropped"]["window"] += 1
             continue
 
         full_text = f"{title} {company} {summary}"
@@ -771,6 +1003,8 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                         "summary": summary[:200],
                     },
                 )
+            if target_stats:
+                target_stats["dropped"]["score"] += 1
             continue
 
         records.append(
@@ -809,6 +1043,8 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                     "link": job.get("link", ""),
                 },
             )
+        if target_stats:
+            target_stats["kept"] += 1
     if diag:
         log_trace(
             "[diag] "
@@ -831,6 +1067,7 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
     reset_source_diagnostics()
+    reset_source_runtime_events()
 
     all_jobs: list[JobRecord] = []
     firestore_client = init_firestore_client()
@@ -898,6 +1135,7 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
         "write_digest_outputs",
         lambda: write_digest_outputs(records, suffix=digest_suffix),
     )
+    save_custom_careers_health_state(finalize_custom_target_diagnostics())
     diagnostics_path = write_source_diagnostics(suffix=digest_suffix)
 
     if not scrape_only:
@@ -914,6 +1152,8 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
         print(f"Digest generated: {out_xlsx}")
         print(f"Roles found: {len(records)}")
         print_source_yield(records)
+        print_source_health_summary()
+        print_recent_digest_forecast()
         if diagnostics_path is not None:
             print(f"Source diagnostics: {diagnostics_path}")
         return
@@ -1026,6 +1266,8 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
     print(f"Digest generated: {out_xlsx}")
     print(f"Roles found: {len(records)}")
     print_source_yield(records)
+    print_source_health_summary()
+    print_recent_digest_forecast()
 
 
 def cli() -> None:
