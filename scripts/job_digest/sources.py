@@ -1580,6 +1580,11 @@ def html_board_search(
     for keyword in BOARD_KEYWORDS[:keyword_limit]:
         slug = slugify(keyword)
         search_url = f"{base_url}/jobs/{slug}/in-london"
+        generic_title_variants = {
+            normalize_text(keyword).lower(),
+            normalize_text(keyword.replace("-", " ")).lower(),
+            normalize_text(slug.replace("-", " ")).lower(),
+        }
         try:
             resp = session.get(search_url, timeout=30)
         except requests.RequestException:
@@ -1591,6 +1596,19 @@ def html_board_search(
         for link, title in links:
             if link in job_map:
                 continue
+            normalized_link = clean_link(link)
+            parsed_link = urlparse(normalized_link)
+            normalized_title = normalize_text(title).lower()
+            if normalized_link.rstrip("/") == search_url.rstrip("/"):
+                continue
+            if parsed_link.path.rstrip("/").lower() == f"/jobs/{slug}/in-london":
+                continue
+            if parsed_link.path.rstrip("/").lower() == f"/jobs/{slug}":
+                continue
+            if normalized_title in generic_title_variants:
+                continue
+            if re.search(r"/jobs/[^/]+/in-[^/]+/?$", parsed_link.path, re.IGNORECASE):
+                continue
             job_map[link] = {
                 "title": title,
                 "company": source_name,
@@ -1600,6 +1618,8 @@ def html_board_search(
                 "posted_date": "",
                 "summary": "",
                 "source": source_name,
+                "_search_slug": slug,
+                "_generic_titles": list(generic_title_variants),
             }
 
     detail_links = list(job_map.keys())[:max_details]
@@ -1618,12 +1638,25 @@ def html_board_search(
             job_map[link]["posted_date"] = details.get("posted_date") or job_map[link]["posted_date"]
             if details.get("summary"):
                 job_map[link]["summary"] = details["summary"]
+        parsed_link = urlparse(link)
+        title_lower = normalize_text(job_map[link]["title"]).lower()
+        generic_titles = set(job_map[link].get("_generic_titles", []) or [])
+        search_slug = job_map[link].get("_search_slug", "")
+        if title_lower in generic_titles or re.search(r"/jobs/[^/]+/in-[^/]+/?$", parsed_link.path, re.IGNORECASE):
+            job_map.pop(link, None)
+            continue
+        if search_slug and parsed_link.path.rstrip("/").lower() in {f"/jobs/{search_slug}/in-london", f"/jobs/{search_slug}"}:
+            job_map.pop(link, None)
+            continue
         if not job_map[link]["posted_text"] and not job_map[link]["posted_date"]:
             posted_text = extract_relative_posted_text(resp.text)
             if posted_text:
                 job_map[link]["posted_text"] = posted_text
         time.sleep(0.2)
 
+    for payload in job_map.values():
+        payload.pop("_search_slug", None)
+        payload.pop("_generic_titles", None)
     jobs.extend(job_map.values())
     return jobs
 
@@ -2670,6 +2703,7 @@ def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
     targets: List[Dict[str, str]] = []
     seen = set()
     health_state = load_custom_careers_health_state()
+    include_alternate_targets = os.getenv("JOB_DIGEST_CUSTOM_INCLUDE_ATS_ALTERNATES", "false").lower() == "true"
     try:
         from .company_coverage import read_registry
         registry_rows = read_registry()
@@ -2687,6 +2721,9 @@ def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
             continue
         seen.add(key)
         registry_row = registry_map.get((row.get("firm") or "").strip(), {})
+        canonical_platform = (registry_row.get("canonical_platform") or "").strip()
+        if canonical_platform and canonical_platform.lower() != "custom" and not include_alternate_targets:
+            continue
         targets.append(
             {
                 "firm": (row.get("firm") or "").strip(),
@@ -2695,6 +2732,7 @@ def load_custom_careers_targets(path: Path) -> List[Dict[str, str]]:
                 "priority_tier": registry_row.get("priority_tier", "Tier3"),
                 "fit_relevance": registry_row.get("fit_relevance", "Adjacent"),
                 "primary_category": registry_row.get("primary_category", ""),
+                "canonical_platform": canonical_platform,
                 "uk_relevance": registry_row.get("uk_relevance", ""),
                 "last_status": str((health_state.get(careers_url, {}) or {}).get("last_status", "")),
                 "last_raw": int((health_state.get(careers_url, {}) or {}).get("last_raw", 0) or 0),
