@@ -489,6 +489,13 @@
   min-width: 0;
 }
 
+.hub-card__assistant-status {
+  font-size: 12px;
+  color: #4338ca;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
 .hub-card__checklist {
   margin-top: 16px;
   padding: 14px;

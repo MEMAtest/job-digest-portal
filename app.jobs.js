@@ -43,6 +43,13 @@ import {
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply, autoTailorCv } from "./app.applyhub.js";
 import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
+import {
+  isApplyAssistantSupported,
+  launchApplyAssistant,
+  formatApplyAssistantStatus,
+  isApplyAssistantBusy,
+  ensureApplicationPack,
+} from "./app.applyassistant.js";
 
 let mobileNavObserver = null;
 
@@ -601,6 +608,16 @@ const renderJobDetail = (job, detailEl) => {
   const dismissNote = statusValue === "dismissed" ? formatDismissReason(job.dismiss_reason) : "";
   const postedDisplay = formatPostedMeta(job);
   const applicantDisplay = job.applicant_count ? `${job.applicant_count} applicants` : "";
+  const assistantSupported = isApplyAssistantSupported(job);
+  const assistantBusy = isApplyAssistantBusy(job.id);
+  const assistantStatus = formatApplyAssistantStatus(job);
+  const assistantResult = job.apply_assistant_last_result || {};
+  const assistantSummary = [
+    assistantResult.filled?.length ? `${assistantResult.filled.length} fields filled` : "",
+    assistantResult.skipped?.length ? `${assistantResult.skipped.length} skipped` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const openStatus =
     job.job_status ||
     (job.is_open === true ? "Open" : "") ||
@@ -731,6 +748,26 @@ const renderJobDetail = (job, detailEl) => {
         </div>
       </div>
       <div class="detail-tab-panel" data-tab="apply">
+        <div class="detail-box">
+          <div class="section-title">Application pack</div>
+          ${
+            assistantSupported
+              ? `
+            <div class="apply-assistant-status">${escapeHtml(assistantStatus)}</div>
+            <div class="apply-assistant-meta">${escapeHtml(
+              `${getJobAtsFamily(job)}${assistantSummary ? ` · ${assistantSummary}` : ""}`.trim()
+            )}</div>
+            <div class="apply-assistant-actions">
+              <button class="btn btn-primary btn-apply-assistant" data-job-id="${escapeHtml(job.id)}" ${
+                  assistantBusy ? "disabled" : ""
+                }>${assistantBusy ? "Launching…" : "Apply Assistant"}</button>
+              <button class="btn btn-secondary btn-generate-pack" data-job-id="${escapeHtml(job.id)}">Generate Pack</button>
+            </div>
+            <div class="apply-assistant-note">The assistant opens a local browser session, uploads your tailored CV, fills common ATS fields, and stops before final submit.</div>
+          `
+              : `<div class="apply-assistant-note">Apply Assistant supports Greenhouse, Lever, Ashby, and Workable only.</div>`
+          }
+        </div>
         <div class="detail-box">
           <div class="section-title">How to apply</div>
           <div>${formatInlineText(job.apply_tips || "Apply with CV tailored to onboarding + KYC impact.")}</div>
@@ -956,6 +993,37 @@ const renderJobDetail = (job, detailEl) => {
       const target = state.jobs.find((item) => item.id === copyCvTextBtn.dataset.jobId);
       if (!target) return;
       copyToClipboard(getTailoredCvPlainText(target));
+    });
+  }
+
+  const generatePackBtn = detailEl.querySelector(".btn-generate-pack");
+  if (generatePackBtn) {
+    generatePackBtn.addEventListener("click", async () => {
+      const target = state.jobs.find((item) => item.id === generatePackBtn.dataset.jobId);
+      if (!target) return;
+      const originalText = generatePackBtn.textContent;
+      generatePackBtn.disabled = true;
+      generatePackBtn.textContent = "Generating…";
+      try {
+        await ensureApplicationPack(target);
+        showToast("Application pack ready");
+        refreshJobViews(target, { tab: "apply" });
+      } catch (error) {
+        console.error(error);
+        generatePackBtn.disabled = false;
+        generatePackBtn.textContent = originalText;
+        showToast(error.message || "Application pack failed");
+      }
+    });
+  }
+
+  const assistantBtn = detailEl.querySelector(".btn-apply-assistant");
+  if (assistantBtn) {
+    assistantBtn.addEventListener("click", async () => {
+      const target = state.jobs.find((item) => item.id === assistantBtn.dataset.jobId);
+      if (!target) return;
+      await launchApplyAssistant(target);
+      refreshJobViews(target, { tab: "apply" });
     });
   }
 

@@ -17,6 +17,12 @@ import {
   safeLocalStorageSet,
 } from "./app.core.js";
 import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
+import {
+  isApplyAssistantSupported,
+  launchApplyAssistant,
+  formatApplyAssistantStatus,
+  isApplyAssistantBusy,
+} from "./app.applyassistant.js";
 
 const loadHubSort = () => {
   try {
@@ -86,12 +92,16 @@ export const resolveChecklistState = (job) => {
     cover_letter_reviewed: Boolean(job.cover_letter),
     requirements_matched: (job.fit_score || 0) >= 75 && Array.isArray(job.key_requirements) && job.key_requirements.length > 0,
     job_link_visited: false,
+    application_form_prepared: Boolean(job.application_form_prepared_at || job.application_pack_generated_at),
     application_submitted: (job.application_status || "").toLowerCase() === "applied",
   };
   const existing = job.apply_checklist || {};
   const merged = { ...auto, ...existing };
   if ((job.application_status || "").toLowerCase() === "applied") {
     merged.application_submitted = true;
+  }
+  if (job.application_form_prepared_at || job.application_pack_generated_at) {
+    merged.application_form_prepared = true;
   }
   return merged;
 };
@@ -313,6 +323,7 @@ export const renderApplyHub = () => {
       { key: "cover_letter_reviewed", label: "Cover letter reviewed" },
       { key: "requirements_matched", label: "Requirements matched" },
       { key: "job_link_visited", label: "Job link visited" },
+      { key: "application_form_prepared", label: "Application form prepared" },
       { key: "application_submitted", label: "Application submitted" },
     ];
     const readyCount = checklistItems.reduce((acc, item) => acc + (checklist[item.key] ? 1 : 0), 0);
@@ -327,6 +338,9 @@ export const renderApplyHub = () => {
     const noteText = job.application_notes || "";
     const noteCount = Math.min(noteText.length, 500);
     const isTailoring = tailoringInFlight.has(job.id);
+    const assistantSupported = isApplyAssistantSupported(job);
+    const assistantBusy = isApplyAssistantBusy(job.id);
+    const assistantStatus = formatApplyAssistantStatus(job);
     const actionLabel =
       statusValue === "applied" || statusValue === "interview" || statusValue === "offer"
         ? "Re-copy & Open"
@@ -339,6 +353,7 @@ export const renderApplyHub = () => {
           <div>
             <h3>${escapeHtml(job.role)}</h3>
             <p>${escapeHtml(job.company)} · ${escapeHtml(job.location)}</p>
+            ${assistantSupported ? `<div class="hub-card__assistant-status">Apply Assistant · ${escapeHtml(assistantStatus)}</div>` : ""}
           </div>
           <span class="${formatFitBadge(job.fit_score)}">${job.fit_score}%</span>
         </div>
@@ -409,6 +424,13 @@ export const renderApplyHub = () => {
         </div>
 
         <div class="hub-card__actions">
+          ${
+            assistantSupported
+              ? `<button class="btn btn-primary btn-apply-assistant" data-job-id="${escapeHtml(job.id)}" ${
+                  assistantBusy ? "disabled" : ""
+                }>${assistantBusy ? "Launching…" : "Apply Assistant"}</button>`
+              : ""
+          }
           <button class="btn btn-primary btn-quick-apply ${allReady ? "btn-quick-apply--ready" : ""}" data-job-id="${escapeHtml(job.id)}">${actionLabel}</button>
           ${isTailoring ? `<button class="btn btn-secondary generate-cv-btn" disabled><span class="tailoring-spinner"></span> Tailoring CV…</button>` : !hasCvTailoredChanges(job) ? `<button class="btn btn-secondary generate-cv-btn" data-job-id="${escapeHtml(job.id)}">Generate Tailored CV</button>` : ""}
           <button class="btn btn-secondary download-cv-btn" data-job-id="${escapeHtml(job.id)}">Download CV PDF</button>
@@ -524,6 +546,13 @@ export const renderApplyHub = () => {
     const jobId = btn.dataset.jobId;
     const job = state.jobs.find((j) => j.id === jobId);
     if (job) btn.addEventListener("click", () => quickApply(job, btn.closest(".hub-card")));
+  });
+
+  hubContainer.querySelectorAll(".btn-apply-assistant").forEach((btn) => {
+    const jobId = btn.dataset.jobId;
+    const job = state.jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    btn.addEventListener("click", () => launchApplyAssistant(job));
   });
 
   hubContainer.querySelectorAll(".download-cv-btn").forEach((btn) => {

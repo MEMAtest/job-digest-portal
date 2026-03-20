@@ -2,6 +2,7 @@
   "name": "job-digest-portal",
   "private": true,
   "scripts": {
+    "apply-assistant": "node scripts/apply-assistant/server.mjs",
     "test:smoke": "node scripts/smoke-e2e.mjs",
     "test:smoke:prod": "node scripts/smoke-e2e.mjs --url=https://adejob.netlify.app/",
     "test:smoke:install": "playwright install chromium"
