@@ -198,6 +198,10 @@ def init_source_diagnostic(source_name: str, raw_count: int) -> dict:
             "timed_out": 0,
             "failed": 0,
             "status": "empty",
+            "mode": "",
+            "query_count": 0,
+            "company_query_count": 0,
+            "adjacent_query_count": 0,
             "notes": [],
             "dropped": {"title": 0, "location": 0, "company": 0, "window": 0, "score": 0},
             "examples": {"title": [], "location": [], "company": [], "window": [], "score": [], "kept": []},
@@ -254,6 +258,15 @@ def merge_runtime_source_events() -> None:
         diag["timed_out"] = max(int(diag.get("timed_out", 0) or 0), int(event.get("timed_out", 0) or 0))
         diag["failed"] = max(int(diag.get("failed", 0) or 0), int(event.get("failed", 0) or 0))
         diag["raw"] = max(int(diag.get("raw", 0) or 0), int(event.get("raw", 0) or 0))
+        if event.get("mode"):
+            diag["mode"] = event.get("mode")
+        diag["query_count"] = max(int(diag.get("query_count", 0) or 0), int(event.get("query_count", 0) or 0))
+        diag["company_query_count"] = max(
+            int(diag.get("company_query_count", 0) or 0), int(event.get("company_query_count", 0) or 0)
+        )
+        diag["adjacent_query_count"] = max(
+            int(diag.get("adjacent_query_count", 0) or 0), int(event.get("adjacent_query_count", 0) or 0)
+        )
         for note in event.get("notes", []) or []:
             add_source_note(diag, note)
     for source_name, diag in SOURCE_DIAGNOSTICS.items():
@@ -318,6 +331,14 @@ def print_source_health_summary() -> None:
         key=lambda item: (order.get(item[1].get("status", "empty"), 9), item[0].lower()),
     ):
         parts = [f"raw={int(diag.get('raw', 0) or 0)}", f"kept={int(diag.get('kept', 0) or 0)}"]
+        if diag.get("mode"):
+            parts.append(f"mode={diag['mode']}")
+        if diag.get("query_count"):
+            parts.append(f"queries={diag['query_count']}")
+        if diag.get("company_query_count"):
+            parts.append(f"company_queries={diag['company_query_count']}")
+        if diag.get("adjacent_query_count"):
+            parts.append(f"adjacent_queries={diag['adjacent_query_count']}")
         if diag.get("blocked"):
             parts.append(f"blocked={diag['blocked']}")
         if diag.get("timed_out"):

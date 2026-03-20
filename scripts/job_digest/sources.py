@@ -50,6 +50,7 @@ from .config import (
     select_company_batch,
 )
 from .models import JobRecord
+from .indeed_jobspy import jobspy_indeed_search
 from .utils import canonicalize_posted_fields, clean_link, extract_relative_posted_text, normalize_text, trim_summary
 
 try:
@@ -88,16 +89,38 @@ def mark_source_runtime_event(
     failed: int = 0,
     raw: int | None = None,
     note: str = "",
+    mode: str = "",
+    query_count: int | None = None,
+    company_query_count: int | None = None,
+    adjacent_query_count: int | None = None,
 ) -> None:
     state = SOURCE_RUNTIME_EVENTS.setdefault(
         source_name,
-        {"blocked": 0, "timed_out": 0, "failed": 0, "raw": 0, "notes": []},
+        {
+            "blocked": 0,
+            "timed_out": 0,
+            "failed": 0,
+            "raw": 0,
+            "notes": [],
+            "mode": "",
+            "query_count": 0,
+            "company_query_count": 0,
+            "adjacent_query_count": 0,
+        },
     )
     state["blocked"] = int(state.get("blocked", 0) or 0) + blocked
     state["timed_out"] = int(state.get("timed_out", 0) or 0) + timed_out
     state["failed"] = int(state.get("failed", 0) or 0) + failed
     if raw is not None:
         state["raw"] = max(int(state.get("raw", 0) or 0), int(raw))
+    if mode:
+        state["mode"] = mode
+    if query_count is not None:
+        state["query_count"] = max(int(state.get("query_count", 0) or 0), int(query_count))
+    if company_query_count is not None:
+        state["company_query_count"] = max(int(state.get("company_query_count", 0) or 0), int(company_query_count))
+    if adjacent_query_count is not None:
+        state["adjacent_query_count"] = max(int(state.get("adjacent_query_count", 0) or 0), int(adjacent_query_count))
     if note:
         notes = state.setdefault("notes", [])
         if note not in notes:
@@ -112,6 +135,10 @@ def get_source_runtime_events() -> Dict[str, Dict[str, object]]:
             "failed": int(payload.get("failed", 0) or 0),
             "raw": int(payload.get("raw", 0) or 0),
             "notes": list(payload.get("notes", []) or []),
+            "mode": str(payload.get("mode", "") or ""),
+            "query_count": int(payload.get("query_count", 0) or 0),
+            "company_query_count": int(payload.get("company_query_count", 0) or 0),
+            "adjacent_query_count": int(payload.get("adjacent_query_count", 0) or 0),
         }
         for name, payload in SOURCE_RUNTIME_EVENTS.items()
     }
@@ -1889,10 +1916,28 @@ def technojobs_search(session: requests.Session) -> List[Dict[str, str]]:
 
 def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
     mode = (os.getenv("JOB_DIGEST_INDEED_MODE", "browser") or "browser").strip().lower()
+    if mode == "jobspy":
+        jobs, meta = jobspy_indeed_search()
+        mark_source_runtime_event(
+            "IndeedUK",
+            raw=int(meta.get("raw", 0) or 0),
+            failed=int(meta.get("failed", 0) or 0),
+            mode="jobspy",
+            query_count=int(meta.get("query_count", 0) or 0),
+            company_query_count=int(meta.get("company_query_count", 0) or 0),
+            adjacent_query_count=int(meta.get("adjacent_query_count", 0) or 0),
+            note="Indeed jobspy yielded jobs" if jobs else "Indeed jobspy returned no jobs",
+        )
+        for note in meta.get("notes", []) or []:
+            mark_source_runtime_event("IndeedUK", note=str(note), mode="jobspy")
+        return jobs
     if mode == "browser":
         browser_jobs = indeed_browser_search()
         if browser_jobs:
             return browser_jobs
+        mark_source_runtime_event("IndeedUK", note="Indeed browser falling back to requests path", mode="browser")
+    elif mode == "requests":
+        mark_source_runtime_event("IndeedUK", mode="requests")
     jobs: List[Dict[str, str]] = []
     primary_base_url = JOB_BOARD_URLS.get("IndeedUK")
     if not primary_base_url:
@@ -2279,9 +2324,16 @@ def indeed_browser_search() -> List[Dict[str, str]]:
             f"blocked_pages={blocked_pages} raw_jobs={raw_jobs}"
         )
     if blocked_pages:
-        mark_source_runtime_event("IndeedUK", blocked=blocked_pages, raw=raw_jobs, note="Indeed browser blocked by anti-bot")
+        mark_source_runtime_event(
+            "IndeedUK",
+            blocked=blocked_pages,
+            raw=raw_jobs,
+            note="Indeed browser blocked by anti-bot",
+            mode="browser",
+            query_count=attempted_queries,
+        )
     elif attempted_queries and raw_jobs == 0:
-        mark_source_runtime_event("IndeedUK", raw=0, note="Indeed browser returned no jobs")
+        mark_source_runtime_event("IndeedUK", raw=0, note="Indeed browser returned no jobs", mode="browser", query_count=attempted_queries)
 
     jobs: List[Dict[str, str]] = []
     seen_links = set()
@@ -2304,7 +2356,7 @@ def indeed_browser_search() -> List[Dict[str, str]]:
             }
         )
     if jobs:
-        mark_source_runtime_event("IndeedUK", raw=len(jobs), note="Indeed browser yielded jobs")
+        mark_source_runtime_event("IndeedUK", raw=len(jobs), note="Indeed browser yielded jobs", mode="browser", query_count=attempted_queries)
     return jobs
 
 
