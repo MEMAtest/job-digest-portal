@@ -4,6 +4,7 @@ config.js
 
 # Python
 scripts/__pycache__/
+scripts/job_digest/__pycache__/
 scripts/*.pyc
 
 # Output / sweep files
@@ -23,3 +24,13 @@ node_modules/
 
 # Local Netlify folder
 .netlify
+
+# Local credentials and one-off admin scripts
+scripts/service_account.json
+scripts/add_job.js
+scripts/cleanup_applied.js
+scripts/dedup_saved.js
+scripts/mark_applied.js
+scripts/mark_applied_kroo.js
+scripts/write_cv_and_cover.js
+scripts/write_kroo_spm_fincrime.js
