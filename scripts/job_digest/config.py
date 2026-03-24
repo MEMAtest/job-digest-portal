@@ -86,14 +86,20 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("JOB_DIGEST_OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_CV_MAX_JOBS = int(os.getenv("JOB_DIGEST_OPENAI_CV_MAX_JOBS", "20"))
 
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("JOB_DIGEST_OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
 JOB_DIGEST_CV_PATH = os.getenv(
     "JOB_DIGEST_CV_PATH",
-    "/Users/adeomosanya/Downloads/AdemolaOmosanya_2026.pdf",
+    "/Users/adeomosanya/Downloads/Ade_Omosanya_CV_Master_Product_v11.pdf",
 )
 JOB_DIGEST_PROFILE = os.getenv(
     "JOB_DIGEST_PROFILE",
-    "Global product/process owner with KYC, onboarding, screening, financial crime, and"
-    " compliance transformation experience across banks and RegTech platforms.",
+    "Global Product Owner with a decade of experience leading CLM, KYC and onboarding"
+    " platform strategy across capital markets, fintech and digital banking."
+    " Direct Fenergo CLM, Napier and Enate ownership across 30+ jurisdictions."
+    " ACAMS Certified, ICA Fellow.",
 )
 JOB_DIGEST_DOCX_PATH = os.getenv(
     "JOB_DIGEST_DOCX_PATH",

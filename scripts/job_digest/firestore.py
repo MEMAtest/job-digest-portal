@@ -13,9 +13,11 @@ import requests
 from . import config
 from .llm import (
     build_enhancement_prompt,
+    fetch_job_text,
     generate_gemini_text,
     generate_gemini_text_with_timeout,
     generate_groq_text,
+    generate_openrouter_text,
     parse_gemini_payload,
 )
 from .company_coverage import compute_coverage_summary, read_registry
@@ -26,10 +28,12 @@ from .utils import canonicalize_posted_fields, infer_ats_family, infer_source_fa
 try:
     import firebase_admin
     from firebase_admin import credentials, firestore
+    from google.cloud.firestore_v1.base_query import FieldFilter
 except Exception:  # noqa: BLE001
     firebase_admin = None
     credentials = None
     firestore = None
+    FieldFilter = None
 
 try:
     import google.generativeai as genai
@@ -150,6 +154,7 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "applicant_count": record.applicant_count,
             "job_status": record.job_status,
             "alternate_links": record.alternate_links,
+            "fit_verdict": record.fit_verdict,
         }
         for key, value in optional_fields.items():
             if isinstance(value, list):
@@ -322,8 +327,8 @@ def cleanup_stale_jobs() -> None:
     try:
         query = (
             client.collection(config.FIREBASE_COLLECTION)
-            .where("application_status", "==", "saved")
-            .where("created_at", "<", cutoff_iso)
+            .where(filter=FieldFilter("application_status", "==", "saved"))
+            .where(filter=FieldFilter("created_at", "<", cutoff_iso))
         )
         for doc in query.stream():
             data = doc.to_dict() or {}
@@ -395,7 +400,10 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
             role = data.get("role") or ""
             if not role:
                 continue
-            notes = data.get("notes") or data.get("role_summary") or ""
+            # Only backfill records missing role_summary
+            if data.get("role_summary"):
+                continue
+            notes = data.get("notes") or ""
             record = JobRecord(
                 role=role,
                 company=data.get("company") or "",
@@ -424,27 +432,37 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
         return
 
     if not records:
-        print("Backfill skipped: no jobs found.")
+        print("Backfill skipped: no jobs missing role_summary.")
         return
 
     total = len(records)
-    print(f"Backfill loaded {total} jobs.")
+    print(f"Backfill loaded {total} jobs missing role_summary.")
 
     updated = 0
     errors = 0
     now_iso = datetime.now(timezone.utc).isoformat()
-    if not (config.GROQ_API_KEY and GroqClient is not None) and not (config.GEMINI_API_KEY and genai is not None):
+    has_llm = (
+        config.OPENROUTER_API_KEY
+        or (config.GROQ_API_KEY and GroqClient is not None)
+        or (config.GEMINI_API_KEY and genai is not None)
+    )
+    if not has_llm:
         print("Backfill skipped: no LLM keys configured.")
         return
 
     for idx, (doc_id, record) in enumerate(zip(doc_ids, records), start=1):
         print(f"Backfill job {idx}/{total}: {record.company} — {record.role}")
-        prompt = build_enhancement_prompt(record)
+        job_text = record.notes
+        if not job_text and record.link:
+            print(f"  Fetching job text from {record.link}")
+            job_text = fetch_job_text(record.link)
+        prompt = build_enhancement_prompt(record, job_text=job_text)
         text: Optional[str] = None
         try:
-            if config.GEMINI_API_KEY and genai is not None:
+            text = generate_openrouter_text(prompt) if config.OPENROUTER_API_KEY else None
+            if not text and config.GEMINI_API_KEY and genai is not None:
                 text = generate_gemini_text_with_timeout(prompt, config.GEMINI_TIMEOUT_SECONDS)
-            elif config.GROQ_API_KEY and GroqClient is not None:
+            if not text and config.GROQ_API_KEY and GroqClient is not None:
                 text = generate_groq_text(prompt)
         except Exception as exc:
             errors += 1
@@ -457,14 +475,23 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
             continue
 
         data = parse_gemini_payload(text)
-        if not data or not data.get("role_summary"):
+        if not data:
             errors += 1
-            print("Backfill error: missing role_summary in response.")
+            print("Backfill error: could not parse LLM response.")
             continue
 
+        update_payload: Dict[str, object] = {"updated_at": now_iso}
+        for key in ("role_summary", "key_requirements", "why_fit", "cv_gap", "company_insights", "fit_score"):
+            val = data.get(key)
+            if val:
+                update_payload[key] = val
+        if len(update_payload) <= 1:  # only updated_at, nothing useful
+            errors += 1
+            print("Backfill error: LLM response had no useful fields.")
+            continue
         try:
             client.collection(config.FIREBASE_COLLECTION).document(doc_id).set(
-                {"role_summary": data.get("role_summary"), "updated_at": now_iso},
+                update_payload,
                 merge=True,
             )
             updated += 1
@@ -690,7 +717,7 @@ def fetch_manual_link_requests(client: Optional["firestore.Client"]) -> List[Dic
     try:
         query = (
             client.collection(config.RUN_REQUESTS_COLLECTION)
-            .where("status", "==", "pending")
+            .where(filter=FieldFilter("status", "==", "pending"))
             .order_by("requested_at")
             .limit(config.MANUAL_LINK_LIMIT)
         )

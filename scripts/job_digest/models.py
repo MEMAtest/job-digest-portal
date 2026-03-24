@@ -17,6 +17,7 @@ class JobRecord:
     why_fit: str
     cv_gap: str
     notes: str
+    fit_verdict: str = ""   # STRONG | PARTIAL | STRETCH | ""
     posted_raw: str = ""
     posted_date: str = ""
     role_summary: str = ""

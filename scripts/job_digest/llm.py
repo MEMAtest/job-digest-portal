@@ -89,11 +89,43 @@ def generate_gemini_text_with_timeout(prompt: str, timeout_seconds: int) -> Opti
             return None
 
 
+def generate_openrouter_text(prompt: str) -> Optional[str]:
+    if not config.OPENROUTER_API_KEY or openai_lib is None:
+        return None
+    try:
+        client = openai_lib.OpenAI(
+            api_key=config.OPENROUTER_API_KEY,
+            base_url=config.OPENROUTER_BASE_URL,
+            timeout=60,
+        )
+        response = client.chat.completions.create(
+            model=config.OPENROUTER_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=4000,
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        print(f"OpenRouter error: {e}")
+        return None
+
+
+def generate_openrouter_text_with_timeout(prompt: str, timeout_seconds: int) -> Optional[str]:
+    if timeout_seconds <= 0:
+        return generate_openrouter_text(prompt)
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(generate_openrouter_text, prompt)
+        try:
+            return future.result(timeout=timeout_seconds)
+        except FutureTimeout:
+            return None
+
+
 def generate_groq_text(prompt: str, usage: Optional[Dict[str, int]] = None) -> Optional[str]:
     if not config.GROQ_API_KEY or GroqClient is None:
         return None
 
-    client = GroqClient(api_key=config.GROQ_API_KEY)
+    client = GroqClient(api_key=config.GROQ_API_KEY, timeout=45)
     backoffs = [2, 4, 8]
     attempts = len(backoffs) + 1
     for attempt in range(attempts):
@@ -118,13 +150,96 @@ def generate_groq_text(prompt: str, usage: Optional[Dict[str, int]] = None) -> O
                 usage["retries"] = usage.get("retries", 0) + 1
             if attempt < attempts - 1:
                 retry_after = _extract_retry_after(e) if status == 429 else None
-                time.sleep(retry_after or backoffs[attempt])
+                # Cap retry-after to 30s to avoid sleeping for hours on daily limit hits
+                time.sleep(min(retry_after or backoffs[attempt], 30))
                 continue
             print(f"Groq error: {e}")
             return None
 
 
-def build_enhancement_prompt(record: JobRecord) -> str:
+_BLOCKED_DOMAINS = (
+    "linkedin.com",
+    "facebook.com",
+    "instagram.com",
+    "twitter.com",
+    "x.com",
+    "glassdoor.com",
+    "indeed.com",
+    "reed.co.uk",
+    "totaljobs.com",
+    "cwjobs.co.uk",
+    "jobsite.co.uk",
+)
+
+
+def _fetch_job_text_inner(url: str) -> str:
+    import requests as _requests
+    from bs4 import BeautifulSoup as _BS
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+        )
+    }
+    resp = _requests.get(url, headers=headers, timeout=(8, 15), allow_redirects=True)
+    resp.raise_for_status()
+    html = resp.text
+    soup = _BS(html, "html.parser")
+    for script in soup.find_all("script", type="application/ld+json"):
+        if not script.string:
+            continue
+        try:
+            payload = json.loads(script.string.strip())
+        except ValueError:
+            continue
+        nodes = [payload] if isinstance(payload, dict) else (payload if isinstance(payload, list) else [])
+        for node in nodes:
+            if isinstance(node, dict) and node.get("@type") in ("JobPosting", "jobPosting"):
+                desc = node.get("description") or ""
+                if desc:
+                    return _BS(desc, "html.parser").get_text(" ", strip=True)[:5000]
+    og_desc = soup.find("meta", property="og:description")
+    if og_desc and og_desc.get("content"):
+        return og_desc.get("content", "")[:5000]
+    meta_desc = soup.find("meta", attrs={"name": "description"})
+    if meta_desc and meta_desc.get("content"):
+        return meta_desc.get("content", "")[:5000]
+    return ""
+
+
+def fetch_job_text(url: str) -> str:
+    """Fetch job description text from the posting URL for LLM enrichment."""
+    if not url:
+        return ""
+    # Skip domains that block scraping
+    lower_url = url.lower()
+    if any(domain in lower_url for domain in _BLOCKED_DOMAINS):
+        return ""
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_fetch_job_text_inner, url)
+        try:
+            return future.result(timeout=20) or ""
+        except Exception:
+            return ""
+
+
+def build_enhancement_prompt(record: JobRecord, job_text: str = "") -> str:
+    text = job_text or record.notes or ""
+    if text:
+        role_summary_instruction = (
+            "Role_summary must be STRICTLY based on job text and include two sections with bullet lines (use exact headings):\n"
+            "Role responsibilities (what the job entails):\n- ...\n- ...\n"
+            "What we're looking for (requirements/qualifications):\n- ...\n- ...\n"
+            "Do not infer beyond job text. If not stated, write '- Not available in posting'.\n"
+        )
+    else:
+        role_summary_instruction = (
+            "No job text is available. For role_summary, use your knowledge of this company and role title "
+            "to infer likely responsibilities and requirements. Use the headings:\n"
+            "Role responsibilities (what the job entails):\n- ...\n- ...\n"
+            "What we're looking for (requirements/qualifications):\n- ...\n- ...\n"
+            "Clearly label these as inferred, e.g. '- Likely: ...'\n"
+        )
     return (
         "You are a senior UK fintech product recruiter and ATS optimisation specialist. "
         "Given the candidate profile and job summary, score fit 0-100 and produce ATS-ready outputs. "
@@ -136,15 +251,16 @@ def build_enhancement_prompt(record: JobRecord) -> str:
         "tailored_cv_bullets (array of 4-6 bullet strings), key_requirements (array of strings), "
         "match_notes (string), company_insights (string), cover_letter (string), "
         "key_talking_points (array of 6-10 strings), star_stories (array of 6-8 STAR summaries with "
-        "Situation/Task/Action/Result + metrics), quick_pitch (string), interview_focus (string).\n\n"
+        "Situation/Task/Action/Result + metrics), quick_pitch (string), interview_focus (string), "
+        "fit_verdict (string: exactly one of STRONG, PARTIAL, or STRETCH — "
+        "STRONG = candidate directly meets most requirements, domain and seniority match, competitive application; "
+        "PARTIAL = genuine overlap but meaningful gap in domain, seniority level, or role-type e.g. ops vs product; "
+        "STRETCH = structural mismatch — wrong domain, significant seniority gap, or function mismatch e.g. compliance vs PM).\n\n"
         "ATS rules: plain text, no tables, no columns, no icons, no bullet symbols other than '- '. "
         "Bullets must be short, action-led, and include metrics if possible. "
         "If the job text includes Qualifications/Requirements, extract 3-6 key requirements into "
         "key_requirements and use match_notes to compare against the candidate profile.\n\n"
-        "Role_summary must be STRICTLY based on job text and include two sections with bullet lines (use exact headings):\n"
-        "Role responsibilities (what the job entails):\n- ...\n- ...\n"
-        "What we're looking for (requirements/qualifications):\n- ...\n- ...\n"
-        "Do not infer beyond job text. If not stated, write '- Not available in posting'.\n"
+        + role_summary_instruction +
         "Tailored_summary must explicitly reference 2-3 stated job requirements and map them to the "
         "candidate's relevant experience.\n\n"
         f"Candidate profile: {config.JOB_DIGEST_PROFILE_TEXT}\n"
@@ -154,7 +270,7 @@ def build_enhancement_prompt(record: JobRecord) -> str:
         f"Company: {record.company}\n"
         f"Location: {record.location}\n"
         f"Posted: {record.posted}\n"
-        f"Summary: {record.notes}\n"
+        f"Summary: {text}\n"
     )
 
 
@@ -170,8 +286,13 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
         if allow_groq and warn_threshold and usage.get("tokens", 0) >= warn_threshold:
             print("Groq token usage nearing daily limit; falling back to Gemini for remaining jobs.")
             allow_groq = False
-        prompt = build_enhancement_prompt(record)
-        text = generate_groq_text(prompt, usage=usage) if allow_groq else None
+        job_text = record.notes
+        if not job_text and record.link:
+            job_text = fetch_job_text(record.link)
+        prompt = build_enhancement_prompt(record, job_text=job_text)
+        text = generate_openrouter_text(prompt) if config.OPENROUTER_API_KEY else None
+        if not text:
+            text = generate_groq_text(prompt, usage=usage) if allow_groq else None
         if not text and config.GEMINI_API_KEY and genai is not None:
             text = generate_gemini_text_with_timeout(prompt, config.GEMINI_TIMEOUT_SECONDS)
         data = parse_gemini_payload(text or "")
@@ -185,6 +306,9 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
         record.fit_score = max(0, min(100, fit_score))
         record.why_fit = data.get("why_fit", record.why_fit) or record.why_fit
         record.cv_gap = data.get("cv_gap", record.cv_gap) or record.cv_gap
+        verdict = str(data.get("fit_verdict", "")).strip().upper()
+        if verdict in ("STRONG", "PARTIAL", "STRETCH"):
+            record.fit_verdict = verdict
         record.role_summary = data.get("role_summary", record.role_summary) or record.role_summary
         record.tailored_summary = data.get("tailored_summary", record.tailored_summary) or record.tailored_summary
         record.quick_pitch = data.get("quick_pitch", record.quick_pitch) or record.quick_pitch
@@ -205,7 +329,7 @@ def enhance_records_with_groq(records: List[JobRecord]) -> List[JobRecord]:
         ):
             val = data.get(list_key)
             if isinstance(val, list) and val:
-                setattr(record, list_key, val)
+                setattr(record, list_key, [str(v) for v in val])
 
     if usage.get("calls", 0) or usage.get("retries", 0):
         print(
@@ -222,7 +346,10 @@ def enhance_records_with_gemini(records: List[JobRecord]) -> List[JobRecord]:
 
     limit = min(config.GEMINI_MAX_JOBS, len(records))
     for record in records[:limit]:
-        prompt = build_enhancement_prompt(record)
+        job_text = record.notes
+        if not job_text and record.link:
+            job_text = fetch_job_text(record.link)
+        prompt = build_enhancement_prompt(record, job_text=job_text)
         text = generate_gemini_text_with_timeout(prompt, config.GEMINI_TIMEOUT_SECONDS)
         data = parse_gemini_payload(text or "")
         if not data:
@@ -235,6 +362,9 @@ def enhance_records_with_gemini(records: List[JobRecord]) -> List[JobRecord]:
         record.fit_score = max(0, min(100, fit_score))
         record.why_fit = data.get("why_fit", record.why_fit) or record.why_fit
         record.cv_gap = data.get("cv_gap", record.cv_gap) or record.cv_gap
+        verdict = str(data.get("fit_verdict", "")).strip().upper()
+        if verdict in ("STRONG", "PARTIAL", "STRETCH"):
+            record.fit_verdict = verdict
         prep_questions = data.get("prep_questions", record.prep_questions)
         if isinstance(prep_questions, str):
             prep_questions = [prep_questions]

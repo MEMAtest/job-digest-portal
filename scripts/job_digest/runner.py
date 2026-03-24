@@ -504,6 +504,7 @@ def write_digest_outputs(records: list[JobRecord], *, suffix: str = "") -> tuple
             "Posted": r.posted,
             "Source": r.source,
             "Fit_Score_%": r.fit_score,
+            "Fit_Verdict": r.fit_verdict,
             "Preference_Match": r.preference_match,
             "Why_Fit": r.why_fit,
             "CV_Gap": r.cv_gap,
@@ -584,7 +585,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
         if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
-        summary = desc_text[:500]
+        summary = desc_text[:2500]
         full_text = f"{title} {company} {summary}"
         score, _, _ = score_fit(full_text, company)
         if score < config.MIN_SCORE:
