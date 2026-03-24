@@ -96,6 +96,9 @@ const proxyFetch = async (url, options) => {
 export const isRecoverableFirestoreError = (error) => {
   const message = String(error?.message || error || "").toLowerCase();
   return (
+    message.includes("permission-denied") ||
+    message.includes("missing or insufficient permissions") ||
+    message.includes("insufficient permissions") ||
     message.includes("blocked_by_client") ||
     message.includes("blocked by client") ||
     message.includes("access control checks") ||
