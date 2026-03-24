@@ -1915,7 +1915,7 @@ def technojobs_search(session: requests.Session) -> List[Dict[str, str]]:
 
 
 def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
-    mode = (os.getenv("JOB_DIGEST_INDEED_MODE", "browser") or "browser").strip().lower()
+    mode = (os.getenv("JOB_DIGEST_INDEED_MODE", "jobspy") or "jobspy").strip().lower()
     if mode == "jobspy":
         jobs, meta = jobspy_indeed_search()
         mark_source_runtime_event(
