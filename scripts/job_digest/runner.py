@@ -491,6 +491,22 @@ def run_source_stage(label: str, fn):
 
 
 def write_digest_outputs(records: list[JobRecord], *, suffix: str = "") -> tuple[Path, Path]:
+    def join_values(values) -> str:
+        parts: list[str] = []
+        for value in values or []:
+            if value is None:
+                continue
+            if isinstance(value, str):
+                text = value.strip()
+            else:
+                try:
+                    text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+                except TypeError:
+                    text = str(value).strip()
+            if text:
+                parts.append(text)
+        return " | ".join(parts)
+
     today = datetime.now().strftime("%Y-%m-%d")
     out_xlsx = config.DIGEST_DIR / f"digest_{today}{suffix}.xlsx"
     out_csv = config.DIGEST_DIR / f"digest_{today}{suffix}.csv"
@@ -510,18 +526,18 @@ def write_digest_outputs(records: list[JobRecord], *, suffix: str = "") -> tuple
             "CV_Gap": r.cv_gap,
             "Role_Summary": r.role_summary,
             "Tailored_Summary": r.tailored_summary,
-            "Tailored_CV_Bullets": " | ".join(r.tailored_cv_bullets),
-            "Key_Requirements": " | ".join(r.key_requirements),
+            "Tailored_CV_Bullets": join_values(r.tailored_cv_bullets),
+            "Key_Requirements": join_values(r.key_requirements),
             "Match_Notes": r.match_notes,
             "Company_Insights": r.company_insights,
             "Cover_Letter": r.cover_letter,
-            "Key_Talking_Points": " | ".join(r.key_talking_points),
-            "STAR_Stories": " | ".join(r.star_stories),
+            "Key_Talking_Points": join_values(r.key_talking_points),
+            "STAR_Stories": join_values(r.star_stories),
             "Quick_Pitch": r.quick_pitch,
             "Interview_Focus": r.interview_focus,
-            "Prep_Questions": " | ".join(r.prep_questions),
-            "Prep_Answers": " | ".join(r.prep_answers),
-            "Scorecard": " | ".join(r.scorecard),
+            "Prep_Questions": join_values(r.prep_questions),
+            "Prep_Answers": join_values(r.prep_answers),
+            "Scorecard": join_values(r.scorecard),
             "Apply_Tips": r.apply_tips,
             "Notes": r.notes,
         }
