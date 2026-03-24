@@ -93,6 +93,7 @@ RAW_CANONICAL_NAME_MAP = {
     "natwest": "NatWest Group",
     "natwest boxed": "NatWest Group",
     "napier": "Napier",
+    "wise australia investments": "Wise",
     "nice actimize": "NICE Actimize",
     "n26": "N26",
     "northern trust": "Northern Trust",
