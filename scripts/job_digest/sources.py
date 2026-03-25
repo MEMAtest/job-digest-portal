@@ -51,6 +51,7 @@ from .config import (
 )
 from .models import JobRecord
 from .indeed_jobspy import jobspy_indeed_search
+from .scoring import assess_fit, build_gaps, build_preference_match, build_reasons, score_fit
 from .utils import canonicalize_posted_fields, clean_link, extract_relative_posted_text, normalize_text, trim_summary
 
 try:
@@ -1492,7 +1493,8 @@ def build_manual_record(session: requests.Session, link: str) -> Optional[JobRec
         return None
 
     full_text = f"{title} {company} {summary}"
-    score, _, _ = score_fit(full_text, company)
+    fit = assess_fit(full_text, company, "Manual", "Manual")
+    score = int(fit["score"])
     why_fit = build_reasons(full_text)
     cv_gap = build_gaps(full_text)
     preference_match = build_preference_match(full_text, company, location)
@@ -1508,6 +1510,7 @@ def build_manual_record(session: requests.Session, link: str) -> Optional[JobRec
         posted_date=normalized_posted_date,
         source="Manual",
         fit_score=score,
+        fit_verdict=str(fit["fit_verdict"]),
         preference_match=preference_match,
         why_fit=why_fit,
         cv_gap=cv_gap,

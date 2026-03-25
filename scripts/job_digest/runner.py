@@ -36,6 +36,7 @@ from .llm import enhance_records_with_groq
 from .models import JobRecord
 from .records import dedupe_records
 from .scoring import (
+    assess_fit,
     build_gaps,
     build_preference_match,
     build_reasons,
@@ -353,6 +354,33 @@ def print_source_health_summary() -> None:
     print("--- End Source Health ---")
 
 
+def min_score_for_fit(fit: dict, source_family: str, source: str) -> int:
+    min_score = config.MIN_SCORE
+    role_family = str(fit.get("role_family", "stretch"))
+    domain_anchor = bool(fit.get("domain_anchor"))
+    negative_hits = list(fit.get("negative_hits", []))
+
+    if source_family == "ATS":
+        if role_family == "core":
+            return 60
+        if role_family == "adjacent":
+            return 62 if domain_anchor else 66
+        return min_score
+
+    if source == "CustomCareers":
+        return CUSTOM_CAREERS_MIN_SCORE
+
+    if source_family == "Aggregator":
+        return 70 if domain_anchor else 75
+
+    if source_family == "JobBoard":
+        if negative_hits:
+            return max(min_score, 75)
+        return 70 if domain_anchor else 75
+
+    return min_score
+
+
 def build_recent_digest_forecast() -> dict:
     digest_files = sorted(
         p for p in config.DIGEST_DIR.glob("digest_*.csv") if "scrape_only" not in p.name
@@ -603,8 +631,10 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
 
         summary = desc_text[:2500]
         full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
+        fit = assess_fit(full_text, company, "Aggregator", "LinkedIn")
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "Aggregator", "LinkedIn")
+        if score < min_score:
             continue
 
         records.append(
@@ -619,6 +649,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
                 source="LinkedIn",
                 source_family="Aggregator",
                 fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
                 why_fit=build_reasons(full_text),
                 cv_gap=build_gaps(full_text),
@@ -652,8 +683,10 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
+        fit = assess_fit(full_text, company, "ATS", "Greenhouse")
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "ATS", "Greenhouse")
+        if score < min_score:
             continue
 
         records.append(
@@ -670,6 +703,7 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
                 ats_family="Greenhouse",
                 ats_account=job.get("ats_account", ""),
                 fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
                 why_fit=build_reasons(full_text),
                 cv_gap=build_gaps(full_text),
@@ -702,8 +736,10 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
+        fit = assess_fit(full_text, company, "ATS", "Lever")
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "ATS", "Lever")
+        if score < min_score:
             continue
 
         records.append(
@@ -720,6 +756,7 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
                 ats_family="Lever",
                 ats_account=job.get("ats_account", ""),
                 fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
                 why_fit=build_reasons(full_text),
                 cv_gap=build_gaps(full_text),
@@ -752,8 +789,10 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
+        fit = assess_fit(full_text, company, "ATS", "SmartRecruiters")
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "ATS", "SmartRecruiters")
+        if score < min_score:
             continue
 
         records.append(
@@ -770,6 +809,7 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
                 ats_family="SmartRecruiters",
                 ats_account=job.get("ats_account", ""),
                 fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
                 why_fit=build_reasons(full_text),
                 cv_gap=build_gaps(full_text),
@@ -802,8 +842,10 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
+        fit = assess_fit(full_text, company, "ATS", "Ashby")
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "ATS", "Ashby")
+        if score < min_score:
             continue
 
         records.append(
@@ -820,6 +862,7 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
                 ats_family="Ashby",
                 ats_account=job.get("ats_account", ""),
                 fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
                 why_fit=build_reasons(full_text),
                 cv_gap=build_gaps(full_text),
@@ -852,8 +895,10 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        if score < config.MIN_SCORE:
+        fit = assess_fit(full_text, company, "ATS", "Workable")
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "ATS", "Workable")
+        if score < min_score:
             continue
 
         records.append(
@@ -870,6 +915,7 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
                 ats_family="Workable",
                 ats_account=job.get("ats_account", ""),
                 fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
                 why_fit=build_reasons(full_text),
                 cv_gap=build_gaps(full_text),
@@ -1022,10 +1068,9 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
             continue
 
         full_text = f"{title} {company} {summary}"
-        score, _, _ = score_fit(full_text, company)
-        min_score = config.MIN_SCORE
-        if effective_source_name == "CustomCareers" and is_target_firm(company):
-            min_score = CUSTOM_CAREERS_MIN_SCORE
+        fit = assess_fit(full_text, company, "JobBoard", effective_source_name)
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "JobBoard", effective_source_name)
         if score < min_score:
             if diag:
                 diag["dropped"]["score"] += 1
@@ -1057,6 +1102,7 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                 source=effective_source_name,
                 source_family="JobBoard",
                 fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
                 why_fit=build_reasons(full_text),
                 cv_gap=build_gaps(full_text),
