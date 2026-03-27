@@ -658,6 +658,11 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
             )
         )
         diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
     return records
 
 
@@ -711,6 +716,11 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
             )
         )
         diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
     return records
 
 
@@ -764,6 +774,11 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
             )
         )
         diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
     return records
 
 
@@ -817,6 +832,11 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
             )
         )
         diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
     return records
 
 
@@ -870,6 +890,11 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
             )
         )
         diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
     return records
 
 
@@ -924,6 +949,11 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
             )
         )
         diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
     return records
 
 
@@ -1147,7 +1177,13 @@ except Exception:  # noqa: BLE001
     ZoneInfo = None
 
 
-def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape_only: bool = False) -> None:
+def main(
+    *,
+    skip_enrichment: bool = False,
+    skip_post_hooks: bool = False,
+    scrape_only: bool = False,
+    ignore_seen_cache: bool = False,
+) -> None:
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
     reset_source_diagnostics()
@@ -1206,15 +1242,19 @@ def main(*, skip_enrichment: bool = False, skip_post_hooks: bool = False, scrape
     records = run_step("dedupe_records", lambda: dedupe_records(sorted(all_jobs, key=lambda x: x.fit_score, reverse=True)))
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
-    seen_cache = prune_seen_cache(load_seen_cache(config.SEEN_CACHE_PATH), config.SEEN_CACHE_DAYS)
-    records = filter_new_records(records, seen_cache)
-    records = sorted(records, key=lambda record: record.fit_score, reverse=True)
+    seen_cache: dict[str, str] = {}
+    if not ignore_seen_cache:
+        seen_cache = prune_seen_cache(load_seen_cache(config.SEEN_CACHE_PATH), config.SEEN_CACHE_DAYS)
+        records = filter_new_records(records, seen_cache)
+        records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
     if not skip_enrichment:
         records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
     digest_suffix = "_scrape_only" if scrape_only else ""
+    if ignore_seen_cache:
+        digest_suffix += "_ignore_seen"
     out_xlsx, out_csv = run_step(
         "write_digest_outputs",
         lambda: write_digest_outputs(records, suffix=digest_suffix),
@@ -1394,6 +1434,11 @@ def cli() -> None:
         action="store_true",
         help="Only scrape/filter/dedupe and write digest outputs; skip Firestore writes and post-hooks",
     )
+    parser.add_argument(
+        "--ignore-seen-cache",
+        action="store_true",
+        help="Validation mode: bypass seen-cache filtering so kept roles are written even if already seen",
+    )
     args = parser.parse_args()
 
     if args.smoke_test:
@@ -1412,6 +1457,7 @@ def cli() -> None:
             skip_enrichment=args.skip_enrichment or args.scrape_only,
             skip_post_hooks=args.skip_post_hooks or args.scrape_only,
             scrape_only=args.scrape_only,
+            ignore_seen_cache=args.ignore_seen_cache,
         )
 
 
