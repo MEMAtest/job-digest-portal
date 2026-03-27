@@ -114,8 +114,12 @@ SOURCE_DIAGNOSTICS_LIMIT = int(os.getenv("JOB_DIGEST_CUSTOM_DIAGNOSTICS_LIMIT", 
 SOURCE_HEALTH_WEAK_YIELD_MIN_RAW = int(os.getenv("JOB_DIGEST_WEAK_YIELD_MIN_RAW", "10") or "10")
 SOURCE_HEALTH_WEAK_YIELD_RATIO = float(os.getenv("JOB_DIGEST_WEAK_YIELD_RATIO", "0.15") or "0.15")
 RECENT_DIGEST_SAMPLE_SIZE = int(os.getenv("JOB_DIGEST_FORECAST_SAMPLE_SIZE", "10") or "10")
+LINKEDIN_DETAILS_DEADLINE_SECONDS = int(os.getenv("JOB_DIGEST_LINKEDIN_DETAILS_DEADLINE_SECONDS", "45") or "45")
+LINKEDIN_DETAIL_TIMEOUT_SECONDS = int(os.getenv("JOB_DIGEST_LINKEDIN_DETAIL_TIMEOUT_SECONDS", "8") or "8")
+LINKEDIN_MAX_DETAIL_JOBS = int(os.getenv("JOB_DIGEST_LINKEDIN_MAX_DETAIL_JOBS", "120") or "120")
 SOURCE_DIAGNOSTICS: dict[str, dict] = {}
 CUSTOM_CAREERS_TARGET_DIAGNOSTICS: dict[str, dict] = {}
+RUN_SUMMARY: dict[str, object] = {}
 
 CUSTOM_CAREERS_TITLE_HINTS = (
     "product",
@@ -180,12 +184,13 @@ def log_trace(message: str) -> None:
 def _diagnostic_enabled_for(source_name: str) -> bool:
     if SOURCE_DIAGNOSTICS_ENABLED:
         return True
-    return source_name in {"CustomCareers", "IndeedUK"}
+    return source_name in {"CustomCareers", "IndeedUK", "LinkedIn", "Greenhouse", "Lever", "SmartRecruiters", "Ashby", "Workable"}
 
 
 def reset_source_diagnostics() -> None:
     SOURCE_DIAGNOSTICS.clear()
     CUSTOM_CAREERS_TARGET_DIAGNOSTICS.clear()
+    RUN_SUMMARY.clear()
 
 
 def init_source_diagnostic(source_name: str, raw_count: int) -> dict:
@@ -199,6 +204,9 @@ def init_source_diagnostic(source_name: str, raw_count: int) -> dict:
             "timed_out": 0,
             "failed": 0,
             "status": "empty",
+            "pre_seen_kept": 0,
+            "post_seen_kept": 0,
+            "seen_filtered": 0,
             "mode": "",
             "query_count": 0,
             "company_query_count": 0,
@@ -275,6 +283,42 @@ def merge_runtime_source_events() -> None:
         diag["status"] = classify_source_diagnostic(diag)
 
 
+def update_seen_cache_summary(pre_seen_records: list[JobRecord], post_seen_records: list[JobRecord]) -> None:
+    post_seen_links = {record.link for record in post_seen_records if record.link}
+    for diag in SOURCE_DIAGNOSTICS.values():
+        diag["pre_seen_kept"] = 0
+        diag["post_seen_kept"] = 0
+        diag["seen_filtered"] = 0
+    for record in pre_seen_records:
+        diag = init_source_diagnostic(record.source or "Unknown", SOURCE_DIAGNOSTICS.get(record.source or "Unknown", {}).get("raw", 0))
+        diag["pre_seen_kept"] = int(diag.get("pre_seen_kept", 0) or 0) + 1
+        if not record.link or record.link in post_seen_links:
+            diag["post_seen_kept"] = int(diag.get("post_seen_kept", 0) or 0) + 1
+    for diag in SOURCE_DIAGNOSTICS.values():
+        diag["seen_filtered"] = max(0, int(diag.get("pre_seen_kept", 0) or 0) - int(diag.get("post_seen_kept", 0) or 0))
+
+    RUN_SUMMARY["pre_seen_kept"] = len(pre_seen_records)
+    RUN_SUMMARY["post_seen_kept"] = len(post_seen_records)
+    RUN_SUMMARY["seen_filtered"] = max(0, len(pre_seen_records) - len(post_seen_records))
+
+
+def print_seen_cache_summary(*, validation_digest_path: str = "") -> None:
+    pre_seen = int(RUN_SUMMARY.get("pre_seen_kept", 0) or 0)
+    post_seen = int(RUN_SUMMARY.get("post_seen_kept", 0) or 0)
+    seen_filtered = int(RUN_SUMMARY.get("seen_filtered", 0) or 0)
+    print("\n--- Seen Cache Summary ---")
+    print(f"  pre_seen_kept={pre_seen}")
+    print(f"  post_seen_kept={post_seen}")
+    print(f"  seen_filtered={seen_filtered}")
+    if validation_digest_path:
+        print(f"  validation_digest={validation_digest_path}")
+    print("--- End Seen Cache Summary ---")
+    log_trace(
+        f"[seen] pre_seen_kept={pre_seen} post_seen_kept={post_seen} "
+        f"seen_filtered={seen_filtered} validation_digest={validation_digest_path or 'none'}"
+    )
+
+
 def _init_custom_target_diagnostic(job: dict, company: str) -> dict | None:
     careers_url = (job.get("target_careers_url") or "").strip()
     if not careers_url:
@@ -332,6 +376,12 @@ def print_source_health_summary() -> None:
         key=lambda item: (order.get(item[1].get("status", "empty"), 9), item[0].lower()),
     ):
         parts = [f"raw={int(diag.get('raw', 0) or 0)}", f"kept={int(diag.get('kept', 0) or 0)}"]
+        if diag.get("pre_seen_kept"):
+            parts.append(f"pre_seen={int(diag.get('pre_seen_kept', 0) or 0)}")
+        if diag.get("post_seen_kept") or diag.get("pre_seen_kept"):
+            parts.append(f"post_seen={int(diag.get('post_seen_kept', 0) or 0)}")
+        if diag.get("seen_filtered"):
+            parts.append(f"seen_filtered={int(diag.get('seen_filtered', 0) or 0)}")
         if diag.get("mode"):
             parts.append(f"mode={diag['mode']}")
         if diag.get("query_count"):
@@ -439,8 +489,11 @@ def write_source_diagnostics(suffix: str = "") -> Path | None:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     output_path = config.DIGEST_DIR / f"source_diagnostics_{today}{suffix}.json"
     try:
+        RUN_SUMMARY["stage_timeout_hit"] = any(int(diag.get("timed_out", 0) or 0) > 0 for diag in SOURCE_DIAGNOSTICS.values())
+        payload = dict(SOURCE_DIAGNOSTICS)
+        payload["__run__"] = dict(RUN_SUMMARY)
         with output_path.open("w", encoding="utf-8") as handle:
-            json.dump(SOURCE_DIAGNOSTICS, handle, indent=2, ensure_ascii=False)
+            json.dump(payload, handle, indent=2, ensure_ascii=False)
         log_trace(f"[step] source diagnostics written to {output_path}")
         return output_path
     except Exception as exc:
@@ -596,6 +649,14 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
     linkedin_jobs = linkedin_search(session)
     print(f"[LinkedIn] {len(linkedin_jobs)} raw results fetched (before filtering)")
     diag = init_source_diagnostic("LinkedIn", len(linkedin_jobs))
+    details_started = time.monotonic()
+    detail_jobs_processed = 0
+
+    def details_deadline_reached() -> bool:
+        if LINKEDIN_DETAILS_DEADLINE_SECONDS <= 0:
+            return False
+        return (time.monotonic() - details_started) >= LINKEDIN_DETAILS_DEADLINE_SECONDS
+
     for job in linkedin_jobs:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
@@ -603,7 +664,20 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
         if not is_relevant_title(title):
             continue
 
-        detail = linkedin_job_details(session, job["job_id"])
+        if LINKEDIN_MAX_DETAIL_JOBS > 0 and detail_jobs_processed >= LINKEDIN_MAX_DETAIL_JOBS:
+            diag["timed_out"] += 1
+            add_source_note(diag, "linkedin detail cap reached")
+            log_trace("[source] linkedin detail cap reached; returning partial results")
+            break
+        if details_deadline_reached():
+            diag["timed_out"] += 1
+            add_source_note(diag, "linkedin detail deadline reached")
+            log_trace("[source] linkedin detail deadline reached; returning partial results")
+            break
+
+        detail_timeout = max(3, LINKEDIN_DETAIL_TIMEOUT_SECONDS)
+        detail = linkedin_job_details(session, job["job_id"], timeout=detail_timeout)
+        detail_jobs_processed += 1
         desc_text = detail.get("description", "")
         if detail.get("title"):
             title = detail["title"]
@@ -663,6 +737,8 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
             "kept",
             {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
         )
+    if detail_jobs_processed:
+        add_source_note(diag, f"linkedin detail jobs processed={detail_jobs_processed}")
     return records
 
 
@@ -1183,6 +1259,8 @@ def main(
     skip_post_hooks: bool = False,
     scrape_only: bool = False,
     ignore_seen_cache: bool = False,
+    validation_digest: bool = False,
+    skip_linkedin: bool = False,
 ) -> None:
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
@@ -1225,7 +1303,11 @@ def main(
                     except Exception:
                         pass
 
-    all_jobs.extend(run_source_stage("linkedin", lambda: collect_linkedin_records(session)))
+    if not skip_linkedin:
+        all_jobs.extend(run_source_stage("linkedin", lambda: collect_linkedin_records(session)))
+    else:
+        diag = init_source_diagnostic("LinkedIn", 0)
+        add_source_note(diag, "skipped by CLI flag")
     all_jobs.extend(run_source_stage("greenhouse", lambda: collect_greenhouse_records(session)))
     all_jobs.extend(run_source_stage("lever", lambda: collect_lever_records(session)))
     all_jobs.extend(run_source_stage("smartrecruiters", lambda: collect_smartrecruiters_records(session)))
@@ -1242,23 +1324,31 @@ def main(
     records = run_step("dedupe_records", lambda: dedupe_records(sorted(all_jobs, key=lambda x: x.fit_score, reverse=True)))
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
+    pre_seen_records = list(records)
     seen_cache: dict[str, str] = {}
     if not ignore_seen_cache:
         seen_cache = prune_seen_cache(load_seen_cache(config.SEEN_CACHE_PATH), config.SEEN_CACHE_DAYS)
         records = filter_new_records(records, seen_cache)
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
+    update_seen_cache_summary(pre_seen_records, records)
 
     if not skip_enrichment:
         records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
     digest_suffix = "_scrape_only" if scrape_only else ""
-    if ignore_seen_cache:
+    if validation_digest:
+        digest_suffix = "_validation"
+    elif ignore_seen_cache:
         digest_suffix += "_ignore_seen"
     out_xlsx, out_csv = run_step(
         "write_digest_outputs",
         lambda: write_digest_outputs(records, suffix=digest_suffix),
     )
+    RUN_SUMMARY["completed"] = True
+    RUN_SUMMARY["validation_digest_written"] = bool(validation_digest or ignore_seen_cache)
+    RUN_SUMMARY["validation_digest_path"] = str(out_csv) if (validation_digest or ignore_seen_cache) else ""
+    RUN_SUMMARY["stage_timeout_hit"] = any(int(diag.get("timed_out", 0) or 0) > 0 for diag in SOURCE_DIAGNOSTICS.values())
     save_custom_careers_health_state(finalize_custom_target_diagnostics())
     diagnostics_path = write_source_diagnostics(suffix=digest_suffix)
 
@@ -1275,8 +1365,11 @@ def main(
     if scrape_only:
         print(f"Digest generated: {out_xlsx}")
         print(f"Roles found: {len(records)}")
+        if not records and int(RUN_SUMMARY.get("pre_seen_kept", 0) or 0) > 0 and not (validation_digest or ignore_seen_cache):
+            print("Production digest empty because all kept roles were already seen.")
         print_source_yield(records)
         print_source_health_summary()
+        print_seen_cache_summary(validation_digest_path=str(out_csv) if (validation_digest or ignore_seen_cache) else "")
         print_recent_digest_forecast()
         if diagnostics_path is not None:
             print(f"Source diagnostics: {diagnostics_path}")
@@ -1439,6 +1532,16 @@ def cli() -> None:
         action="store_true",
         help="Validation mode: bypass seen-cache filtering so kept roles are written even if already seen",
     )
+    parser.add_argument(
+        "--validation-digest",
+        action="store_true",
+        help="Write a validation digest showing kept roles before seen-cache suppression",
+    )
+    parser.add_argument(
+        "--skip-linkedin",
+        action="store_true",
+        help="Skip LinkedIn for source-isolation and validation runs",
+    )
     args = parser.parse_args()
 
     if args.smoke_test:
@@ -1454,10 +1557,12 @@ def cli() -> None:
             print("Skipping run: outside scheduled run window or already sent for this slot.")
             raise SystemExit(0)
         main(
-            skip_enrichment=args.skip_enrichment or args.scrape_only,
-            skip_post_hooks=args.skip_post_hooks or args.scrape_only,
-            scrape_only=args.scrape_only,
-            ignore_seen_cache=args.ignore_seen_cache,
+            skip_enrichment=args.skip_enrichment or args.scrape_only or args.validation_digest,
+            skip_post_hooks=args.skip_post_hooks or args.scrape_only or args.validation_digest,
+            scrape_only=args.scrape_only or args.validation_digest,
+            ignore_seen_cache=args.ignore_seen_cache or args.validation_digest,
+            validation_digest=args.validation_digest,
+            skip_linkedin=args.skip_linkedin,
         )
 
 

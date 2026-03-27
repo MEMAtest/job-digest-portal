@@ -179,6 +179,49 @@ def should_skip_custom_careers_page(title: str, link: str = "", summary: str = "
         return True
     if link_norm and CUSTOM_CAREERS_SKIP_PATH_PATTERN.search(link_norm):
         return True
+    business_line_titles = {
+        "financial institutions",
+        "government agencies",
+        "public sector",
+        "accounting firms",
+        "crypto businesses",
+        "solutions",
+        "industries",
+        "our customers",
+        "platform",
+        "products",
+    }
+    if title_norm.lower() in business_line_titles:
+        return True
+    hiring_markers = (
+        "responsibilities",
+        "requirements",
+        "qualifications",
+        "job description",
+        "about the role",
+        "what you'll do",
+        "what you will do",
+        "experience",
+        "apply now",
+    )
+    role_shape_markers = (
+        "manager",
+        "analyst",
+        "lead",
+        "director",
+        "specialist",
+        "engineer",
+        "owner",
+        "associate",
+        "officer",
+        "consultant",
+        "partner",
+        "head of",
+        "vice president",
+    )
+    combined = f"{title_norm} {summary_norm}".lower()
+    if not any(marker in combined for marker in hiring_markers) and not any(marker in title_norm.lower() for marker in role_shape_markers):
+        return True
     generic_summary_markers = (
         "search and apply for jobs directly",
         "supporting people with disabilities",
@@ -353,11 +396,11 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
     return list(jobs.values())
 
 
-def linkedin_job_details(session: requests.Session, job_id: str) -> Dict[str, str]:
+def linkedin_job_details(session: requests.Session, job_id: str, timeout: int = 20) -> Dict[str, str]:
     detail_url = f"https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/{job_id}"
     headers = {"User-Agent": USER_AGENT}
     try:
-        resp = session.get(detail_url, headers=headers, timeout=20)
+        resp = session.get(detail_url, headers=headers, timeout=timeout)
     except requests.RequestException:
         return {}
     if resp.status_code != 200:
