@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { chromium } from "playwright";
+import { buildResolvedCvModel } from "../../app.cv.schema.js";
 
 const safe = (value) =>
   String(value || "")
@@ -37,11 +38,21 @@ const bulletHtml = (items = []) =>
     .join("");
 
 export const buildCvHtml = ({ role, company, sections = {}, baseCvSections = {}, answers = {} }) => {
-  const summary = sections.summary || baseCvSections.summary || "";
-  const keyAchievements = sections.key_achievements || baseCvSections.key_achievements || [];
-  const vistra = sections.vistra_bullets || baseCvSections.vistra_bullets || [];
-  const ebury = sections.ebury_bullets || baseCvSections.ebury_bullets || [];
-
+  const model = buildResolvedCvModel({ baseSections: baseCvSections, tailoredSections: sections });
+  const competencies = model.competencies
+    .map((entry) => `<div style="margin-bottom:2px;"><strong>${safe(entry.label)}:</strong> ${safe(entry.items.join(", "))}</div>`)
+    .join("");
+  const experienceHtml = model.experience
+    .map(
+      (entry) => `
+        <div style="margin-bottom:10px;">
+          <div style="font-weight:700;color:#0f172a;">${safe(entry.company_line)}</div>
+          <div style="font-size:10px;color:#475569;margin-bottom:3px;">${safe(entry.title)} | ${safe(entry.date_range)}</div>
+          <div style="font-size:10px;color:#334155;margin-bottom:3px;">${safe(entry.role_summary)}</div>
+          ${bulletHtml(entry.bullets)}
+        </div>`
+    )
+    .join("");
   return `
     <html>
       <body style="font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:28px 36px;font-size:11px;line-height:1.35;">
@@ -50,28 +61,42 @@ export const buildCvHtml = ({ role, company, sections = {}, baseCvSections = {},
           <div style="font-size:10px;color:#475569;">${safe(answers.location || "")} | ${safe(answers.phone || "")} | ${safe(
     answers.email || ""
   )}</div>
-          <div style="font-size:10px;color:#334155;">${safe(answers.linkedinUrl || "")}${answers.portfolioUrl ? ` | ${safe(answers.portfolioUrl)}` : ""}</div>
+          <div style="font-size:10px;color:#334155;">${safe(model.header.linkedin_url || answers.linkedinUrl || "")}${
+            answers.portfolioUrl ? ` | ${safe(answers.portfolioUrl)}` : ""
+          }</div>
           <div style="font-size:10px;color:#7c3aed;margin-top:6px;">Tailored for ${safe(role || "role")}${company ? ` at ${safe(company)}` : ""}</div>
         </div>
 
         <div style="margin-bottom:10px;">
           <div style="font-size:12px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #0f172a;margin-bottom:4px;">Professional Summary</div>
-          <div>${safe(summary)}</div>
+          <div>${safe(model.summary)}</div>
         </div>
 
         <div style="margin-bottom:10px;">
           <div style="font-size:12px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #0f172a;margin-bottom:4px;">Key Achievements</div>
-          ${bulletHtml(keyAchievements)}
+          ${bulletHtml(model.key_achievements)}
         </div>
 
         <div style="margin-bottom:10px;">
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #0f172a;margin-bottom:4px;">Vistra Experience</div>
-          ${bulletHtml(vistra)}
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #0f172a;margin-bottom:4px;">Professional Experience</div>
+          ${experienceHtml}
         </div>
 
         <div style="margin-bottom:10px;">
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #0f172a;margin-bottom:4px;">Ebury Experience</div>
-          ${bulletHtml(ebury)}
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #0f172a;margin-bottom:4px;">Previous Experience</div>
+          ${bulletHtml(model.previous_experience)}
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #0f172a;margin-bottom:4px;">Core Competencies</div>
+          ${competencies}
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;border-bottom:1px solid #0f172a;margin-bottom:4px;">Education & Certifications</div>
+          ${model.education.map((item) => `<div>${safe(item)}</div>`).join("")}
+          <div style="margin-top:4px;">${safe(model.certifications.join(" | "))}</div>
+          ${model.governance.map((item) => `<div>${safe(item)}</div>`).join("")}
         </div>
       </body>
     </html>

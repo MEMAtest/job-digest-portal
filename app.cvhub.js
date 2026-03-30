@@ -14,7 +14,13 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "./app.core.js";
-import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement, hasCvTailoredChanges } from "./app.cv.js";
+import {
+  getTailoredCvPlainText,
+  buildTailoredCvHtml,
+  renderPdfFromElement,
+  hasCvTailoredChanges,
+  getCvSectionDefinitions,
+} from "./app.cv.js";
 
 const loadCvHubSort = () => {
   try {
@@ -185,12 +191,7 @@ export const buildApplicationPackHtml = (job) => {
 
 export const buildSideBySideDiff = (job) => {
   const tailored = job.tailored_cv_sections || {};
-  const sections = [
-    { key: "summary", label: "Professional Summary", isArray: false },
-    { key: "key_achievements", label: "Key Achievements", isArray: true },
-    { key: "vistra_bullets", label: "Vistra Experience", isArray: true },
-    { key: "ebury_bullets", label: "Ebury Experience", isArray: true },
-  ];
+  const sections = getCvSectionDefinitions();
 
   let html = '<div class="cv-compare-grid">';
   html += '<div class="cv-compare-grid__col"><div class="cv-compare-grid__heading">Base CV</div>';
@@ -268,12 +269,7 @@ export const renderCvHub = () => {
   const hasMore = sortedJobs.length > cvHubShowCount;
 
   const base = state.baseCvSections;
-  const sectionDefs = [
-    { key: "summary", label: "Summary", isArray: false },
-    { key: "key_achievements", label: "Key Achievements", isArray: true },
-    { key: "vistra_bullets", label: "Vistra Experience", isArray: true },
-    { key: "ebury_bullets", label: "Ebury Experience", isArray: true },
-  ];
+  const sectionDefs = getCvSectionDefinitions();
 
   const currentSort = state.cvHubSort;
   const filterPills = [
@@ -319,7 +315,7 @@ export const renderCvHub = () => {
     <div class="cv-base-card">
       <h3>Base CV</h3>
       <p>Edit and save your master CV. Changes are used as a baseline for tailoring.</p>
-      <p class="cv-base-hint" style="font-size:12px;color:#64748b;margin:0 0 12px;padding:8px 12px;background:#f0f9ff;border-radius:8px;border:1px solid #bae6fd;">Sections above (Summary, Achievements, Vistra, Ebury) are tailored per job. Roles below Ebury are fixed across all applications.</p>
+      <p class="cv-base-hint" style="font-size:12px;color:#64748b;margin:0 0 12px;padding:8px 12px;background:#f0f9ff;border-radius:8px;border:1px solid #bae6fd;">The builder now uses the master CV schema. Editable sections below are the controlled sections that can vary per application while the master structure stays fixed.</p>
       <div class="cv-base-sections">
         ${sectionDefs
           .map((sec) => {

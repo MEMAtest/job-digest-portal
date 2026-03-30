@@ -1,6 +1,13 @@
 const { getFirestore } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
 const { generateTailoredCvSections } = require("./_cv_generation");
+const {
+  MASTER_CV_SCHEMA,
+  getDefaultBaseCvSections,
+  getResolvedCvSections,
+  normalizeTailoredCvSections,
+  validateCvVariant,
+} = require("./_cv_schema");
 
 const SUPPORTED_ATS = new Set(["Greenhouse", "Lever", "Ashby", "Workable"]);
 
@@ -16,13 +23,7 @@ const DEFAULT_APPLICATION_PROFILE = {
   salaryExpectation: "",
 };
 
-const DEFAULT_BASE_CV_SECTIONS = {
-  summary:
-    "Onboarding, KYC and screening product leader specialising in platform configuration, workflow orchestration and MI for regulated financial services.",
-  key_achievements: [],
-  vistra_bullets: [],
-  ebury_bullets: [],
-};
+const DEFAULT_BASE_CV_SECTIONS = getDefaultBaseCvSections();
 
 const cleanText = (value) => String(value || "").replace(/\s+/g, " ").trim();
 
@@ -91,7 +92,7 @@ exports.handler = async (event) => {
       return withCors({ error: "Apply Assistant supports Greenhouse, Lever, Ashby, and Workable only" }, 400);
     }
 
-    let tailoredSections = job.tailored_cv_sections || {};
+    let tailoredSections = normalizeTailoredCvSections(job.tailored_cv_sections || {});
     if (!tailoredSections || !Object.keys(tailoredSections).length) {
       tailoredSections = await generateTailoredCvSections({
         db,
@@ -110,6 +111,14 @@ exports.handler = async (event) => {
       ...DEFAULT_BASE_CV_SECTIONS,
       ...(cvSettingsDoc.exists ? cvSettingsDoc.data() : {}),
     };
+    const resolvedCvSections = getResolvedCvSections({
+      baseSections: baseCvSections,
+      tailoredSections: tailoredSections,
+    });
+    const cvValidation = validateCvVariant({
+      baseSections: baseCvSections,
+      tailoredSections: tailoredSections,
+    });
 
     const answers = {
       fullName: applicationProfile.fullName,
@@ -132,6 +141,7 @@ exports.handler = async (event) => {
       generated_at: generatedAt,
       cv_ready: true,
       answer_fields: Object.keys(answers).filter((key) => cleanText(answers[key])),
+      master_cv_version: MASTER_CV_SCHEMA.version,
     };
 
     await db.collection("jobs").doc(jobId).update({
@@ -152,6 +162,9 @@ exports.handler = async (event) => {
         answers,
         tailoredCvSections: tailoredSections,
         baseCvSections,
+        resolvedCvSections,
+        masterCv: MASTER_CV_SCHEMA,
+        cvValidation,
       },
     });
   } catch (error) {

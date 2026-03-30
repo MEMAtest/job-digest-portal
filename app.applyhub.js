@@ -16,7 +16,13 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "./app.core.js";
-import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
+import {
+  getTailoredCvPlainText,
+  buildTailoredCvHtml,
+  renderPdfFromElement,
+  hasCvTailoredChanges,
+  getCvSectionDefinitions,
+} from "./app.cv.js";
 import {
   isApplyAssistantSupported,
   launchApplyAssistant,
@@ -67,23 +73,6 @@ export const autoTailorCv = async (job) => {
     tailoringInFlight.delete(job.id);
     if (state.handlers.renderApplyHub) state.handlers.renderApplyHub();
   }
-};
-
-export const hasCvTailoredChanges = (job) => {
-  const tailored = job.tailored_cv_sections || {};
-  const sections = ["summary", "key_achievements", "vistra_bullets", "ebury_bullets"];
-  return sections.some((key) => {
-    const tailoredVal = tailored[key];
-    const baseVal = state.baseCvSections[key];
-    if (!tailoredVal) return false;
-    if (Array.isArray(tailoredVal)) {
-      return JSON.stringify(tailoredVal) !== JSON.stringify(baseVal || []);
-    }
-    if (typeof tailoredVal === "string") {
-      return tailoredVal.trim() !== String(baseVal || "").trim();
-    }
-    return false;
-  });
 };
 
 export const resolveChecklistState = (job) => {
@@ -145,12 +134,7 @@ const buildPreviewText = (html) => {
 
 const buildCvDiff = (job) => {
   const tailored = job.tailored_cv_sections || {};
-  const sections = [
-    { key: "summary", label: "Professional Summary", isArray: false },
-    { key: "key_achievements", label: "Key Achievements", isArray: true },
-    { key: "vistra_bullets", label: "Vistra Experience", isArray: true },
-    { key: "ebury_bullets", label: "Ebury Experience", isArray: true },
-  ];
+  const sections = getCvSectionDefinitions();
 
   let html = "";
   for (const sec of sections) {

@@ -1,66 +1,31 @@
 const OpenAI = require("openai");
+const { buildMasterCvPromptText, MASTER_CV_VERSION, normalizeTailoredCvSections } = require("./_cv_schema");
 
 const buildCvPrompt = (profileText, job) => {
   return (
     "You are a senior CV writer for UK fintech and financial services product roles. " +
-    "Given the candidate's real CV and a target JD, produce tailored CV sections that " +
-    "sound unmistakably human, pass ATS screening at 95%+ keyword coverage, and avoid " +
-    "raising credibility eyebrows.\n\n" +
+    "You are given the candidate's canonical master CV and a target job. Produce controlled overrides only. " +
+    "Do not rewrite the full CV from scratch.\n\n" +
     "Return JSON ONLY with a single key 'tailored_cv_sections' containing:\n" +
-    "- summary: 3-4 sentences (domain anchor + credentials + \"how you work\" line)\n" +
-    "- key_achievements: array of 6-7 bullets (each metric appears HERE only, not repeated in role bullets)\n" +
-    "- vistra_bullets: array of exactly 9 flat bullets (NO sub-headings, NO sub-sections)\n" +
-    "- ebury_bullets: array of 4 bullets (qualitative if metrics already in key_achievements)\n\n" +
-    "═══ HUMAN-READABILITY RULES (mandatory) ═══\n" +
-    "1. DOMAIN ANCHOR: First sentence of summary names the specific domain for THIS role " +
-    "(e.g., \"Identity, KYC and fraud product manager specialising in screening platforms, " +
-    "authentication workflows and onboarding verification\"). Never open with generic " +
-    "\"Product Manager with 13+ years...\"\n" +
-    "2. NO TEMPLATE PHRASES: Never use \"proven track record\", \"strong analytical\", " +
-    "\"complex cross-functional problems\", \"data-driven methodologies\", \"results-oriented\", " +
-    "\"results-driven\", \"strong understanding\", \"strong commercial acumen\". Use concrete " +
-    "verbs: built, redesigned, diagnosed, negotiated, shipped, wrote, ran, stood up, scoped.\n" +
-    "3. DE-DUPLICATE METRICS: Each percentage/number appears ONCE in the entire output. " +
-    "If 55% is in key_achievements, vistra_bullets must refer qualitatively " +
-    "(\"eliminated the primary bottleneck in cycle time\"). Never repeat the same metric.\n" +
-    "4. ACTION + OUTCOME BULLETS: At least half must follow \"Did X; achieved Y\". " +
-    "E.g., \"Diagnosed bottlenecks across onboarding, QA and servicing workflows; " +
-    "redesigned process flows to reduce journey friction\"\n" +
-    "5. VARY LANGUAGE: Use \"customer experience\" once, then rotate: \"journey friction\", " +
-    "\"drop-offs\", \"service levels\", \"cycle time\", \"throughput\". Never repeat a phrase " +
-    "across bullets.\n" +
-    "6. \"HOW YOU WORK\" LINE: Include exactly one sentence in summary describing working " +
-    "style that is hard to fake. E.g., \"Run weekly deep-dive sessions with ops leads; " +
-    "publish SteerCo-ready packs with owners, dates and dependency tracking.\"\n\n" +
-    "═══ ATS RULES (target 95%+) ═══\n" +
-    "- Mirror the JD's exact nouns: once in summary + once in skills/technical + naturally " +
-    "in experience. Not everywhere.\n" +
-    "- Prefer evidence-led keywords (\"built X dashboard\", \"reduced Y false positives\") " +
-    "over generic descriptors (\"data-driven, strategic\")\n" +
-    "- Use standard section headings the ATS can parse: PROFESSIONAL SUMMARY, KEY ACHIEVEMENTS, " +
-    "PROFESSIONAL EXPERIENCE, TECHNICAL & PRODUCT CAPABILITIES, EDUCATION & CERTIFICATIONS\n" +
-    "- Keep tool/platform lists relevant to THIS role; long stacks look padded\n\n" +
-    "═══ CREDIBILITY RULES ═══\n" +
-    "- No repeated metrics across sections. Each big number once (in achievements OR role " +
-    "bullets), then qualitative.\n" +
-    "- Audit-friendly numbers: include scope + baseline + method briefly. Over-precise or " +
-    "\"perfect\" claims feel manufactured.\n" +
-    "- Tool lists: prioritise what the role asks for. Don't list every tool you've touched.\n\n" +
-    "═══ AI RESEMBLANCE RULES ═══\n" +
-    "- Cut all template phrases unless immediately followed by a concrete example\n" +
-    "- Vary sentence structure: mix short blunt lines (\"Stood up EDD squad\") with one " +
-    "occasional longer line\n" +
-    "- The \"how you work\" line is the single strongest anti-AI signal. Make it specific " +
-    "and operational.\n\n" +
-    "═══ FORMATTING ═══\n" +
-    "- British English ONLY (optimised, organised, colour, centre, programme)\n" +
-    "- NO full stops at the end of bullets\n" +
-    "- NO em dashes; use commas, semicolons or \"to\"\n" +
-    "- Keep real metrics (55%, 20%, 38%, £400k, 50k+, 470 PEP, £120k ARR): never water down\n" +
-    "- Do NOT fabricate experience. Only rephrase, reorder and re-emphasise\n" +
-    "- Fit within 2 A4 pages\n" +
-    "- One consistent bullet style throughout (no mixed symbols)\n\n" +
-    `Candidate CV:\n${profileText}\n\n` +
+    "- master_cv_version: string\n" +
+    "- summary: 3-4 sentences tailored to the role\n" +
+    "- key_achievements: array of 5-6 bullets\n" +
+    "- vistra_bullets: array of 5-7 bullets\n" +
+    "- ebury_bullets: array of 4-5 bullets\n" +
+    "- mema_bullets: array of 3-4 bullets\n" +
+    "- elucidate_bullets: array of 3-4 bullets\n" +
+    "- n26_bullets: array of 2-3 bullets\n" +
+    "- experience_overrides: object with keys vistra, ebury, mema, elucidate, n26 mirroring the bullet arrays above\n" +
+    "- notes: object with changed_sections array and locked_sections_preserved boolean\n\n" +
+    "Rules:\n" +
+    "- The master CV is the source of truth. Do not change employers, role titles, chronology or qualifications\n" +
+    "- Only rephrase, reorder and emphasise content that already exists in the master CV\n" +
+    "- Keep metrics real and non-duplicated across sections\n" +
+    "- British English only\n" +
+    "- No fabricated tools, sectors, products or achievements\n" +
+    "- Prioritise recruiter credibility over keyword stuffing\n" +
+    `Master CV:\n${buildMasterCvPromptText()}\n\n` +
+    (profileText ? `Supplemental candidate notes:\n${profileText}\n\n` : "") +
     "Target job:\n" +
     `Title: ${job.role || ""}\n` +
     `Company: ${job.company || ""}\n` +
@@ -72,14 +37,14 @@ const buildCvPrompt = (profileText, job) => {
 const parseSectionsFromText = (text) => {
   try {
     const parsed = JSON.parse(text);
-    return parsed.tailored_cv_sections || parsed;
+    return normalizeTailoredCvSections(parsed.tailored_cv_sections || parsed);
   } catch (_) {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("Failed to parse CV response");
     }
     const parsed = JSON.parse(jsonMatch[0]);
-    return parsed.tailored_cv_sections || parsed;
+    return normalizeTailoredCvSections(parsed.tailored_cv_sections || parsed);
   }
 };
 
@@ -90,9 +55,6 @@ const loadCvProfileText = async (db) => {
 
 const generateTailoredCvSections = async ({ db, job, apiKey }) => {
   const profileText = await loadCvProfileText(db);
-  if (!profileText) {
-    throw new Error("CV profile not found in settings/cv_profile");
-  }
   if (!apiKey) {
     throw new Error("OpenAI API key not configured");
   }
@@ -107,7 +69,15 @@ const generateTailoredCvSections = async ({ db, job, apiKey }) => {
   });
 
   const text = response.choices[0]?.message?.content || "";
-  return parseSectionsFromText(text);
+  const sections = parseSectionsFromText(text);
+  return {
+    ...sections,
+    master_cv_version: sections.master_cv_version || MASTER_CV_VERSION,
+    notes: {
+      locked_sections_preserved: true,
+      ...(sections.notes || {}),
+    },
+  };
 };
 
 module.exports = {
