@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v16';
+const CACHE_VERSION = 'v17';
 const CACHE_NAME = `job-digest-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -10,6 +10,7 @@ const APP_SHELL = [
   '/app.js',
   '/app.core.js',
   '/app.cv.js',
+  '/app.cv.schema.js',
   '/app.applyassistant.js',
   '/app.applyhub.js',
   '/app.cvhub.js',

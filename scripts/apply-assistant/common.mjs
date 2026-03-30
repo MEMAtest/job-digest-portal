@@ -57,14 +57,12 @@ export const buildCvHtml = ({ role, company, sections = {}, baseCvSections = {},
     <html>
       <body style="font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:28px 36px;font-size:11px;line-height:1.35;">
         <div style="text-align:center;margin-bottom:10px;">
-          <div style="font-size:22px;font-weight:700;color:#0f172a;">${safe(answers.fullName || "Candidate")}</div>
-          <div style="font-size:10px;color:#475569;">${safe(answers.location || "")} | ${safe(answers.phone || "")} | ${safe(
-    answers.email || ""
-  )}</div>
-          <div style="font-size:10px;color:#334155;">${safe(model.header.linkedin_url || answers.linkedinUrl || "")}${
-            answers.portfolioUrl ? ` | ${safe(answers.portfolioUrl)}` : ""
-          }</div>
-          <div style="font-size:10px;color:#7c3aed;margin-top:6px;">Tailored for ${safe(role || "role")}${company ? ` at ${safe(company)}` : ""}</div>
+          <div style="font-size:22px;font-weight:700;color:#0f172a;">${safe(model.header.full_name || answers.fullName || "Candidate")}</div>
+          <div style="font-size:10px;color:#475569;">${safe(model.header.location || answers.location || "")} | ${safe(
+    model.header.phone || answers.phone || ""
+  )} | ${safe(model.header.email || answers.email || "")} | ${safe(model.header.linkedin_url || answers.linkedinUrl || "")}</div>
+          <div style="font-size:10px;color:#334155;">Portfolio: ${safe(model.header.portfolio_items.join(" | "))}</div>
+          <div style="margin-top:6px;border-top:1px solid #cbd5e1;"></div>
         </div>
 
         <div style="margin-bottom:10px;">
