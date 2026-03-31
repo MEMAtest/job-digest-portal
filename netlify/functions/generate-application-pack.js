@@ -1,12 +1,12 @@
 const { getFirestore } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
-const { generateTailoredCvSections, hasCvGenerationProvider } = require("./_cv_generation");
+const { generateTailoredCvBundle, hasCvGenerationProvider, loadBaseCvSections } = require("./_cv_generation");
 const {
   MASTER_CV_SCHEMA,
-  getDefaultBaseCvSections,
   getResolvedCvSections,
   normalizeTailoredCvSections,
   validateCvVariant,
+  finalizeTailoredCvSections,
 } = require("./_cv_schema");
 
 const SUPPORTED_ATS = new Set(["Greenhouse", "Lever", "Ashby", "Workable"]);
@@ -22,8 +22,6 @@ const DEFAULT_APPLICATION_PROFILE = {
   noticePeriod: "",
   salaryExpectation: "",
 };
-
-const DEFAULT_BASE_CV_SECTIONS = getDefaultBaseCvSections();
 
 const cleanText = (value) => String(value || "").replace(/\s+/g, " ").trim();
 
@@ -92,33 +90,45 @@ exports.handler = async (event) => {
       return withCors({ error: "Apply Assistant supports Greenhouse, Lever, Ashby, and Workable only" }, 400);
     }
 
+    const baseCvSections = await loadBaseCvSections(db);
     let tailoredSections = normalizeTailoredCvSections(job.tailored_cv_sections || {});
+    let cvValidation = validateCvVariant({
+      baseSections: baseCvSections,
+      tailoredSections,
+    });
     if (!tailoredSections || !Object.keys(tailoredSections).length) {
       if (!hasCvGenerationProvider()) {
         return withCors({ error: "No CV generation provider configured" }, 500);
       }
-      tailoredSections = await generateTailoredCvSections({
+      const generationResult = await generateTailoredCvBundle({
         db,
         job,
         apiKey: process.env.OPENAI_API_KEY,
       });
+      tailoredSections = generationResult.sections;
+      cvValidation = generationResult.validation;
+    } else {
+      const finalized = finalizeTailoredCvSections({
+        baseSections: baseCvSections,
+        tailoredSections,
+        job,
+        providerName: tailoredSections.generated_by_provider || "",
+        styleProfileId: tailoredSections.style_profile || "master_default",
+      });
+      tailoredSections = finalized.sections;
+      cvValidation = finalized.validation;
     }
 
     const profileDoc = await db.collection("settings").doc("application_profile").get();
-    const cvSettingsDoc = await db.collection("cv_settings").doc("base_cv").get();
     const applicationProfile = {
       ...DEFAULT_APPLICATION_PROFILE,
       ...(profileDoc.exists ? profileDoc.data() : {}),
-    };
-    const baseCvSections = {
-      ...DEFAULT_BASE_CV_SECTIONS,
-      ...(cvSettingsDoc.exists ? cvSettingsDoc.data() : {}),
     };
     const resolvedCvSections = getResolvedCvSections({
       baseSections: baseCvSections,
       tailoredSections: tailoredSections,
     });
-    const cvValidation = validateCvVariant({
+    cvValidation = validateCvVariant({
       baseSections: baseCvSections,
       tailoredSections: tailoredSections,
     });
@@ -149,6 +159,7 @@ exports.handler = async (event) => {
 
     await db.collection("jobs").doc(jobId).update({
       tailored_cv_sections: tailoredSections,
+      cv_validation: cvValidation,
       cv_generated_at: generatedAt,
       application_pack: applicationPack,
       application_pack_generated_at: generatedAt,

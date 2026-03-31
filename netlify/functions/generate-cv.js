@@ -1,6 +1,6 @@
 const { getFirestore } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
-const { generateTailoredCvSections, hasCvGenerationProvider } = require("./_cv_generation");
+const { generateTailoredCvBundle, hasCvGenerationProvider } = require("./_cv_generation");
 
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return handleOptions();
@@ -31,16 +31,18 @@ exports.handler = async (event) => {
     const job = jobDoc.data();
 
     try {
-      const sections = await generateTailoredCvSections({ db, job, apiKey: process.env.OPENAI_API_KEY });
+      const result = await generateTailoredCvBundle({ db, job, apiKey: process.env.OPENAI_API_KEY });
+      const sections = result.sections;
 
       // Write back to Firestore
       await db.collection("jobs").doc(jobId).update({
         tailored_cv_sections: sections,
+        cv_validation: result.validation,
         cv_generated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
 
-      return withCors({ success: true, sections });
+      return withCors({ success: true, sections, cvValidation: result.validation });
     } catch (error) {
       return withCors({ error: error.message || "CV generation failed" }, 500);
     }

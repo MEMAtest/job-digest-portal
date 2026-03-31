@@ -165,7 +165,7 @@ export const buildTailoredCvHtml = (job = {}) => {
     .join("");
 
   container.innerHTML = `
-    <div style="font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:0 20px;margin:0;width:680px;box-sizing:border-box;font-size:11px;line-height:1.3;">
+    <div style="font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:0 20px;margin:0;width:680px;box-sizing:border-box;font-size:11px;line-height:1.3;font-variant-ligatures:none;font-feature-settings:'liga' 0,'clig' 0;">
       <div style="text-align:center;margin-bottom:6px;">
         <div style="font-size:21px;font-weight:700;letter-spacing:0.5px;color:#0f172a;margin-bottom:3px;">${escapeHtml(
           header.full_name.toUpperCase()

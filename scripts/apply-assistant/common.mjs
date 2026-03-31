@@ -55,7 +55,7 @@ export const buildCvHtml = ({ role, company, sections = {}, baseCvSections = {},
     .join("");
   return `
     <html>
-      <body style="font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:28px 36px;font-size:11px;line-height:1.35;">
+      <body style="font-family:Helvetica,Arial,sans-serif;color:#1f2937;padding:28px 36px;font-size:11px;line-height:1.35;font-variant-ligatures:none;font-feature-settings:'liga' 0,'clig' 0;">
         <div style="text-align:center;margin-bottom:10px;">
           <div style="font-size:22px;font-weight:700;color:#0f172a;">${safe(model.header.full_name || answers.fullName || "Candidate")}</div>
           <div style="font-size:10px;color:#475569;">${safe(model.header.location || answers.location || "")} | ${safe(

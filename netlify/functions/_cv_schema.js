@@ -178,6 +178,72 @@ const FORBIDDEN_PHRASES = [
   "strategic thinker",
 ];
 
+const WEAK_SUMMARY_OPENINGS = [
+  "within the",
+  "my experience",
+  "i deliver",
+  "i have led",
+  "my expertise spans",
+  "equipped me to",
+];
+
+const WEAK_SUMMARY_PHRASES = [
+  "business growth",
+  "transformative platform",
+  "transformative workflow",
+  "dynamic environment",
+  "fast-paced environment",
+  "cross-functional stakeholders",
+];
+
+const WEAK_BULLET_PHRASES = [
+  "responsible for",
+  "worked closely with",
+  "worked cross-functionally",
+  "helped drive",
+  "leveraged",
+  "utilised",
+  "best-in-class",
+  "business growth",
+];
+
+const HIGH_VALUE_TERMS = [
+  "api",
+  "apis",
+  "fenergo",
+  "napier",
+  "enate",
+  "lexisnexis",
+  "jumio",
+  "postident",
+  "intelli-corp",
+  "salesforce",
+  "power bi",
+  "microsoft fabric",
+  "onboarding",
+  "identity",
+  "kyc",
+  "kyb",
+  "screening",
+  "financial crime",
+  "fraud",
+  "clm",
+  "aml",
+  "sanctions",
+  "transaction monitoring",
+  "edd",
+  "cdd",
+  "client lifecycle",
+  "data mapping",
+  "migration",
+  "orchestration",
+  "continuous monitoring",
+  "hypercare",
+  "uat",
+  "go-live",
+  "regulatory remediation",
+];
+
 const CV_SECTION_DEFS = Object.freeze([
   { key: "summary", label: "Professional Summary", isArray: false },
   { key: "key_achievements", label: "Key Achievements", isArray: true },
@@ -315,15 +381,168 @@ const getResolvedCvSections = ({ baseSections = {}, tailoredSections = {} } = {}
 const collectNumbers = (items = []) =>
   items
     .join(" ")
-    .match(/(?:£\\s*)?\\d[\\d+,\\.]*%?|\\b\\d+\\+\\b/g)
-    ?.map((item) => item.replace(/\\s+/g, "")) || [];
+    .match(/(?:£\s*)?\d[\d,\.]*\+?%?/g)
+    ?.map((item) => item.replace(/\s+/g, ""))
+    .filter((item) => item && !/^\d{4}$/.test(item)) || [];
+
+const countRepeatedNumbers = (items = []) => {
+  const counts = new Map();
+  collectNumbers(items).forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+  return Array.from(counts.entries())
+    .filter(([, count]) => count > 1)
+    .map(([value]) => value);
+};
+
+const splitSentences = (text = "") =>
+  String(text)
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const countGenericPhraseHits = (text = "", phrases = []) => {
+  const lower = String(text || "").toLowerCase();
+  return phrases.filter((phrase) => lower.includes(phrase));
+};
+
+const countFirstPersonPronouns = (text = "") => (String(text || "").match(/\b(i|my|me|mine)\b/gi) || []).length;
+
+const countWeirdGlyphs = (text = "") => (String(text || "").match(/[→•◆■▪●○◦]|[–—]/g) || []).length;
+
+const countDomainAnchors = (text = "") => {
+  const lower = String(text || "").toLowerCase();
+  return HIGH_VALUE_TERMS.filter((term) => lower.includes(term)).length;
+};
+
+const extractAnchorTerms = (text = "") => {
+  const lower = String(text || "").toLowerCase();
+  return HIGH_VALUE_TERMS.filter((term) => lower.includes(term));
+};
+
+const getSectionStats = (items = []) => {
+  const list = Array.isArray(items) ? items.map((item) => String(item || "").trim()).filter(Boolean) : [];
+  const lengths = list.map((item) => item.length);
+  const totalLength = lengths.reduce((sum, value) => sum + value, 0);
+  return {
+    count: list.length,
+    averageLength: list.length ? totalLength / list.length : 0,
+    genericPhraseCount: list.reduce((sum, item) => sum + countGenericPhraseHits(item, WEAK_BULLET_PHRASES).length, 0),
+    weirdGlyphCount: list.reduce((sum, item) => sum + countWeirdGlyphs(item), 0),
+    repeatedNumbers: countRepeatedNumbers(list),
+  };
+};
+
+const evaluateSummary = ({ summary = "", baseSummary = "" } = {}) => {
+  const text = String(summary || "").trim();
+  const baseText = String(baseSummary || "").trim();
+  const sentences = splitSentences(text);
+  const baseRepeatedNumbers = countRepeatedNumbers([baseText]);
+  const repeatedNumbers = countRepeatedNumbers([text]);
+  const genericPhraseHits = countGenericPhraseHits(text, [...FORBIDDEN_PHRASES, ...WEAK_SUMMARY_PHRASES]);
+  const weakOpenings = WEAK_SUMMARY_OPENINGS.filter((phrase) => text.toLowerCase().startsWith(phrase));
+  const firstPersonCount = countFirstPersonPronouns(text);
+  const domainAnchorCount = countDomainAnchors(text);
+  const weirdGlyphCount = countWeirdGlyphs(text);
+  const errors = [];
+  const warnings = [];
+
+  if (!text) errors.push("Summary is empty");
+  if (sentences.length < 3 || sentences.length > 4) warnings.push(`Summary should be 3-4 sentences; found ${sentences.length}`);
+  if (text.length < 360 || text.length > 760) warnings.push(`Summary length is outside the target range; found ${text.length} characters`);
+  if (genericPhraseHits.length) warnings.push(`Summary contains generic phrasing: ${genericPhraseHits.join(", ")}`);
+  if (weakOpenings.length) warnings.push(`Summary opens weakly: ${weakOpenings.join(", ")}`);
+  if (firstPersonCount) warnings.push("Summary uses first-person pronouns instead of master-style third-person phrasing");
+  if (domainAnchorCount < 3) warnings.push("Summary is missing sufficient domain anchors from the master CV");
+  if (weirdGlyphCount) warnings.push("Summary contains non-ATS-safe punctuation or glyphs");
+  if (repeatedNumbers.length > baseRepeatedNumbers.length) {
+    warnings.push(`Summary introduces repeated metrics beyond the master baseline: ${repeatedNumbers.join(", ")}`);
+  }
+
+  const critical =
+    genericPhraseHits.length > 0 ||
+    weakOpenings.length > 0 ||
+    firstPersonCount > 0 ||
+    domainAnchorCount < 2 ||
+    weirdGlyphCount > 0;
+
+  return {
+    ok: errors.length === 0 && !critical,
+    errors,
+    warnings,
+    metrics: {
+      generic_phrase_count: genericPhraseHits.length,
+      weak_opening_count: weakOpenings.length,
+      first_person_count: firstPersonCount,
+      summary_sentence_count: sentences.length,
+      summary_length_chars: text.length,
+      repeated_metric_count: repeatedNumbers.length,
+      domain_anchor_count: domainAnchorCount,
+      weird_glyph_count: weirdGlyphCount,
+    },
+  };
+};
+
+const evaluateBulletSection = ({ label, items = [], baseItems = [] } = {}) => {
+  const stats = getSectionStats(items);
+  const baseStats = getSectionStats(baseItems);
+  const text = items.join(" ").toLowerCase();
+  const baseText = baseItems.join(" ").toLowerCase();
+  const requiredAnchors = extractAnchorTerms(baseText);
+  const retainedAnchors = requiredAnchors.filter((term) => text.includes(term));
+  const errors = [];
+  const warnings = [];
+
+  if (!stats.count) {
+    errors.push(`${label} is empty`);
+  }
+  if (stats.count < Math.max(3, baseStats.count - 1)) {
+    warnings.push(`${label} is shorter than the master section`);
+  }
+  if (stats.averageLength < baseStats.averageLength * 0.6) {
+    warnings.push(`${label} is materially thinner than the master bullets`);
+  }
+  if (stats.genericPhraseCount > 1) {
+    warnings.push(`${label} contains generic bullet phrasing`);
+  }
+  if (stats.weirdGlyphCount > 0) {
+    warnings.push(`${label} contains non-ATS-safe punctuation or glyphs`);
+  }
+  if (stats.repeatedNumbers.length > baseStats.repeatedNumbers.length) {
+    warnings.push(`${label} repeats metrics beyond the master baseline: ${stats.repeatedNumbers.join(", ")}`);
+  }
+  if (requiredAnchors.length && retainedAnchors.length === 0) {
+    warnings.push(`${label} drops the key platform/domain anchors from the master section`);
+  }
+
+  const critical =
+    errors.length > 0 ||
+    stats.weirdGlyphCount > 0 ||
+    (requiredAnchors.length && retainedAnchors.length === 0) ||
+    stats.averageLength < baseStats.averageLength * 0.45;
+
+  return {
+    ok: !critical,
+    errors,
+    warnings,
+    metrics: {
+      bullet_count: stats.count,
+      bullet_average_length: Math.round(stats.averageLength),
+      generic_phrase_count: stats.genericPhraseCount,
+      weird_glyph_count: stats.weirdGlyphCount,
+      repeated_metric_count: stats.repeatedNumbers.length,
+      retained_anchor_count: retainedAnchors.length,
+      required_anchor_count: requiredAnchors.length,
+    },
+  };
+};
 
 const validateCvVariant = ({ baseSections = {}, tailoredSections = {} } = {}) => {
   const resolvedSections = getResolvedCvSections({ baseSections, tailoredSections });
+  const resolvedBase = getResolvedCvSections({ baseSections, tailoredSections: {} });
   const warnings = [];
   const errors = [];
 
-  const repeatedNumbers = collectNumbers([
+  const repeatedNumbers = countRepeatedNumbers([
     resolvedSections.summary,
     ...resolvedSections.key_achievements,
     ...resolvedSections.vistra_bullets,
@@ -331,27 +550,75 @@ const validateCvVariant = ({ baseSections = {}, tailoredSections = {} } = {}) =>
     ...resolvedSections.mema_bullets,
     ...resolvedSections.elucidate_bullets,
     ...resolvedSections.n26_bullets,
-  ]).filter((value, index, list) => list.indexOf(value) !== index);
+  ]);
 
-  if (repeatedNumbers.length) {
-    warnings.push(`Repeated metrics detected: ${Array.from(new Set(repeatedNumbers)).join(", ")}`);
+  const baseRepeatedNumbers = countRepeatedNumbers([
+    resolvedBase.summary,
+    ...resolvedBase.key_achievements,
+    ...resolvedBase.vistra_bullets,
+    ...resolvedBase.ebury_bullets,
+    ...resolvedBase.mema_bullets,
+    ...resolvedBase.elucidate_bullets,
+    ...resolvedBase.n26_bullets,
+  ]);
+
+  if (repeatedNumbers.length > baseRepeatedNumbers.length) {
+    warnings.push(`Repeated metrics detected beyond the master baseline: ${repeatedNumbers.join(", ")}`);
   }
 
-  if (!hasStringValue(resolvedSections.summary)) {
-    errors.push("Summary is empty");
-  }
+  const summaryCheck = evaluateSummary({
+    summary: resolvedSections.summary,
+    baseSummary: resolvedBase.summary,
+  });
+  warnings.push(...summaryCheck.warnings);
+  errors.push(...summaryCheck.errors);
 
-  if ((resolvedSections.key_achievements || []).length < 4) {
-    warnings.push("Key achievements section is shorter than the master CV");
-  }
+  const achievementsCheck = evaluateBulletSection({
+    label: "Key achievements",
+    items: resolvedSections.key_achievements,
+    baseItems: resolvedBase.key_achievements,
+  });
+  warnings.push(...achievementsCheck.warnings);
+  errors.push(...achievementsCheck.errors);
 
-  const lowerSummary = String(resolvedSections.summary || "").toLowerCase();
-  const matchedPhrases = FORBIDDEN_PHRASES.filter((phrase) => lowerSummary.includes(phrase));
-  if (matchedPhrases.length) {
-    warnings.push(`Summary contains generic phrasing: ${matchedPhrases.join(", ")}`);
-  }
-  if (String(resolvedSections.summary || "").includes("→")) {
-    warnings.push("Summary contains non-ATS-safe arrow characters");
+  const sectionMetrics = {};
+  CV_SECTION_DEFS.filter((section) => section.isArray && section.key !== "key_achievements").forEach((section) => {
+    const sectionCheck = evaluateBulletSection({
+      label: section.label,
+      items: resolvedSections[section.key],
+      baseItems: resolvedBase[section.key],
+    });
+    sectionMetrics[section.key] = sectionCheck.metrics;
+    warnings.push(...sectionCheck.warnings);
+    errors.push(...sectionCheck.errors);
+  });
+
+  const qualityScore = Math.max(
+    0,
+    100 -
+      errors.length * 25 -
+      warnings.length * 4 -
+      summaryCheck.metrics.generic_phrase_count * 8 -
+      summaryCheck.metrics.weak_opening_count * 10 -
+      summaryCheck.metrics.first_person_count * 8 -
+      Math.max(0, repeatedNumbers.length - baseRepeatedNumbers.length) * 6
+  );
+
+  const materialWarningCount = warnings.filter((warning) =>
+    /(generic|weaker|drops the key|repeats metrics|non-ATS-safe|missing sufficient domain anchors|materially thinner)/i.test(warning)
+  ).length;
+
+  let decision = "accept";
+  if (
+    errors.length ||
+    summaryCheck.metrics.generic_phrase_count > 0 ||
+    summaryCheck.metrics.weak_opening_count > 0 ||
+    summaryCheck.metrics.first_person_count > 0 ||
+    summaryCheck.metrics.domain_anchor_count < 2
+  ) {
+    decision = "fallback_master";
+  } else if (qualityScore < 84 || materialWarningCount > 2) {
+    decision = "retry";
   }
 
   return {
@@ -359,9 +626,108 @@ const validateCvVariant = ({ baseSections = {}, tailoredSections = {} } = {}) =>
     errors,
     warnings,
     metrics: {
-      repeated_metric_count: Array.from(new Set(repeatedNumbers)).length,
+      repeated_metric_count: repeatedNumbers.length,
+      repeated_metric_baseline: baseRepeatedNumbers.length,
+      generic_phrase_count: summaryCheck.metrics.generic_phrase_count,
+      summary_sentence_count: summaryCheck.metrics.summary_sentence_count,
+      summary_length_chars: summaryCheck.metrics.summary_length_chars,
+      domain_anchor_count: summaryCheck.metrics.domain_anchor_count,
       section_count: CV_SECTION_DEFS.length,
       master_cv_version: MASTER_CV_SCHEMA.version,
+      section_metrics: sectionMetrics,
+    },
+    quality_score: qualityScore,
+    decision,
+  };
+};
+
+const finalizeTailoredCvSections = ({
+  baseSections = {},
+  tailoredSections = {},
+  job = {},
+  providerName = "",
+  styleProfileId = "master_default",
+} = {}) => {
+  const resolvedBase = { ...getDefaultBaseCvSections(), ...baseSections };
+  const normalizedTailored = normalizeTailoredCvSections(tailoredSections);
+  const finalized = normalizeTailoredCvSections(normalizedTailored);
+  const qualityNotes = [];
+  const sectionDecisions = {};
+
+  const summaryCheck = evaluateSummary({
+    summary: normalizedTailored.summary,
+    baseSummary: resolvedBase.summary,
+  });
+  if (!summaryCheck.ok) {
+    finalized.summary = resolvedBase.summary;
+    sectionDecisions.summary = "fallback_master";
+    qualityNotes.push("Summary reverted to the master CV because the tailored version was weaker.");
+  } else {
+    sectionDecisions.summary = "accepted";
+  }
+
+  const achievementsCheck = evaluateBulletSection({
+    label: "Key achievements",
+    items: normalizedTailored.key_achievements,
+    baseItems: resolvedBase.key_achievements,
+  });
+  if (!achievementsCheck.ok) {
+    finalized.key_achievements = [...resolvedBase.key_achievements];
+    sectionDecisions.key_achievements = "fallback_master";
+    qualityNotes.push("Key achievements reverted to the master CV because the tailored bullets were thinner or more generic.");
+  } else {
+    sectionDecisions.key_achievements = "accepted";
+  }
+
+  CV_SECTION_DEFS.filter((section) => section.experienceId).forEach((section) => {
+    const sectionCheck = evaluateBulletSection({
+      label: section.label,
+      items: normalizedTailored[section.key],
+      baseItems: resolvedBase[section.key],
+    });
+    if (!sectionCheck.ok) {
+      finalized[section.key] = [...resolvedBase[section.key]];
+      sectionDecisions[section.key] = "fallback_master";
+      qualityNotes.push(`${section.label} reverted to the master CV because the tailored bullets lost important specificity.`);
+    } else {
+      sectionDecisions[section.key] = "accepted";
+    }
+  });
+
+  const normalizedFinal = normalizeTailoredCvSections({
+    ...finalized,
+    generated_by_provider: providerName || normalizedTailored.generated_by_provider || "",
+    style_profile: styleProfileId || normalizedTailored.style_profile || "master_default",
+  });
+  const validation = validateCvVariant({
+    baseSections: resolvedBase,
+    tailoredSections: normalizedFinal,
+  });
+
+  const hasFallbacks = Object.values(sectionDecisions).some((value) => value === "fallback_master");
+  const qualityStatus =
+    validation.decision === "accept" && !hasFallbacks
+      ? "accepted"
+      : hasFallbacks
+      ? "fallback_master"
+      : "retry_failed";
+
+  return {
+    sections: {
+      ...normalizedFinal,
+      generated_by_provider: providerName || normalizedFinal.generated_by_provider || "",
+      style_profile: styleProfileId || normalizedFinal.style_profile || "master_default",
+      quality_status: qualityStatus,
+      quality_notes: qualityNotes,
+      master_cv_version: normalizedFinal.master_cv_version || MASTER_CV_SCHEMA.version,
+    },
+    validation,
+    quality_status: qualityStatus,
+    quality_notes: qualityNotes,
+    section_decisions: sectionDecisions,
+    job_context: {
+      role: job.role || "",
+      company: job.company || "",
     },
   };
 };
@@ -409,5 +775,6 @@ module.exports = {
   normalizeTailoredCvSections,
   getResolvedCvSections,
   validateCvVariant,
+  finalizeTailoredCvSections,
   buildMasterCvPromptText,
 };

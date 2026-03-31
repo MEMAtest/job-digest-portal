@@ -2,11 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { writeApplicationPack } from './apply-assistant/common.mjs';
-import { MASTER_CV_SCHEMA, getDefaultBaseCvSections, normalizeTailoredCvSections, validateCvVariant } from '../app.cv.schema.js';
+import { MASTER_CV_SCHEMA } from '../app.cv.schema.js';
 
 const require = createRequire(import.meta.url);
 const { getFirestore } = require('./firebase_admin');
-const { generateTailoredCvSections } = require('../netlify/functions/_cv_generation.js');
+const { generateTailoredCvBundle } = require('../netlify/functions/_cv_generation.js');
 
 const extractEnvValue = (raw, key) => {
   const pattern = new RegExp(`${key}=(.*?)(?:\\n[A-Z0-9_]+=|\\n*$)`, 's');
@@ -77,19 +77,19 @@ const runGeneration = async ({ db, job, forcedProvider = '' }) => {
   else delete process.env.JOB_DIGEST_CV_PROVIDER;
 
   try {
-    const tailoredSections = normalizeTailoredCvSections(
-      await generateTailoredCvSections({
-        db,
-        job,
-        apiKey: process.env.OPENAI_API_KEY,
-      }),
-    );
-    const baseCvSections = getDefaultBaseCvSections();
-    const cvValidation = validateCvVariant({
-      baseSections: baseCvSections,
-      tailoredSections,
+    const result = await generateTailoredCvBundle({
+      db,
+      job,
+      apiKey: process.env.OPENAI_API_KEY,
     });
-    return { tailoredSections, baseCvSections, cvValidation };
+    return {
+      tailoredSections: result.sections,
+      baseCvSections: result.baseCvSections,
+      cvValidation: result.validation,
+      qualityStatus: result.quality_status,
+      qualityNotes: result.quality_notes,
+      providerAttempts: result.provider_attempts,
+    };
   } finally {
     if (previousProvider) process.env.JOB_DIGEST_CV_PROVIDER = previousProvider;
     else delete process.env.JOB_DIGEST_CV_PROVIDER;
@@ -104,23 +104,7 @@ if (!jobDoc.exists) {
   process.exit(1);
 }
 const job = jobDoc.data() || {};
-let { tailoredSections, baseCvSections, cvValidation } = await runGeneration({ db, job });
-
-const shouldRetryWithOpenRouter =
-  process.env.OPENROUTER_API_KEY &&
-  tailoredSections.generated_by_provider !== 'openrouter' &&
-  cvValidation.warnings.some((warning) => /generic phrasing|Repeated metrics/i.test(warning));
-
-if (shouldRetryWithOpenRouter) {
-  try {
-    const openRouterAttempt = await runGeneration({ db, job, forcedProvider: 'openrouter' });
-    if (openRouterAttempt.cvValidation.warnings.length < cvValidation.warnings.length) {
-      ({ tailoredSections, baseCvSections, cvValidation } = openRouterAttempt);
-    }
-  } catch (error) {
-    // Keep the best available draft if the retry path fails.
-  }
-}
+const { tailoredSections, baseCvSections, cvValidation, qualityStatus, qualityNotes, providerAttempts } = await runGeneration({ db, job });
 
 const answers = {
   fullName: MASTER_CV_SCHEMA.header.full_name,
@@ -133,6 +117,7 @@ const answers = {
 
 await jobRef.update({
   tailored_cv_sections: tailoredSections,
+  cv_validation: cvValidation,
   cv_generated_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });
@@ -158,6 +143,9 @@ console.log(
       ats_family: job.ats_family || '',
       source: job.source || '',
       cvValidation,
+      qualityStatus,
+      qualityNotes,
+      providerAttempts,
       output: writeResult,
     },
     null,
