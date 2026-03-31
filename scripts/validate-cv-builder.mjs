@@ -8,6 +8,7 @@ const {
   finalizeTailoredCvSections,
   validateCvVariant,
 } = require('../netlify/functions/_cv_schema.js');
+const { inferRoleFamily, rankEvidenceForJob } = require('../netlify/functions/_cv_evidence_library.js');
 
 const base = getDefaultBaseCvSections();
 
@@ -56,6 +57,32 @@ const fixtures = [
       n26_bullets: [...base.n26_bullets],
     },
     expectedStatus: 'accepted',
+    job: {
+      role: 'Senior Product Manager, Fenergo CLM',
+      company: 'Reference Co',
+      description: 'Own the Fenergo CLM roadmap, API integrations, migration and go-live delivery for corporate onboarding.',
+    },
+    expectedRoleFamily: 'fenergo_delivery',
+  },
+  {
+    id: 'fraud-role-family-selection',
+    description: 'Fraud and financial-crime roles should map to the fraud reference family.',
+    tailored: {
+      summary: base.summary,
+      key_achievements: [...base.key_achievements],
+      vistra_bullets: [...base.vistra_bullets],
+      ebury_bullets: [...base.ebury_bullets],
+      mema_bullets: [...base.mema_bullets],
+      elucidate_bullets: [...base.elucidate_bullets],
+      n26_bullets: [...base.n26_bullets],
+    },
+    job: {
+      role: 'Head of Fraud Operations',
+      company: 'Validation Co',
+      description: 'Lead fraud controls, transaction monitoring, sanctions and financial crime operations.',
+    },
+    expectedStatus: 'accepted',
+    expectedRoleFamily: 'financial_crime_ops',
   },
 ];
 
@@ -65,7 +92,7 @@ const results = fixtures.map((fixture) => {
     tailoredSections: fixture.tailored,
     providerName: 'fixture',
     styleProfileId: 'master_default',
-    job: {
+    job: fixture.job || {
       role: fixture.id,
       company: 'Validation Co',
     },
@@ -74,6 +101,12 @@ const results = fixtures.map((fixture) => {
     baseSections: base,
     tailoredSections: finalized.sections,
   });
+  const job = fixture.job || {
+    role: fixture.id,
+    company: 'Validation Co',
+  };
+  const roleFamily = inferRoleFamily(job);
+  const rankedEvidence = rankEvidenceForJob(job, { limit: 3 });
   return {
     id: fixture.id,
     description: fixture.description,
@@ -82,10 +115,13 @@ const results = fixtures.map((fixture) => {
     qualityScore: validation.quality_score,
     warnings: validation.warnings,
     summaryMatchesMaster: finalized.sections.summary === base.summary,
+    roleFamily,
+    rankedEvidence,
     finalized,
     passed:
       finalized.quality_status === fixture.expectedStatus &&
-      (!fixture.expectSummaryFallback || finalized.sections.summary === base.summary),
+      (!fixture.expectSummaryFallback || finalized.sections.summary === base.summary) &&
+      (!fixture.expectedRoleFamily || roleFamily === fixture.expectedRoleFamily),
   };
 });
 
@@ -97,6 +133,7 @@ if (failed.length) {
     actualStatus: item.actualStatus,
     warnings: item.warnings,
     summaryMatchesMaster: item.summaryMatchesMaster,
+    roleFamily: item.roleFamily,
   })) }, null, 2));
   process.exit(1);
 }
@@ -125,4 +162,6 @@ console.log(JSON.stringify({ ok: true, results: results.map((result) => ({
   actualStatus: result.actualStatus,
   qualityScore: result.qualityScore,
   warningCount: result.warnings.length,
+  roleFamily: result.roleFamily,
+  topEvidenceIds: result.rankedEvidence.map((item) => item.id),
 })), packResult }, null, 2));

@@ -89,6 +89,8 @@ const runGeneration = async ({ db, job, forcedProvider = '' }) => {
       qualityStatus: result.quality_status,
       qualityNotes: result.quality_notes,
       providerAttempts: result.provider_attempts,
+      roleFamily: result.role_family,
+      evidenceContext: result.evidence_context,
     };
   } finally {
     if (previousProvider) process.env.JOB_DIGEST_CV_PROVIDER = previousProvider;
@@ -104,7 +106,7 @@ if (!jobDoc.exists) {
   process.exit(1);
 }
 const job = jobDoc.data() || {};
-const { tailoredSections, baseCvSections, cvValidation, qualityStatus, qualityNotes, providerAttempts } = await runGeneration({ db, job });
+const { tailoredSections, baseCvSections, cvValidation, qualityStatus, qualityNotes, providerAttempts, roleFamily, evidenceContext } = await runGeneration({ db, job });
 
 const answers = {
   fullName: MASTER_CV_SCHEMA.header.full_name,
@@ -146,6 +148,8 @@ console.log(
       qualityStatus,
       qualityNotes,
       providerAttempts,
+      roleFamily,
+      evidenceTopIds: (evidenceContext?.rankedEvidence || []).map((item) => item.id),
       output: writeResult,
     },
     null,

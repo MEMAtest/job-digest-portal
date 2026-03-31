@@ -160,6 +160,7 @@ exports.handler = async (event) => {
     await db.collection("jobs").doc(jobId).update({
       tailored_cv_sections: tailoredSections,
       cv_validation: cvValidation,
+      cv_role_family: tailoredSections.role_family || "",
       cv_generated_at: generatedAt,
       application_pack: applicationPack,
       application_pack_generated_at: generatedAt,

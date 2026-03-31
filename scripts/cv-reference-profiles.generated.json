@@ -1,0 +1,67 @@
+{
+  "financial_crime_ops": {
+    "source_pdf_path": "/Users/adeomosanya/Downloads/AdeOmosanya_CV_myPOS.pdf",
+    "pages": 2,
+    "summary": "fcafines.memaconsultants.com | vulnerability.memaconsultants.com | smcr.memaconsultants.com Product Manager with 13+ years building financial crime controls, screening systems and compliance products across digital banking, B2B fintech and RegTech. Experienced designing and optimising fraud and financial crime detection systems, including sanctions screening configuration, transaction monitoring requirements, risk-rating logic and threshold tuning that reduced false positives by 38% at one institution. Works directly with engineering on sprint delivery, with compliance and risk teams on translating AML/CFT regulation into scalable product controls, and with data teams on MI and reporting. At Vistra, owns the global screening, KYC and onboarding product across 30+ jurisdictions. At N26, defined transaction monitoring, sanctions screening and EDD requirements under direct BaFin scrutiny. Independently shipped three live RegTech products using data scraping, API integrations and AI-assisted workflows.",
+    "achievements": [
+      "Reduced unnecessary screening alerts by 38% at Ebury by classifying false positives by threshold band, building what-if scenarios and working directly with the LexisNexis API to implement revised configurations, with no reduction in control coverage",
+      "Reduced manual screening escalations by 30% and improved QA throughput by 15% at Vistra through threshold tuning, QA framework design and MI dashboards across 30+ jurisdictions",
+      "Defined transaction monitoring, sanctions screening and EDD requirements during BaFin remediation at N26; embedded customer risk-rating rules into product logic, rationalised sanctions list subscriptions to halve alert volume and contributed to closure of 12 audit points",
+      "Replaced fragmented Excel-based financial crime processes across 30+ countries with one global screening, KYC and onboarding model built on three integrated platforms (Vistra)",
+      "Took a financial crime risk assessment SaaS product from blank page to Tier 1 global bank deployment at Elucidate, securing \u00a3120k ARR through zero-to-one discovery and delivery",
+      "Built and deployed 3 live RegTech products solo (FCA Fines Dashboard, Vulnerability Portal, SMCR Platform) with no engineering team, growing the consultancy to 25+ clients"
+    ]
+  },
+  "product_delivery": {
+    "source_pdf_path": "/Users/adeomosanya/Downloads/AdeOmosanya_CV_MB.pdf",
+    "pages": 2,
+    "summary": "Senior Product Manager with 13+ years owning backlogs, writing user stories and delivering sprint-based change with engineering squads in complex, regulated financial services environments. Proven track record translating business and regulatory requirements into clear squad-level priorities, managing cross-functional delivery across engineering, compliance, operations and risk, and tracking product outcomes through well-defined success metrics. Currently leads global product ownership across onboarding, KYC and screening platforms at Vistra. Earlier roles at Ebury, Elucidate and N26 add digital banking, B2B SaaS and remediation delivery under direct regulatory scrutiny.",
+    "achievements": [
+      "Owned backlog, user stories and sprint delivery across multiple concurrent product workstreams at Vistra; managed scope trade-offs with tech leads, prioritised features across regulatory, operational and business value dimensions and ran QA validation before each release",
+      "Defined API integration requirements across Fenergo, Napier, Power BI and Microsoft Fabric; worked with engineers on endpoint specifications, payload structure and error handling through to production",
+      "Reduced onboarding cycle time by 20% and client outreach touchpoints by 30% through journey redesign, improved data capture and workflow optimisation across 30+ jurisdictions",
+      "Delivered 20% onboarding conversion uplift and 38% fewer unnecessary screening reviews by identifying friction points through funnel analytics and prioritising the changes that addressed root causes (Ebury)",
+      "Closed 12 BaFin audit points at N26 by translating regulatory requirements into product specifications and delivering financial crime controls under direct regulatory scrutiny",
+      "Independently built and deployed 3 live RegTech products with no engineering team, owning the full stack from discovery through to API integrations and go-live"
+    ]
+  },
+  "clm_programme": {
+    "source_pdf_path": "/Users/adeomosanya/Downloads/AdeOmosanya_CV_CLM_PD.pdf",
+    "pages": 2,
+    "summary": "Senior CLM and KYC transformation leader with 13+ years delivering complex, multi-jurisdictional programs across regulated financial services. Currently leads global CLM Program at Vistra, owning the end-to-end implementation of Fenergo, Napier and Enate across 30+ jurisdictions, covering platform configuration, integration, regulatory alignment, vendor management, stakeholder governance, and go-live delivery. Deep hands-on Fenergo expertise across CLM journey design, CDD/EDD configuration, risk scoring, and approval routing for corporate clients with complex beneficial ownership and multi-layered entity structures. Earlier roles at Ebury and N26 add regulated digital banking, data-led optimisation, and remediation delivery under direct regulatory scrutiny.",
+    "achievements": [
+      "Led end-to-end Fenergo CLM implementation across 30+ jurisdictions at Vistra: defined target-state requirements, configured CLM journeys, managed vendor relationship, coordinated cross-functional delivery across compliance, technology, operations, and front office, and delivered go-lives across EMEA and APAC",
+      "Defined and owned multi-year CLM Program roadmap: sequenced platform rollout across Enate (orchestration), Fenergo (KYC), and Napier (screening) by regulatory urgency, team readiness, and platform dependency; managed competing priorities across compliance, engineering, and operations throughout",
+      "Built \u00a3400k+ business case covering vendor evaluation, cost-benefit analysis and pricing negotiation; delivered 18+ MI dashboards across APAC and EMEA for Program tracking, operational performance and regulatory visibility",
+      "Reduced onboarding cycle time by 20% and client outreach touchpoints by 30% through target-state CLM design and improved data capture across 30+ jurisdictions",
+      "Managed Napier vendor relationship through full implementation lifecycle: selection via structured scorecard, configuration, QA framework design, phased cutover and go-live; Dutch DNB subsequently validated the implementation in a regulatory effectiveness assessment",
+      "Closed 12 BaFin audit points at N26 by defining product requirements across TM, screening and EDD under direct regulatory scrutiny"
+    ]
+  },
+  "fenergo_delivery": {
+    "source_pdf_path": "/Users/adeomosanya/Downloads/Ade_Omosanya_CV_Fenergo__SPM.pdf",
+    "pages": 2,
+    "summary": "Senior Product Manager with 13+ years across banking, B2B SaaS and RegTech, including hands-on experience configuring and integrating Fenergo CLM across two organisations and 30+ jurisdictions. Works directly with engineers, vendor delivery teams and Fenergo\u2019s APAC team on journey design, API integrations, data mapping, sprint delivery, UAT and go-live. Experience spans corporate and institutional, commercial and B2B, consumer digital and correspondent banking. Translates regulatory and client needs into prioritised product roadmaps and has independently shipped three live RegTech products using scraping, data pipelines and API integrations.",
+    "achievements": [
+      "Replaced fragmented Excel-based processes across 30+ countries with one global onboarding, KYC and screening model built on Fenergo, Napier and Enate; delivered 55% faster onboarding and 30% fewer client outreach touchpoints (Vistra)",
+      "Designed Fenergo CLM journeys across 30+ jurisdictions covering entity capture, risk assessment, document collection, client outreach and approval routing, working directly with Fenergo\u2019s APAC delivery team on configuration and go-live (Vistra)",
+      "Configured Fenergo against local onboarding requirements at Ebury and led Salesforce-to-Fenergo CLM migration of 50k+ client records with zero downtime",
+      "Contributed to closure of 12 BaFin audit points, halved alert volume and cut PEP review time by 50% through financial crime product and remediation changes at N26",
+      "Delivered 20% onboarding conversion uplift and 38% fewer unnecessary screening reviews by optimising ID&V and screening flows across three European markets (Ebury)",
+      "Took a correspondent banking SaaS product from blank page to Tier 1 global bank deployment at Elucidate, securing \u00a3120k ARR through zero-to-one discovery and delivery"
+    ]
+  },
+  "institutional_clm": {
+    "source_pdf_path": "/Users/adeomosanya/Downloads/AdeOmosanya_CV_RBC__CLM.pdf",
+    "pages": 2,
+    "summary": "",
+    "achievements": [
+      "Defined and executed a multi-year CLM product roadmap at Vistra: sequenced the phased rollout of sanctions screening, onboarding orchestration and KYC workflow across 30+ jurisdictions, prioritising by regulatory urgency, team readiness and platform dependency",
+      "Standardised global CLM operating model across Enate, Fenergo and Napier, replacing fragmented Excel-based processes across EMEA and APAC; reduced onboarding cycle time by 20% and client outreach touchpoints by 30% across 30+ countries",
+      "Napier sanctions screening implementation validated by the Dutch DNB in a regulatory effectiveness assessment; manual screening escalations fell 30% and QA throughput improved 15% through threshold tuning and capacity planning",
+      "Built \u00a3400k+ business case and launched 18+ KPI dashboards across APAC and EMEA to support platform decisions, delivery tracking and operational visibility",
+      "Delivered 20% onboarding conversion uplift and 38% fewer unnecessary screening reviews by optimising ID&V and screening flows across Jumio, PostIdent, Intelli-corp and LexisNexis (Ebury)",
+      "Led zero-to-one discovery and PoC delivery for a Tier 1 global bank at Elucidate, securing \u00a3120k ARR; post-PoC iteration drove 40% MAU uplift and cut deployment from 10 to 6 weeks"
+    ]
+  }
+}

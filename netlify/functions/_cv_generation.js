@@ -7,6 +7,7 @@ const {
   finalizeTailoredCvSections,
 } = require("./_cv_schema");
 const { buildCvStyleProfilePrompt } = require("./_cv_style_profiles");
+const { scoreEvidenceAlignment } = require("./_cv_evidence_library");
 
 const OPENAI_MODEL = process.env.OPENAI_CV_MODEL || "gpt-4o";
 const OPENROUTER_MODEL = process.env.JOB_DIGEST_OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
@@ -158,6 +159,8 @@ const getStatusRank = (status) => {
 const compareCandidates = (left, right) => {
   const statusDiff = getStatusRank(left.quality_status) - getStatusRank(right.quality_status);
   if (statusDiff !== 0) return statusDiff;
+  const evidenceDiff = (left.evidence_alignment_score || 0) - (right.evidence_alignment_score || 0);
+  if (evidenceDiff !== 0) return evidenceDiff;
   const scoreDiff = (left.validation?.quality_score || 0) - (right.validation?.quality_score || 0);
   if (scoreDiff !== 0) return scoreDiff;
   const fallbackDiff = (right.quality_notes?.length || 0) - (left.quality_notes?.length || 0);
@@ -176,7 +179,7 @@ const generateTailoredCvBundle = async ({ db, job, apiKey }) => {
     throw new Error("No CV generation provider configured");
   }
 
-  const { profile, prompt: styleProfilePrompt } = buildCvStyleProfilePrompt(job);
+  const { profile, roleFamily, prompt: styleProfilePrompt, evidence } = buildCvStyleProfilePrompt(job);
   const prompt = buildCvPrompt(profileText, job, styleProfilePrompt);
   const candidates = [];
   let lastError = null;
@@ -196,10 +199,16 @@ const generateTailoredCvBundle = async ({ db, job, apiKey }) => {
         ...finalized,
         provider: provider.name,
         style_profile: profile.id,
+        role_family: roleFamily,
+        evidence_alignment_score: scoreEvidenceAlignment(finalized.sections, job, { roleFamily }),
       };
       candidates.push(candidate);
 
-      if (candidate.quality_status === "accepted" && (candidate.validation?.quality_score || 0) >= 90) {
+      if (
+        candidate.quality_status === "accepted" &&
+        (candidate.validation?.quality_score || 0) >= 90 &&
+        candidate.evidence_alignment_score >= 6
+      ) {
         break;
       }
     } catch (error) {
@@ -223,7 +232,9 @@ const generateTailoredCvBundle = async ({ db, job, apiKey }) => {
       quality_status: candidate.quality_status,
       quality_score: candidate.validation?.quality_score || 0,
       warning_count: candidate.validation?.warnings?.length || 0,
+      evidence_alignment_score: candidate.evidence_alignment_score || 0,
     })),
+    evidence_context: evidence,
   };
 };
 
@@ -236,9 +247,12 @@ const generateTailoredCvSections = async ({ db, job, apiKey }) => {
     quality_status: result.quality_status,
     quality_notes: result.quality_notes,
     style_profile: result.style_profile,
+    role_family: result.role_family,
     notes: {
       locked_sections_preserved: true,
       provider_attempts: result.provider_attempts,
+      evidence_reference_profile: result.evidence_context?.referenceProfile?.label || "",
+      evidence_top_ids: (result.evidence_context?.rankedEvidence || []).map((item) => item.id),
       ...(result.sections.notes || {}),
     },
   };
