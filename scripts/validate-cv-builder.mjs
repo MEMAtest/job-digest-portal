@@ -8,7 +8,7 @@ const {
   finalizeTailoredCvSections,
   validateCvVariant,
 } = require('../netlify/functions/_cv_schema.js');
-const { inferRoleFamily, rankEvidenceForJob } = require('../netlify/functions/_cv_evidence_library.js');
+const { inferRoleFamily, rankEvidenceForJob, buildOptimizedBaseSections } = require('../netlify/functions/_cv_evidence_library.js');
 
 const base = getDefaultBaseCvSections();
 
@@ -84,6 +84,28 @@ const fixtures = [
     expectedStatus: 'accepted',
     expectedRoleFamily: 'financial_crime_ops',
   },
+  {
+    id: 'product-delivery-optimised-baseline',
+    description: 'Product-delivery roles should keep the master summary if the reference summary is weaker, while still pulling stronger delivery achievements.',
+    tailored: {
+      summary: base.summary,
+      key_achievements: [...base.key_achievements],
+      vistra_bullets: [...base.vistra_bullets],
+      ebury_bullets: [...base.ebury_bullets],
+      mema_bullets: [...base.mema_bullets],
+      elucidate_bullets: [...base.elucidate_bullets],
+      n26_bullets: [...base.n26_bullets],
+    },
+    job: {
+      role: 'Senior Product Manager, Core Platform Delivery',
+      company: 'Validation Co',
+      description: 'Own backlog, user stories, engineering delivery, API integrations and sprint execution across a regulated platform.',
+    },
+    expectedStatus: 'accepted',
+    expectedRoleFamily: 'product_delivery',
+    expectOptimizedSummaryFromMaster: true,
+    expectOptimizedAchievementMatch: /Owned backlog, user stories and sprint delivery/i,
+  },
 ];
 
 const results = fixtures.map((fixture) => {
@@ -107,6 +129,7 @@ const results = fixtures.map((fixture) => {
   };
   const roleFamily = inferRoleFamily(job);
   const rankedEvidence = rankEvidenceForJob(job, { limit: 3 });
+  const optimizedBase = buildOptimizedBaseSections({ job, baseSections: base });
   return {
     id: fixture.id,
     description: fixture.description,
@@ -117,11 +140,15 @@ const results = fixtures.map((fixture) => {
     summaryMatchesMaster: finalized.sections.summary === base.summary,
     roleFamily,
     rankedEvidence,
+    optimizedBase,
     finalized,
     passed:
       finalized.quality_status === fixture.expectedStatus &&
       (!fixture.expectSummaryFallback || finalized.sections.summary === base.summary) &&
-      (!fixture.expectedRoleFamily || roleFamily === fixture.expectedRoleFamily),
+      (!fixture.expectedRoleFamily || roleFamily === fixture.expectedRoleFamily) &&
+      (!fixture.expectOptimizedSummaryFromMaster || optimizedBase.sections.summary === base.summary) &&
+      (!fixture.expectOptimizedAchievementMatch ||
+        optimizedBase.sections.key_achievements.some((item) => fixture.expectOptimizedAchievementMatch.test(item))),
   };
 });
 
@@ -134,6 +161,8 @@ if (failed.length) {
     warnings: item.warnings,
     summaryMatchesMaster: item.summaryMatchesMaster,
     roleFamily: item.roleFamily,
+    optimizedSummary: item.optimizedBase.sections.summary,
+    optimizedAchievements: item.optimizedBase.sections.key_achievements,
   })) }, null, 2));
   process.exit(1);
 }
@@ -164,4 +193,5 @@ console.log(JSON.stringify({ ok: true, results: results.map((result) => ({
   warningCount: result.warnings.length,
   roleFamily: result.roleFamily,
   topEvidenceIds: result.rankedEvidence.map((item) => item.id),
+  optimizedSummarySource: result.optimizedBase.sections.optimisation_notes?.summary_source || '',
 })), packResult }, null, 2));

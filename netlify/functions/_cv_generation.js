@@ -7,7 +7,7 @@ const {
   finalizeTailoredCvSections,
 } = require("./_cv_schema");
 const { buildCvStyleProfilePrompt } = require("./_cv_style_profiles");
-const { scoreEvidenceAlignment } = require("./_cv_evidence_library");
+const { scoreEvidenceAlignment, buildOptimizedBaseSections } = require("./_cv_evidence_library");
 
 const OPENAI_MODEL = process.env.OPENAI_CV_MODEL || "gpt-4o";
 const OPENROUTER_MODEL = process.env.JOB_DIGEST_OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
@@ -168,28 +168,62 @@ const compareCandidates = (left, right) => {
   return (right.validation?.warnings?.length || 0) - (left.validation?.warnings?.length || 0);
 };
 
+const buildReferenceFallbackCandidate = ({ optimizedBaseSections, job, roleFamily, evidence, providerAttempts = [], lastError = null }) => {
+  const fallbackFinalized = finalizeTailoredCvSections({
+    baseSections: optimizedBaseSections,
+    tailoredSections: optimizedBaseSections,
+    job,
+    providerName: "reference_fallback",
+    styleProfileId: roleFamily,
+  });
+
+  return {
+    ...fallbackFinalized,
+    provider: "reference_fallback",
+    style_profile: roleFamily,
+    role_family: roleFamily,
+    evidence_alignment_score: scoreEvidenceAlignment(fallbackFinalized.sections, job, { roleFamily }),
+    quality_status: "accepted",
+    quality_notes: [
+      "Used the role-family optimised baseline because no LLM provider produced a usable draft.",
+      ...(lastError?.message ? [`Last provider error: ${lastError.message}`] : []),
+    ],
+    provider_attempts: providerAttempts,
+    evidence_context: evidence,
+  };
+};
+
 const generateTailoredCvBundle = async ({ db, job, apiKey }) => {
   const profileText = await loadCvProfileText(db);
-  const baseCvSections = await loadBaseCvSections(db);
+  const storedBaseCvSections = await loadBaseCvSections(db);
   if (apiKey && !process.env.OPENAI_API_KEY) {
     process.env.OPENAI_API_KEY = apiKey;
   }
   const providers = getCvProviders();
-  if (!providers.length) {
-    throw new Error("No CV generation provider configured");
-  }
-
   const { profile, roleFamily, prompt: styleProfilePrompt, evidence } = buildCvStyleProfilePrompt(job);
+  const { sections: optimizedBaseCvSections } = buildOptimizedBaseSections({
+    job,
+    baseSections: storedBaseCvSections,
+  });
+  if (!providers.length) {
+    return buildReferenceFallbackCandidate({
+      optimizedBaseSections: optimizedBaseCvSections,
+      job,
+      roleFamily,
+      evidence,
+    });
+  }
   const prompt = buildCvPrompt(profileText, job, styleProfilePrompt);
   const candidates = [];
   let lastError = null;
+  const providerAttempts = [];
 
   for (const provider of providers) {
     try {
       const text = await generateWithProvider({ provider, prompt });
       const parsedSections = parseSectionsFromText(text);
       const finalized = finalizeTailoredCvSections({
-        baseSections: baseCvSections,
+        baseSections: optimizedBaseCvSections,
         tailoredSections: parsedSections,
         job,
         providerName: provider.name,
@@ -203,6 +237,13 @@ const generateTailoredCvBundle = async ({ db, job, apiKey }) => {
         evidence_alignment_score: scoreEvidenceAlignment(finalized.sections, job, { roleFamily }),
       };
       candidates.push(candidate);
+      providerAttempts.push({
+        provider: provider.name,
+        quality_status: candidate.quality_status,
+        quality_score: candidate.validation?.quality_score || 0,
+        warning_count: candidate.validation?.warnings?.length || 0,
+        evidence_alignment_score: candidate.evidence_alignment_score || 0,
+      });
 
       if (
         candidate.quality_status === "accepted" &&
@@ -213,27 +254,31 @@ const generateTailoredCvBundle = async ({ db, job, apiKey }) => {
       }
     } catch (error) {
       lastError = error;
-      if (!isRetryableProviderError(error)) {
-        continue;
-      }
+      providerAttempts.push({
+        provider: provider.name,
+        error: error.message || String(error),
+        quality_status: "provider_error",
+      });
+      continue;
     }
   }
 
   if (!candidates.length) {
-    throw lastError || new Error("CV generation failed");
+    return buildReferenceFallbackCandidate({
+      optimizedBaseSections: optimizedBaseCvSections,
+      job,
+      roleFamily,
+      evidence,
+      providerAttempts,
+      lastError,
+    });
   }
 
   const bestCandidate = candidates.sort(compareCandidates).at(-1);
   return {
     ...bestCandidate,
-    baseCvSections,
-    provider_attempts: candidates.map((candidate) => ({
-      provider: candidate.provider,
-      quality_status: candidate.quality_status,
-      quality_score: candidate.validation?.quality_score || 0,
-      warning_count: candidate.validation?.warnings?.length || 0,
-      evidence_alignment_score: candidate.evidence_alignment_score || 0,
-    })),
+    baseCvSections: optimizedBaseCvSections,
+    provider_attempts: providerAttempts,
     evidence_context: evidence,
   };
 };

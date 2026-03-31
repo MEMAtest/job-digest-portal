@@ -40,6 +40,16 @@ const TAG_RULES = Object.freeze([
   { tag: 'corporate_clients', pattern: /corporate|institutional|beneficial ownership|entity structures/i },
 ]);
 
+const SUMMARY_BLOCKLIST = [
+  /proven track record/i,
+  /results-driven/i,
+  /strategic thinker/i,
+  /within the/i,
+  /my experience/i,
+  /i deliver/i,
+  /business growth/i,
+];
+
 const ROLE_FAMILY_PATTERNS = Object.freeze([
   { id: 'financial_crime_ops', pattern: /fraud|financial crime|aml|sanctions|transaction monitoring|controls|remediation|screening/i },
   { id: 'fenergo_delivery', pattern: /fenergo/i },
@@ -49,6 +59,15 @@ const ROLE_FAMILY_PATTERNS = Object.freeze([
 ]);
 
 const normalizeText = (value = '') => String(value || '').replace(/\s+/g, ' ').trim();
+const fingerprintText = (value = '') =>
+  normalizeText(value)
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .replace(/\b(the|and|with|across|through|for|at|of|to|in)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+const extractNumbers = (value = '') =>
+  (normalizeText(value).match(/(?:£\s*)?\d[\d,\.]*\+?%?/g) || []).filter((item) => item && !/^\d{4}$/.test(item));
 
 const extractTags = (text = '') => {
   const normalized = normalizeText(text);
@@ -211,6 +230,100 @@ const scoreEvidenceAlignment = (sections = {}, job = {}, options = {}) => {
   return scoreTagOverlap(jobTags, sectionTags);
 };
 
+const scoreSummaryCandidate = (summary = '', job = {}, options = {}) => {
+  const roleFamily = options.roleFamily || inferRoleFamily(job);
+  const jobTags = buildJobTagSet(job, roleFamily);
+  const tags = extractTags(summary);
+  const overlap = scoreTagOverlap(jobTags, tags);
+  const blocked = SUMMARY_BLOCKLIST.some((pattern) => pattern.test(summary));
+  const sentenceCount = normalizeText(summary).split(/(?<=[.!?])\s+/).filter(Boolean).length;
+  const firstPerson = /\b(i|my|me|mine)\b/i.test(summary);
+  return overlap * 5 - (blocked ? 20 : 0) - (firstPerson ? 12 : 0) - (sentenceCount > 4 ? 4 : 0) - (sentenceCount < 3 ? 4 : 0);
+};
+
+const chooseOptimizedSummary = ({ baseSummary = '', referenceSummary = '', job = {}, roleFamily = 'master_default' } = {}) => {
+  const candidates = [
+    { source: 'master', text: baseSummary },
+    ...(referenceSummary ? [{ source: 'reference', text: referenceSummary }] : []),
+  ].map((candidate) => ({
+    ...candidate,
+    score: scoreSummaryCandidate(candidate.text, job, { roleFamily }) + (candidate.source === 'reference' ? 2 : 0),
+  }));
+
+  return candidates.sort((left, right) => left.score - right.score).at(-1) || { source: 'master', text: baseSummary, score: 0 };
+};
+
+const chooseOptimizedAchievements = ({ baseAchievements = [], referenceAchievements = [], job = {}, roleFamily = 'master_default', limit = 5 } = {}) => {
+  const jobTags = buildJobTagSet(job, roleFamily);
+  const pool = [
+    ...baseAchievements.map((text) => ({ source: 'master', text })),
+    ...referenceAchievements.map((text) => ({ source: 'reference', text })),
+  ];
+  const seen = new Set();
+  const seenNumbers = new Set();
+  const ranked = pool
+    .map((item) => {
+      const tags = extractTags(item.text);
+      const overlap = scoreTagOverlap(jobTags, tags);
+      const blocked = /proven track record|results-driven|business growth/i.test(item.text);
+      return {
+        ...item,
+        tags,
+        score: overlap * 5 + (item.source === 'reference' ? 2 : 0) - (blocked ? 20 : 0),
+      };
+    })
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .filter((item) => {
+      const fingerprint = fingerprintText(item.text);
+      if (!fingerprint || seen.has(fingerprint)) return false;
+      seen.add(fingerprint);
+      const numbers = extractNumbers(item.text);
+      if (numbers.length && numbers.every((value) => seenNumbers.has(value))) return false;
+      numbers.forEach((value) => seenNumbers.add(value));
+      return true;
+    });
+
+  const selected = ranked.slice(0, limit).map((item) => item.text);
+  return selected.length ? selected : baseAchievements.slice(0, limit);
+};
+
+const buildOptimizedBaseSections = ({ job = {}, baseSections = {} } = {}) => {
+  const roleFamily = inferRoleFamily(job);
+  const referenceProfile = getCvReferenceProfile(roleFamily);
+  const sections = {
+    ...baseSections,
+    summary: baseSections.summary || '',
+    key_achievements: [...(baseSections.key_achievements || [])],
+  };
+
+  const chosenSummary = chooseOptimizedSummary({
+    baseSummary: baseSections.summary || '',
+    referenceSummary: referenceProfile.summary_reference || '',
+    job,
+    roleFamily,
+  });
+  sections.summary = chosenSummary.text || sections.summary;
+  sections.key_achievements = chooseOptimizedAchievements({
+    baseAchievements: baseSections.key_achievements || [],
+    referenceAchievements: referenceProfile.achievement_references || [],
+    job,
+    roleFamily,
+    limit: 5,
+  });
+  sections.optimisation_notes = {
+    role_family: roleFamily,
+    summary_source: chosenSummary.source,
+    reference_profile: referenceProfile.label,
+  };
+
+  return {
+    roleFamily,
+    referenceProfile,
+    sections,
+  };
+};
+
 module.exports = {
   TAG_RULES,
   EVIDENCE_LIBRARY,
@@ -220,4 +333,5 @@ module.exports = {
   rankEvidenceForJob,
   buildEvidencePromptContext,
   scoreEvidenceAlignment,
+  buildOptimizedBaseSections,
 };
