@@ -1,6 +1,6 @@
 const { getFirestore } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
-const { generateTailoredCvSections } = require("./_cv_generation");
+const { generateTailoredCvSections, hasCvGenerationProvider } = require("./_cv_generation");
 const {
   MASTER_CV_SCHEMA,
   getDefaultBaseCvSections,
@@ -94,6 +94,9 @@ exports.handler = async (event) => {
 
     let tailoredSections = normalizeTailoredCvSections(job.tailored_cv_sections || {});
     if (!tailoredSections || !Object.keys(tailoredSections).length) {
+      if (!hasCvGenerationProvider()) {
+        return withCors({ error: "No CV generation provider configured" }, 500);
+      }
       tailoredSections = await generateTailoredCvSections({
         db,
         job,

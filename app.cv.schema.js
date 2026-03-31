@@ -210,6 +210,16 @@ const COMPETENCY_KEY_BY_ID = Object.freeze(
 );
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
+const FORBIDDEN_PHRASES = [
+  "results-driven",
+  "proven track record",
+  "skilled in",
+  "adept at",
+  "strong understanding",
+  "strong commercial acumen",
+  "data-driven",
+  "strategic thinker",
+];
 
 const hasArrayValue = (value) => Array.isArray(value) && value.some((item) => String(item || "").trim());
 const hasStringValue = (value) => typeof value === "string" && value.trim();
@@ -344,6 +354,7 @@ export const validateCvVariant = ({ baseSections = {}, tailoredSections = {} } =
   const errors = [];
 
   const repeatedNumbers = collectNumbers([
+    resolvedSections.summary,
     ...resolvedSections.key_achievements,
     ...resolvedSections.vistra_bullets,
     ...resolvedSections.ebury_bullets,
@@ -362,6 +373,15 @@ export const validateCvVariant = ({ baseSections = {}, tailoredSections = {} } =
 
   if ((resolvedSections.key_achievements || []).length < 4) {
     warnings.push("Key achievements section is shorter than the master CV");
+  }
+
+  const lowerSummary = String(resolvedSections.summary || "").toLowerCase();
+  const matchedPhrases = FORBIDDEN_PHRASES.filter((phrase) => lowerSummary.includes(phrase));
+  if (matchedPhrases.length) {
+    warnings.push(`Summary contains generic phrasing: ${matchedPhrases.join(", ")}`);
+  }
+  if (String(resolvedSections.summary || "").includes("→")) {
+    warnings.push("Summary contains non-ATS-safe arrow characters");
   }
 
   return {

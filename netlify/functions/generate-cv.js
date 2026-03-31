@@ -1,6 +1,6 @@
 const { getFirestore } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
-const { generateTailoredCvSections } = require("./_cv_generation");
+const { generateTailoredCvSections, hasCvGenerationProvider } = require("./_cv_generation");
 
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return handleOptions();
@@ -17,9 +17,8 @@ exports.handler = async (event) => {
       return withCors({ error: "jobId required" }, 400);
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return withCors({ error: "OpenAI API key not configured" }, 500);
+    if (!hasCvGenerationProvider()) {
+      return withCors({ error: "No CV generation provider configured" }, 500);
     }
 
     const db = getFirestore();
@@ -32,7 +31,7 @@ exports.handler = async (event) => {
     const job = jobDoc.data();
 
     try {
-      const sections = await generateTailoredCvSections({ db, job, apiKey });
+      const sections = await generateTailoredCvSections({ db, job, apiKey: process.env.OPENAI_API_KEY });
 
       // Write back to Firestore
       await db.collection("jobs").doc(jobId).update({

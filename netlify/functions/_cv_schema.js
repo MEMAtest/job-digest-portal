@@ -167,6 +167,17 @@ const MASTER_CV_SCHEMA = Object.freeze({
   governance: ["School Governor | Conway Primary School (2015–2019)"],
 });
 
+const FORBIDDEN_PHRASES = [
+  "results-driven",
+  "proven track record",
+  "skilled in",
+  "adept at",
+  "strong understanding",
+  "strong commercial acumen",
+  "data-driven",
+  "strategic thinker",
+];
+
 const CV_SECTION_DEFS = Object.freeze([
   { key: "summary", label: "Professional Summary", isArray: false },
   { key: "key_achievements", label: "Key Achievements", isArray: true },
@@ -313,6 +324,7 @@ const validateCvVariant = ({ baseSections = {}, tailoredSections = {} } = {}) =>
   const errors = [];
 
   const repeatedNumbers = collectNumbers([
+    resolvedSections.summary,
     ...resolvedSections.key_achievements,
     ...resolvedSections.vistra_bullets,
     ...resolvedSections.ebury_bullets,
@@ -331,6 +343,15 @@ const validateCvVariant = ({ baseSections = {}, tailoredSections = {} } = {}) =>
 
   if ((resolvedSections.key_achievements || []).length < 4) {
     warnings.push("Key achievements section is shorter than the master CV");
+  }
+
+  const lowerSummary = String(resolvedSections.summary || "").toLowerCase();
+  const matchedPhrases = FORBIDDEN_PHRASES.filter((phrase) => lowerSummary.includes(phrase));
+  if (matchedPhrases.length) {
+    warnings.push(`Summary contains generic phrasing: ${matchedPhrases.join(", ")}`);
+  }
+  if (String(resolvedSections.summary || "").includes("→")) {
+    warnings.push("Summary contains non-ATS-safe arrow characters");
   }
 
   return {
