@@ -13,6 +13,7 @@ import {
   safeLocalStorageGet,
   safeLocalStorageSet,
 } from "./app.core.js";
+import { renderInterviewReview, cleanupInterviewReview } from "./app.interview-review.js";
 
 export const buildPrepQa = (job) => {
   const questions = job.prep_questions || [];
@@ -422,12 +423,205 @@ export const openPrepMode = (jobId) => {
 
 export const closePrepMode = () => {
   if (!prepOverlay) return;
+  cleanupInterviewReview();
   prepOverlay.classList.add("hidden");
   document.body.style.overflow = "";
   state.activePrepJob = null;
   if (prepOverlayContent) {
     prepOverlayContent.innerHTML = "";
   }
+};
+
+const getRehearsalKey = (jobId, slug) => `prep_rehearsal_${jobId}_${slug}`;
+
+const renderSpokenAnswers = (container, job) => {
+  if (!job.spoken_intro_60s) {
+    container.innerHTML = `
+      <div class="spoken-empty">
+        <p>No spoken answers generated yet.</p>
+        <button class="btn btn-primary generate-spoken-btn" data-job-id="${escapeHtml(job.id)}">Generate spoken answers</button>
+      </div>
+    `;
+    const btn = container.querySelector(".generate-spoken-btn");
+    if (btn) {
+      btn.addEventListener("click", async () => {
+        btn.textContent = "Generating...";
+        btn.disabled = true;
+        try {
+          const res = await fetch("/.netlify/functions/generate-prep", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jobId: job.id }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Generation failed");
+          // Apply spoken fields directly to the in-memory job object
+          const liveJob = state.jobs.find((j) => j.id === job.id) || job;
+          liveJob.spoken_intro_60s = data.spoken_intro_60s || "";
+          liveJob.spoken_intro_90s = data.spoken_intro_90s || "";
+          liveJob.spoken_why_role = data.spoken_why_role || "";
+          liveJob.spoken_working_style = data.spoken_working_style || "";
+          liveJob.spoken_stories = data.spoken_stories || [];
+          liveJob.power_questions = data.power_questions || [];
+          state.activePrepJob = liveJob;
+          showToast("Spoken answers generated");
+          renderSpokenAnswers(container, liveJob);
+        } catch (err) {
+          showToast("Generation failed: " + err.message);
+          btn.textContent = "Generate spoken answers";
+          btn.disabled = false;
+        }
+      });
+    }
+    return;
+  }
+
+  let introVersion = "60s";
+
+  const getIntroText = () =>
+    introVersion === "90s"
+      ? job.spoken_intro_90s || job.spoken_intro_60s || ""
+      : job.spoken_intro_60s || "";
+
+  const extractHook = (text) => {
+    if (!text) return "";
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+    return sentences.slice(0, 2).join(" ").trim() || text.slice(0, 120);
+  };
+
+  const spokenSection = (titleText, bodyText, slug) => {
+    const hook = extractHook(bodyText);
+    const rehKey = getRehearsalKey(job.id, slug);
+    const count = parseInt(safeLocalStorageGet(rehKey) || "0", 10);
+    return `
+      <div class="spoken-section" data-slug="${escapeHtml(slug)}">
+        <h3 class="spoken-section__title">${escapeHtml(titleText)}</h3>
+        <p class="spoken-section__hook">${formatInlineText(hook)}</p>
+        <button class="spoken-reveal btn btn-secondary">Reveal full answer</button>
+        <div class="spoken-full hidden">${formatInlineText(bodyText)}</div>
+        <div class="spoken-actions">
+          <button class="spoken-copy btn btn-ghost" data-text="${escapeHtml(bodyText)}">Copy</button>
+          <button class="spoken-rehearsed btn btn-ghost" data-key="${escapeHtml(rehKey)}" data-count="${count}">
+            ${count > 0 ? `Rehearsed ${count}&times;` : "Mark rehearsed"}
+          </button>
+        </div>
+      </div>
+    `;
+  };
+
+  const stories = (Array.isArray(job.spoken_stories) ? job.spoken_stories : []).filter(
+    (s) => s && typeof s === "object"
+  );
+  const questions = Array.isArray(job.power_questions) ? job.power_questions : [];
+
+  const storiesHtml = stories
+    .map((s, i) => {
+      const slug = `story-${i}-${slugify(s.title || String(i))}`;
+      const rehKey = getRehearsalKey(job.id, slug);
+      const count = parseInt(safeLocalStorageGet(rehKey) || "0", 10);
+      return `
+        <div class="spoken-section spoken-story" data-slug="${escapeHtml(slug)}">
+          <h3 class="spoken-section__title">${escapeHtml(s.title || `Story ${i + 1}`)}</h3>
+          <p class="spoken-section__hook">${formatInlineText(s.hook || "")}</p>
+          <button class="spoken-reveal btn btn-secondary">Reveal full answer</button>
+          <div class="spoken-full hidden">${formatInlineText(s.full || "")}</div>
+          <div class="spoken-actions">
+            <button class="spoken-copy btn btn-ghost" data-text="${escapeHtml(s.full || "")}">Copy</button>
+            <button class="spoken-rehearsed btn btn-ghost" data-key="${escapeHtml(rehKey)}" data-count="${count}">
+              ${count > 0 ? `Rehearsed ${count}&times;` : "Mark rehearsed"}
+            </button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  const questionsHtml = questions.length
+    ? `
+      <div class="spoken-questions">
+        <h3 class="spoken-section__title">Questions to ask</h3>
+        <ol class="spoken-questions__list">
+          ${questions.map((q) => `<li>${formatInlineText(q)}</li>`).join("")}
+        </ol>
+      </div>
+    `
+    : "";
+
+  container.innerHTML = `
+    <div class="spoken-answers">
+      <div class="spoken-section spoken-intro" data-slug="intro">
+        <h3 class="spoken-section__title">Tell me about yourself</h3>
+        <div class="spoken-intro__toggle">
+          <button class="btn btn-ghost spoken-toggle ${introVersion === "60s" ? "spoken-toggle--active" : ""}" data-version="60s">60s</button>
+          <button class="btn btn-ghost spoken-toggle ${introVersion === "90s" ? "spoken-toggle--active" : ""}" data-version="90s">90s</button>
+        </div>
+        <p class="spoken-section__hook spoken-intro__hook">${formatInlineText(extractHook(getIntroText()))}</p>
+        <button class="spoken-reveal btn btn-secondary">Reveal full answer</button>
+        <div class="spoken-full hidden spoken-intro__full">${formatInlineText(getIntroText())}</div>
+        <div class="spoken-actions">
+          <button class="spoken-copy btn btn-ghost spoken-intro__copy" data-text="${escapeHtml(getIntroText())}">Copy</button>
+          ${(() => {
+            const introRehCount = parseInt(safeLocalStorageGet(getRehearsalKey(job.id, "intro")) || "0", 10);
+            return `<button class="spoken-rehearsed btn btn-ghost" data-key="${escapeHtml(getRehearsalKey(job.id, "intro"))}" data-count="${introRehCount}">${introRehCount > 0 ? `Rehearsed ${introRehCount}&times;` : "Mark rehearsed"}</button>`;
+          })()}
+        </div>
+      </div>
+      ${job.spoken_why_role ? spokenSection("Why this role?", job.spoken_why_role, "why-role") : ""}
+      ${job.spoken_working_style ? spokenSection("How do you work with teams?", job.spoken_working_style, "working-style") : ""}
+      ${stories.length ? `<h2 class="spoken-heading">Stories</h2>${storiesHtml}` : ""}
+      ${questionsHtml}
+    </div>
+  `;
+
+  // 60s/90s toggle
+  container.querySelectorAll(".spoken-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      introVersion = btn.dataset.version;
+      container.querySelectorAll(".spoken-toggle").forEach((b) =>
+        b.classList.toggle("spoken-toggle--active", b.dataset.version === introVersion)
+      );
+      const newText = getIntroText();
+      const hookEl = container.querySelector(".spoken-intro__hook");
+      const fullEl = container.querySelector(".spoken-intro__full");
+      const copyBtn = container.querySelector(".spoken-intro__copy");
+      const revealBtn = container.querySelector(".spoken-section.spoken-intro .spoken-reveal");
+      if (hookEl) hookEl.innerHTML = formatInlineText(extractHook(newText));
+      if (fullEl) { fullEl.innerHTML = formatInlineText(newText); fullEl.classList.add("hidden"); }
+      if (revealBtn) revealBtn.classList.remove("hidden");
+      if (copyBtn) copyBtn.dataset.text = newText;
+    });
+  });
+
+  // Reveal buttons
+  container.querySelectorAll(".spoken-reveal").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const section = btn.closest(".spoken-section");
+      const fullEl = section && section.querySelector(".spoken-full");
+      if (fullEl) {
+        fullEl.classList.remove("hidden");
+        btn.classList.add("hidden");
+      }
+    });
+  });
+
+  // Copy buttons
+  container.querySelectorAll(".spoken-copy").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      copyToClipboard(btn.dataset.text || "");
+      showToast("Copied");
+    });
+  });
+
+  // Rehearsed buttons
+  container.querySelectorAll(".spoken-rehearsed").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      const newCount = (parseInt(btn.dataset.count || "0", 10) + 1);
+      safeLocalStorageSet(key, String(newCount));
+      btn.dataset.count = String(newCount);
+      btn.innerHTML = `Rehearsed ${newCount}&times;`;
+    });
+  });
 };
 
 const renderCheatSheet = (container, job) => {
@@ -503,9 +697,150 @@ const renderCheatSheet = (container, job) => {
   }
 };
 
+const ratingLabel = (rating) => {
+  const map = { strong: "Strong", adequate: "Adequate", weak: "Weak", missed: "Missed" };
+  return map[rating] || "Adequate";
+};
+
+const renderDebrief = (container, job) => {
+  // State C — analysis exists (non-empty questions array)
+  if (Array.isArray(job.debrief_questions) && job.debrief_questions.length > 0) {
+    const strengths = Array.isArray(job.debrief_strengths) ? job.debrief_strengths : [];
+    const focus = Array.isArray(job.debrief_round2_focus) ? job.debrief_round2_focus : [];
+    const watchOuts = Array.isArray(job.debrief_watch_outs) ? job.debrief_watch_outs : [];
+
+    const toList = (items) =>
+      items.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
+
+    const questionCards = job.debrief_questions
+      .map((q, i) => {
+        const rating = q.rating || "adequate";
+        return `
+          <div class="debrief-card">
+            <div class="debrief-card__header">
+              <span class="debrief-rating debrief-rating--${escapeHtml(rating)}">${ratingLabel(rating)}</span>
+              <div class="debrief-card__question">${escapeHtml(q.question || "")}</div>
+            </div>
+            <p class="debrief-card__summary">${formatInlineText(q.your_answer_summary || "")}</p>
+            <button class="spoken-reveal btn btn-secondary">See improved answer ▼</button>
+            <div class="spoken-full hidden debrief-improved-wrap">
+              <div class="debrief-improved">${formatInlineText(q.improved_answer || "")}</div>
+              <div class="debrief-why-better">${escapeHtml(q.why_better || "")}</div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    container.innerHTML = `
+      <div class="debrief-results">
+        <div class="debrief-summary-grid">
+          ${strengths.length ? `<div class="debrief-strengths"><h4>What landed well</h4><ul>${toList(strengths)}</ul></div>` : ""}
+          ${focus.length ? `<div class="debrief-focus"><h4>Round 2 focus</h4><ul>${toList(focus)}</ul></div>` : ""}
+          ${watchOuts.length ? `<div class="debrief-watchouts"><h4>Watch outs</h4><ul>${toList(watchOuts)}</ul></div>` : ""}
+        </div>
+        <p class="debrief-questions-heading">Questions asked (${job.debrief_questions.length})</p>
+        ${questionCards}
+        <div class="debrief-reanalyse-row">
+          <button class="btn btn-secondary debrief-reanalyse-btn">Re-analyse with new transcript</button>
+        </div>
+      </div>
+    `;
+
+    container.querySelectorAll(".spoken-reveal").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const card = btn.closest(".debrief-card");
+        const fullEl = card && card.querySelector(".spoken-full");
+        if (fullEl) {
+          fullEl.classList.remove("hidden");
+          btn.classList.add("hidden");
+        }
+      });
+    });
+
+    const reanalyseBtn = container.querySelector(".debrief-reanalyse-btn");
+    if (reanalyseBtn) {
+      reanalyseBtn.addEventListener("click", () => {
+        const savedTranscript = job.debrief_transcript || "";
+        renderDebriefInputState(container, job, savedTranscript);
+      });
+    }
+    return;
+  }
+
+  // State B — transcript saved but analysis did not complete or returned empty (e.g. GPT error, page refresh mid-flight)
+  if (job.debrief_transcript) {
+    container.innerHTML = `
+      <div class="debrief-empty">
+        <p>Transcript saved, but the analysis did not complete. Click Re-analyse to retry.</p>
+        <button class="btn btn-secondary debrief-reanalyse-btn">Re-analyse</button>
+      </div>
+    `;
+    const btn = container.querySelector(".debrief-reanalyse-btn");
+    if (btn) {
+      btn.addEventListener("click", () => {
+        renderDebriefInputState(container, job, job.debrief_transcript || "");
+      });
+    }
+    return;
+  }
+
+  // State A — no transcript yet
+  renderDebriefInputState(container, job, "");
+};
+
+const renderDebriefInputState = (container, job, prefillTranscript) => {
+  container.innerHTML = `
+    <div class="debrief-empty">
+      <p>Paste your interview transcript below and click Analyse to get question-by-question feedback, improved answers, and round 2 focus areas.</p>
+      <textarea class="debrief-textarea" rows="12" placeholder="Paste the full interview transcript here…">${escapeHtml(prefillTranscript)}</textarea>
+      <button class="btn btn-primary debrief-analyse-btn" data-job-id="${escapeHtml(job.id)}">Analyse interview</button>
+    </div>
+  `;
+
+  const btn = container.querySelector(".debrief-analyse-btn");
+  const textarea = container.querySelector(".debrief-textarea");
+  if (btn) {
+    btn.addEventListener("click", async () => {
+      const transcript = (textarea && textarea.value.trim()) || "";
+      if (!transcript) {
+        showToast("Please paste a transcript first.");
+        return;
+      }
+      btn.textContent = "Analysing…";
+      btn.disabled = true;
+      try {
+        const res = await fetch("/.netlify/functions/generate-prep-from-transcript", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId: job.id, transcript }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Analysis failed");
+        const liveJob = state.jobs.find((j) => j.id === job.id) || job;
+        liveJob.debrief_transcript = transcript;
+        liveJob.debrief_questions = data.debrief_questions || [];
+        liveJob.debrief_round2_focus = data.debrief_round2_focus || [];
+        liveJob.debrief_watch_outs = data.debrief_watch_outs || [];
+        liveJob.debrief_strengths = data.debrief_strengths || [];
+        liveJob.debrief_analyzed_at = data.debrief_analyzed_at || "";
+        state.activePrepJob = liveJob;
+        showToast("Debrief complete");
+        renderDebrief(container, liveJob);
+      } catch (err) {
+        showToast("Analysis failed: " + err.message);
+        btn.textContent = "Analyse interview";
+        btn.disabled = false;
+      }
+    });
+  }
+};
+
 export const switchPrepTab = (tabName) => {
   const job = state.activePrepJob;
   if (!job || !prepOverlayContent) return;
+
+  if (tabName !== "review") cleanupInterviewReview();
 
   document.querySelectorAll(".prep-tab").forEach((btn) => {
     btn.classList.toggle("prep-tab--active", btn.dataset.prepTab === tabName);
@@ -513,6 +848,12 @@ export const switchPrepTab = (tabName) => {
 
   if (tabName === "cheatsheet") {
     renderCheatSheet(prepOverlayContent, job);
+  } else if (tabName === "spoken") {
+    renderSpokenAnswers(prepOverlayContent, job);
+  } else if (tabName === "review") {
+    renderInterviewReview(prepOverlayContent, job);
+  } else if (tabName === "debrief") {
+    renderDebrief(prepOverlayContent, job);
   } else if (tabName === "flashcards") {
     const items = buildStudyDeckItems(job);
     const deckItems = items.length ? items : buildFallbackDeckItems(job);

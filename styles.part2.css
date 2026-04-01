@@ -780,6 +780,134 @@
   margin-bottom: 8px;
 }
 
+/* Spoken Answers */
+.spoken-answers {
+  padding: 16px 0;
+}
+
+.spoken-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: #64748b;
+}
+
+.spoken-empty p {
+  margin-bottom: 16px;
+}
+
+.spoken-heading {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #4f46e5;
+  margin: 28px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.spoken-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.spoken-section__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 10px;
+}
+
+.spoken-intro__toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.spoken-toggle {
+  font-size: 12px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.spoken-toggle--active {
+  background: #4f46e5;
+  color: #fff;
+  border-color: #4f46e5;
+}
+
+.spoken-toggle--active:hover {
+  background: #4338ca;
+}
+
+.spoken-section__hook {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #1e293b;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.spoken-full {
+  font-size: 14px;
+  line-height: 1.75;
+  color: #334155;
+  margin: 12px 0;
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.spoken-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-ghost:hover {
+  background: #f1f5f9;
+}
+
+.spoken-questions {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.spoken-questions__list {
+  margin: 10px 0 0 0;
+  padding-left: 20px;
+}
+
+.spoken-questions__list li {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
 /* Cheat sheet */
 .cheatsheet__section {
   margin-bottom: 20px;
