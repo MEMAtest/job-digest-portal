@@ -266,10 +266,12 @@ const chooseOptimizedAchievements = ({ baseAchievements = [], referenceAchieveme
       const tags = extractTags(item.text);
       const overlap = scoreTagOverlap(jobTags, tags);
       const blocked = /proven track record|results-driven|business growth/i.test(item.text);
+      const numbers = extractNumbers(item.text);
       return {
         ...item,
         tags,
-        score: overlap * 5 + (item.source === 'reference' ? 2 : 0) - (blocked ? 20 : 0),
+        numbers,
+        score: overlap * 5 + (item.source === 'reference' ? 2 : 0) + numbers.length - (blocked ? 20 : 0),
       };
     })
     .filter((item) => item.score > 0)
@@ -278,13 +280,34 @@ const chooseOptimizedAchievements = ({ baseAchievements = [], referenceAchieveme
       const fingerprint = fingerprintText(item.text);
       if (!fingerprint || seen.has(fingerprint)) return false;
       seen.add(fingerprint);
-      const numbers = extractNumbers(item.text);
-      if (numbers.length && numbers.every((value) => seenNumbers.has(value))) return false;
-      numbers.forEach((value) => seenNumbers.add(value));
+      if (item.numbers.length && item.numbers.every((value) => seenNumbers.has(value))) return false;
+      item.numbers.forEach((value) => seenNumbers.add(value));
       return true;
     });
 
   const selected = ranked.slice(0, limit).map((item) => item.text);
+  if (selected.length < limit) {
+    const selectedFingerprints = new Set(selected.map((item) => fingerprintText(item)));
+    const remaining = pool
+      .map((item) => ({
+        ...item,
+        score:
+          scoreTagOverlap(jobTags, extractTags(item.text)) * 4 +
+          extractNumbers(item.text).filter((value) => !seenNumbers.has(value)).length * 3 +
+          (item.source === 'reference' ? 1 : 0),
+      }))
+      .sort((left, right) => right.score - left.score)
+      .filter((item) => {
+        const fingerprint = fingerprintText(item.text);
+        return fingerprint && !selectedFingerprints.has(fingerprint);
+      });
+
+    for (const item of remaining) {
+      selected.push(item.text);
+      selectedFingerprints.add(fingerprintText(item.text));
+      if (selected.length >= limit) break;
+    }
+  }
   return selected.length ? selected : baseAchievements.slice(0, limit);
 };
 
