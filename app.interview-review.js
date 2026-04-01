@@ -243,7 +243,7 @@ const renderUploadUi = (container, job) => {
     <div class="ir-upload">
       <div class="ir-upload-icon">🎙️</div>
       <h3>Upload interview recording</h3>
-      <p>Upload an audio or video file of your interview. It will be transcribed and analysed against your CV and this role.</p>
+      <p>Upload a recording to get a transcript, score breakdown and specific next-round prep against your CV and this role.</p>
       <label class="ir-file-label btn btn-primary">
         Choose file
         <input type="file" class="ir-file-input" accept="audio/*,video/mp4" style="display:none">

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "apply-assistant": "node scripts/apply-assistant/server.mjs",
+    "validate:prep-language": "node scripts/validate-prep-language.mjs",
     "validate:cv-builder": "node scripts/validate-cv-builder.mjs",
     "test:smoke": "node scripts/smoke-e2e.mjs",
     "test:smoke:prod": "node scripts/smoke-e2e.mjs --url=https://adejob.netlify.app/",

@@ -438,7 +438,7 @@ const renderSpokenAnswers = (container, job) => {
   if (!job.spoken_intro_60s) {
     container.innerHTML = `
       <div class="spoken-empty">
-        <p>No spoken answers generated yet.</p>
+        <p>No spoken answers yet. Generate natural interview answers you can actually rehearse.</p>
         <button class="btn btn-primary generate-spoken-btn" data-job-id="${escapeHtml(job.id)}">Generate spoken answers</button>
       </div>
     `;
@@ -792,7 +792,7 @@ const renderDebrief = (container, job) => {
 const renderDebriefInputState = (container, job, prefillTranscript) => {
   container.innerHTML = `
     <div class="debrief-empty">
-      <p>Paste your interview transcript below and click Analyse to get question-by-question feedback, improved answers, and round 2 focus areas.</p>
+      <p>Paste the transcript to get question-by-question feedback, stronger spoken answers and specific round-two prep.</p>
       <textarea class="debrief-textarea" rows="12" placeholder="Paste the full interview transcript here…">${escapeHtml(prefillTranscript)}</textarea>
       <button class="btn btn-primary debrief-analyse-btn" data-job-id="${escapeHtml(job.id)}">Analyse interview</button>
     </div>
