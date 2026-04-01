@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v17';
+const CACHE_VERSION = 'v18';
 const CACHE_NAME = `job-digest-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -19,6 +19,7 @@ const APP_SHELL = [
   '/app.dashboard.js',
   '/app.notifications.js',
   '/app.prep.js',
+  '/app.learn.js',
   '/app.triage.js',
   '/app.settings.js',
   '/config.js',
