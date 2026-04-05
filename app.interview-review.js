@@ -3,6 +3,7 @@ import { getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.
 import {
   getStorage,
   ref,
+  setMaxUploadRetryTime,
   uploadBytesResumable,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 import {
@@ -12,6 +13,7 @@ import {
 
 const ACCEPTED_TYPES = ["audio/mp4", "audio/m4a", "audio/mpeg", "audio/wav", "audio/webm", "video/mp4"];
 const MAX_SIZE_MB = 200;
+const MAX_UPLOAD_RETRY_MS = 10000;
 
 let _unsubscribe = null;
 
@@ -175,7 +177,7 @@ const startPolling = (container, job) => {
   });
 };
 
-const triggerAnalysis = async (container, job, storagePath) => {
+const triggerAnalysis = async (container, job, storagePath, storageBucket = "") => {
   renderProcessing(container, "Transcribing and analysing…");
   startPolling(container, job);
 
@@ -183,7 +185,7 @@ const triggerAnalysis = async (container, job, storagePath) => {
     const response = await fetch("/.netlify/functions/analyse-interview-background", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobId: job.id, storagePath }),
+      body: JSON.stringify({ jobId: job.id, storagePath, storageBucket }),
     });
     if (!response.ok) {
       const message = await response.text();
@@ -204,11 +206,23 @@ const triggerAnalysis = async (container, job, storagePath) => {
   }
 };
 
+const getStorageBucketCandidates = () => {
+  const app = getApp();
+  const configuredBucket = String(app.options?.storageBucket || window.FIREBASE_CONFIG?.storageBucket || "").trim();
+  const projectId = String(app.options?.projectId || window.FIREBASE_CONFIG?.projectId || "").trim();
+  const candidates = [
+    configuredBucket,
+    projectId ? `${projectId}.appspot.com` : "",
+    projectId ? `${projectId}.firebasestorage.app` : "",
+  ]
+    .map((bucket) => bucket.replace(/^gs:\/\//, ""))
+    .filter(Boolean);
+
+  return Array.from(new Set(candidates));
+};
+
 const uploadAndAnalyse = async (container, job, file) => {
-  const storage = getStorage(getApp());
   const path = `interviews/${job.id}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-  const storageRef = ref(storage, path);
-  const uploadTask = uploadBytesResumable(storageRef, file);
 
   container.innerHTML = `
     <div class="ir-uploading">
@@ -218,23 +232,42 @@ const uploadAndAnalyse = async (container, job, file) => {
     </div>
   `;
 
-  uploadTask.on(
-    "state_changed",
-    (snapshot) => {
-      const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-      const fill = container.querySelector(".ir-progress-fill");
-      const label = container.querySelector(".ir-progress-pct");
-      if (fill) fill.style.width = `${pct}%`;
-      if (label) label.textContent = `${pct}%`;
-    },
-    (err) => {
-      showToast("Upload failed: " + err.message);
-      renderUploadUi(container, job);
-    },
-    async () => {
-      await triggerAnalysis(container, job, path);
+  const updateProgress = (snapshot) => {
+    const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+    const fill = container.querySelector(".ir-progress-fill");
+    const label = container.querySelector(".ir-progress-pct");
+    if (fill) fill.style.width = `${pct}%`;
+    if (label) label.textContent = `${pct}%`;
+  };
+
+  const bucketCandidates = getStorageBucketCandidates();
+  let lastError = null;
+
+  for (const bucketName of bucketCandidates) {
+    try {
+      const storage = getStorage(getApp(), `gs://${bucketName}`);
+      setMaxUploadRetryTime(storage, MAX_UPLOAD_RETRY_MS);
+      const storageRef = ref(storage, path);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      await new Promise((resolve, reject) => {
+        uploadTask.on(
+          "state_changed",
+          updateProgress,
+          (err) => reject(err),
+          () => resolve()
+        );
+      });
+
+      await triggerAnalysis(container, job, path, bucketName);
+      return;
+    } catch (error) {
+      lastError = error;
     }
-  );
+  }
+
+  showToast("Upload failed: " + (lastError?.message || "Unknown error"));
+  renderUploadUi(container, job);
 };
 
 const renderUploadUi = (container, job) => {

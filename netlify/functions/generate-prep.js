@@ -6,21 +6,10 @@ const {
   buildRetryFeedback,
   chooseBetterCandidate,
 } = require("./_prep_language_validator");
-const OpenAI = require("openai");
-
-const OPENAI_MODEL = process.env.OPENAI_PREP_MODEL || "gpt-4o";
-
-const getPrepProvider = () => {
-  if (!process.env.OPENAI_API_KEY) {
-    return null;
-  }
-  return {
-    name: "openai",
-    apiKey: process.env.OPENAI_API_KEY,
-    model: OPENAI_MODEL,
-    clientOptions: {},
-  };
-};
+const {
+  buildTextProviders,
+  generateTextWithProvider,
+} = require("./_prep_ai");
 
 const buildSpokenPrompt = ({ profileText, job, retryFeedback = "" }) => {
   const retrySection = retryFeedback
@@ -110,28 +99,7 @@ const normalizeSpokenPayload = (payload) => ({
     .filter(Boolean),
 });
 
-const generateWithProvider = async ({ provider, prompt }) => {
-  const client = new OpenAI({
-    apiKey: provider.apiKey,
-    ...provider.clientOptions,
-  });
-
-  const response = await client.chat.completions.create({
-    model: provider.model,
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.35,
-    max_tokens: 5000,
-    response_format: { type: "json_object" },
-  });
-
-  const text = response.choices[0]?.message?.content || "";
-  if (!text) {
-    throw new Error(`No response content from ${provider.name}`);
-  }
-  return text;
-};
-
-const buildStoredSpokenPayload = ({ spoken, validation, provider, attemptCount }) => ({
+const buildStoredSpokenPayload = ({ spoken, validation, providerName, attemptCount, providerAttempts }) => ({
   spoken_intro_60s: spoken.spoken_intro_60s || "",
   spoken_intro_90s: spoken.spoken_intro_90s || "",
   spoken_why_role: spoken.spoken_why_role || "",
@@ -141,7 +109,8 @@ const buildStoredSpokenPayload = ({ spoken, validation, provider, attemptCount }
   prep_quality_status: validation.decision === "accept" && attemptCount > 1 ? "retried" : validation.decision,
   prep_quality_notes: [...(validation.errors || []), ...(validation.warnings || [])].slice(0, 12),
   prep_quality_score: validation.quality_score || 0,
-  prep_provider: provider.name,
+  prep_provider: providerName,
+  prep_provider_attempts: providerAttempts || [],
 });
 
 exports.handler = async (event) => {
@@ -159,8 +128,8 @@ exports.handler = async (event) => {
       return withCors({ error: "jobId required" }, 400);
     }
 
-    const provider = getPrepProvider();
-    if (!provider) {
+    const providers = buildTextProviders();
+    if (!providers.length) {
       return withCors({ error: "No prep generation provider configured" }, 500);
     }
 
@@ -179,28 +148,53 @@ exports.handler = async (event) => {
 
     const candidates = [];
     let lastError = null;
-    let retryFeedback = "";
+    const providerAttempts = [];
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      try {
-        const prompt = buildSpokenPrompt({ profileText, job, retryFeedback });
-        const text = await generateWithProvider({ provider, prompt });
-        const spoken = normalizeSpokenPayload(parseSpokenFromText(text));
-        const validation = validateSpokenPayload(spoken, {
-          jobRole: job.role || "",
-          jobCompany: job.company || "",
-        });
+    for (const provider of providers) {
+      let retryFeedback = "";
 
-        candidates.push({ spoken, validation, attempt });
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          const prompt = buildSpokenPrompt({ profileText, job, retryFeedback });
+          const text = await generateTextWithProvider({
+            provider,
+            prompt,
+            temperature: 0.35,
+            maxTokens: 5000,
+          });
+          const spoken = normalizeSpokenPayload(parseSpokenFromText(text));
+          const validation = validateSpokenPayload(spoken, {
+            jobRole: job.role || "",
+            jobCompany: job.company || "",
+          });
 
-        if (validation.decision === "accept") {
-          break;
+          candidates.push({ spoken, validation, attempt, providerName: provider.name });
+          providerAttempts.push({
+            provider: provider.name,
+            attempt,
+            decision: validation.decision,
+            quality_score: validation.quality_score || 0,
+          });
+
+          if (validation.decision === "accept" && (validation.quality_score || 0) >= 88) {
+            break;
+          }
+
+          retryFeedback = buildRetryFeedback(validation);
+        } catch (error) {
+          lastError = error;
+          providerAttempts.push({
+            provider: provider.name,
+            attempt,
+            error: error.message || String(error),
+          });
+          retryFeedback = `- Provider error on previous attempt: ${error.message || String(error)}`;
         }
+      }
 
-        retryFeedback = buildRetryFeedback(validation);
-      } catch (error) {
-        lastError = error;
-        retryFeedback = `- Provider error on previous attempt: ${error.message || String(error)}`;
+      const currentBest = candidates.sort(chooseBetterCandidate).at(-1);
+      if (currentBest?.validation?.decision === "accept" && (currentBest.validation?.quality_score || 0) >= 90) {
+        break;
       }
     }
 
@@ -229,8 +223,9 @@ exports.handler = async (event) => {
     const stored = buildStoredSpokenPayload({
       spoken: bestCandidate.spoken,
       validation: bestCandidate.validation,
-      provider,
+      providerName: bestCandidate.providerName,
       attemptCount: bestCandidate.attempt,
+      providerAttempts,
     });
 
     await db.collection("jobs").doc(jobId).update({

@@ -1,19 +1,35 @@
 const admin = require("firebase-admin");
 
-const initApp = () => {
-  if (admin.apps.length) return;
-
+const parseServiceAccount = () => {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_JSON");
 
-  let creds;
   try {
-    creds = JSON.parse(raw);
+    return JSON.parse(raw);
   } catch {
     throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON");
   }
+};
 
-  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || creds.storageBucket || "jobsapp-3a2e2.firebasestorage.app";
+const buildStorageBucketCandidates = (creds) => {
+  const projectId = creds.project_id || creds.projectId || "";
+  const candidates = [
+    process.env.FIREBASE_STORAGE_BUCKET,
+    creds.storageBucket,
+    projectId ? `${projectId}.appspot.com` : "",
+    projectId ? `${projectId}.firebasestorage.app` : "",
+  ]
+    .map((value) => String(value || "").trim().replace(/^gs:\/\//, ""))
+    .filter(Boolean);
+
+  return Array.from(new Set(candidates));
+};
+
+const initApp = () => {
+  if (admin.apps.length) return;
+
+  const creds = parseServiceAccount();
+  const storageBucket = buildStorageBucketCandidates(creds)[0];
 
   admin.initializeApp({
     credential: admin.credential.cert(creds),
@@ -26,9 +42,15 @@ const getFirestore = () => {
   return admin.firestore();
 };
 
-const getStorageBucket = () => {
+const getStorageBucket = (bucketName = "") => {
   initApp();
-  return admin.storage().bucket();
+  const normalized = String(bucketName || "").trim().replace(/^gs:\/\//, "");
+  return normalized ? admin.storage().bucket(normalized) : admin.storage().bucket();
 };
 
-module.exports = { getFirestore, getStorageBucket };
+const getStorageBucketCandidates = () => {
+  const creds = parseServiceAccount();
+  return buildStorageBucketCandidates(creds);
+};
+
+module.exports = { getFirestore, getStorageBucket, getStorageBucketCandidates };

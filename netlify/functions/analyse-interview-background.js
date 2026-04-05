@@ -1,13 +1,16 @@
-const { getFirestore, getStorageBucket } = require("./_firebase");
+const { getFirestore, getStorageBucket, getStorageBucketCandidates } = require("./_firebase");
 const { loadCvProfileText } = require("./_cv_generation");
 const {
   validateInterviewAnalysisPayload,
   buildRetryFeedback,
   chooseBetterCandidate,
 } = require("./_prep_language_validator");
-const { default: OpenAI, toFile } = require("openai");
-
-const OPENAI_MODEL = process.env.OPENAI_PREP_MODEL || "gpt-4o";
+const {
+  buildTextProviders,
+  buildTranscriptionProviders,
+  generateTextWithProvider,
+  transcribeAudioWithProvider,
+} = require("./_prep_ai");
 
 const ANALYSIS_DIMENSIONS = [
   "Domain knowledge",
@@ -124,40 +127,123 @@ const normalizeAnalysis = (payload) => ({
   core_gap_summary: String(payload?.core_gap_summary || "").trim(),
 });
 
-const getClient = () => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
-  return new OpenAI({ apiKey });
-};
+const downloadInterviewFile = async ({ storagePath, storageBucketName = "" }) => {
+  const candidates = storageBucketName
+    ? [storageBucketName, ...getStorageBucketCandidates().filter((name) => name !== storageBucketName)]
+    : getStorageBucketCandidates();
+  let lastError = null;
 
-const generateAnalysis = async ({ openai, transcript, profileText, job }) => {
-  const candidates = [];
-  let retryFeedback = "";
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    const chatRes = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
-      messages: [{ role: "user", content: buildAnalysisPrompt({ transcript, profileText, job, retryFeedback }) }],
-      temperature: 0.25,
-      max_tokens: 3000,
-      response_format: { type: "json_object" },
-    });
-
-    const parsed = normalizeAnalysis(parseJson(chatRes.choices[0]?.message?.content || "{}"));
-    const validation = validateInterviewAnalysisPayload(parsed, {
-      jobRole: job.role || "",
-      jobCompany: job.company || "",
-    });
-    candidates.push({ analysis: parsed, validation, attempt });
-
-    if (validation.decision === "accept") {
-      break;
+  for (const bucketName of candidates) {
+    try {
+      const file = getStorageBucket(bucketName).file(storagePath);
+      const [buffer] = await file.download();
+      return { buffer, bucketName };
+    } catch (error) {
+      lastError = error;
     }
-
-    retryFeedback = buildRetryFeedback(validation);
   }
 
-  return candidates.sort(chooseBetterCandidate).at(-1);
+  throw lastError || new Error("Interview recording could not be downloaded from storage");
+};
+
+const transcribeInterview = async ({ buffer, storagePath }) => {
+  const providers = buildTranscriptionProviders();
+  if (!providers.length) {
+    throw new Error("No transcription provider configured");
+  }
+
+  let lastError = null;
+  const attempts = [];
+
+  for (const provider of providers) {
+    try {
+      const transcript = await transcribeAudioWithProvider({
+        provider,
+        buffer,
+        fileName: storagePath.split("/").pop() || "interview.m4a",
+        mimeType: "audio/mp4",
+        language: "en",
+      });
+      attempts.push({ provider: provider.name, status: "success" });
+      return { transcript, providerName: provider.name, attempts };
+    } catch (error) {
+      lastError = error;
+      attempts.push({
+        provider: provider.name,
+        status: "error",
+        error: error.message || String(error),
+      });
+    }
+  }
+
+  throw new Error(lastError?.message || "Interview transcription failed");
+};
+
+const generateAnalysis = async ({ transcript, profileText, job }) => {
+  const providers = buildTextProviders();
+  if (!providers.length) {
+    throw new Error("No prep generation provider configured");
+  }
+
+  const candidates = [];
+  const providerAttempts = [];
+  let lastError = null;
+
+  for (const provider of providers) {
+    let retryFeedback = "";
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const text = await generateTextWithProvider({
+          provider,
+          prompt: buildAnalysisPrompt({ transcript, profileText, job, retryFeedback }),
+          temperature: 0.25,
+          maxTokens: 3000,
+        });
+
+        const parsed = normalizeAnalysis(parseJson(text || "{}"));
+        const validation = validateInterviewAnalysisPayload(parsed, {
+          jobRole: job.role || "",
+          jobCompany: job.company || "",
+        });
+        candidates.push({ analysis: parsed, validation, attempt, providerName: provider.name });
+        providerAttempts.push({
+          provider: provider.name,
+          attempt,
+          decision: validation.decision,
+          quality_score: validation.quality_score || 0,
+        });
+
+        if (validation.decision === "accept" && (validation.quality_score || 0) >= 88) {
+          break;
+        }
+
+        retryFeedback = buildRetryFeedback(validation);
+      } catch (error) {
+        lastError = error;
+        providerAttempts.push({
+          provider: provider.name,
+          attempt,
+          error: error.message || String(error),
+        });
+        retryFeedback = `- Provider error on previous attempt: ${error.message || String(error)}`;
+      }
+    }
+
+    const currentBest = candidates.sort(chooseBetterCandidate).at(-1);
+    if (currentBest?.validation?.decision === "accept" && (currentBest.validation?.quality_score || 0) >= 90) {
+      break;
+    }
+  }
+
+  if (!candidates.length) {
+    throw new Error(lastError?.message || "Interview analysis generation failed");
+  }
+
+  return {
+    bestCandidate: candidates.sort(chooseBetterCandidate).at(-1),
+    providerAttempts,
+  };
 };
 
 exports.handler = async (event) => {
@@ -165,10 +251,12 @@ exports.handler = async (event) => {
 
   let jobId;
   let storagePath;
+  let storageBucketName;
   try {
     const payload = JSON.parse(event.body || "{}");
     jobId = payload.jobId;
     storagePath = payload.storagePath;
+    storageBucketName = payload.storageBucket;
   } catch {
     return { statusCode: 400, body: "Bad request" };
   }
@@ -182,30 +270,15 @@ exports.handler = async (event) => {
   try {
     await jobRef.update({ interview_status: "processing", interview_updated_at: new Date().toISOString() });
 
-    const bucket = getStorageBucket();
-    const file = bucket.file(storagePath);
-    const [buffer] = await file.download();
-
-    const openai = getClient();
-    const audioFile = await toFile(
-      buffer,
-      storagePath.split("/").pop() || "interview.m4a",
-      { type: "audio/mp4" }
-    );
-
-    const transcriptionRes = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: "whisper-1",
-      language: "en",
-    });
-    const transcript = transcriptionRes.text || "";
+    const { buffer, bucketName } = await downloadInterviewFile({ storagePath, storageBucketName });
+    const transcriptionResult = await transcribeInterview({ buffer, storagePath });
+    const transcript = transcriptionResult.transcript || "";
 
     const jobDoc = await jobRef.get();
     const job = jobDoc.exists ? jobDoc.data() : {};
     const profileText = await loadCvProfileText(db);
 
-    const bestCandidate = await generateAnalysis({
-      openai,
+    const { bestCandidate, providerAttempts } = await generateAnalysis({
       transcript,
       profileText,
       job,
@@ -233,10 +306,15 @@ exports.handler = async (event) => {
       interview_transcript: transcript,
       interview_analysis: bestCandidate.analysis,
       interview_storage_path: storagePath,
+      interview_storage_bucket: bucketName,
       interview_status: "done",
       interview_quality_status: qualityStatus,
       interview_quality_notes: [...(bestCandidate.validation.errors || []), ...(bestCandidate.validation.warnings || [])].slice(0, 12),
       interview_quality_score: bestCandidate.validation.quality_score || 0,
+      interview_analysis_provider: bestCandidate.providerName,
+      interview_analysis_provider_attempts: providerAttempts,
+      interview_transcription_provider: transcriptionResult.providerName,
+      interview_transcription_attempts: transcriptionResult.attempts,
       interview_analysed_at: new Date().toISOString(),
       interview_updated_at: new Date().toISOString(),
     });

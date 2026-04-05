@@ -6,21 +6,10 @@ const {
   buildRetryFeedback,
   chooseBetterCandidate,
 } = require("./_prep_language_validator");
-const OpenAI = require("openai");
-
-const OPENAI_MODEL = process.env.OPENAI_PREP_MODEL || "gpt-4o";
-
-const getPrepProvider = () => {
-  if (!process.env.OPENAI_API_KEY) {
-    return null;
-  }
-  return {
-    name: "openai",
-    apiKey: process.env.OPENAI_API_KEY,
-    model: OPENAI_MODEL,
-    clientOptions: {},
-  };
-};
+const {
+  buildTextProviders,
+  generateTextWithProvider,
+} = require("./_prep_ai");
 
 const buildDebriefPrompt = ({ profileText, job, transcript, retryFeedback = "" }) => {
   const retrySection = retryFeedback
@@ -112,27 +101,6 @@ const normalizeDebriefPayload = (payload) => ({
     .filter(Boolean),
 });
 
-const generateWithProvider = async ({ provider, prompt }) => {
-  const client = new OpenAI({
-    apiKey: provider.apiKey,
-    ...provider.clientOptions,
-  });
-
-  const response = await client.chat.completions.create({
-    model: provider.model,
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.3,
-    max_tokens: 5000,
-    response_format: { type: "json_object" },
-  });
-
-  const text = response.choices[0]?.message?.content || "";
-  if (!text) {
-    throw new Error(`No response content from ${provider.name}`);
-  }
-  return text;
-};
-
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return handleOptions();
 
@@ -155,8 +123,8 @@ exports.handler = async (event) => {
       return withCors({ error: "Transcript is too long (max 30,000 characters). Please trim it and try again." }, 400);
     }
 
-    const provider = getPrepProvider();
-    if (!provider) {
+    const providers = buildTextProviders();
+    if (!providers.length) {
       return withCors({ error: "No prep generation provider configured" }, 500);
     }
 
@@ -180,25 +148,50 @@ exports.handler = async (event) => {
 
     const candidates = [];
     let lastError = null;
-    let retryFeedback = "";
+    const providerAttempts = [];
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      try {
-        const prompt = buildDebriefPrompt({ profileText, job, transcript, retryFeedback });
-        const text = await generateWithProvider({ provider, prompt });
-        const debrief = normalizeDebriefPayload(parseDebriefFromText(text));
-        const validation = validateDebriefPayload(debrief, {
-          jobRole: job.role || "",
-          jobCompany: job.company || "",
-        });
-        candidates.push({ debrief, validation, attempt });
-        if (validation.decision === "accept") {
-          break;
+    for (const provider of providers) {
+      let retryFeedback = "";
+
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        try {
+          const prompt = buildDebriefPrompt({ profileText, job, transcript, retryFeedback });
+          const text = await generateTextWithProvider({
+            provider,
+            prompt,
+            temperature: 0.3,
+            maxTokens: 5000,
+          });
+          const debrief = normalizeDebriefPayload(parseDebriefFromText(text));
+          const validation = validateDebriefPayload(debrief, {
+            jobRole: job.role || "",
+            jobCompany: job.company || "",
+          });
+          candidates.push({ debrief, validation, attempt, providerName: provider.name });
+          providerAttempts.push({
+            provider: provider.name,
+            attempt,
+            decision: validation.decision,
+            quality_score: validation.quality_score || 0,
+          });
+          if (validation.decision === "accept" && (validation.quality_score || 0) >= 88) {
+            break;
+          }
+          retryFeedback = buildRetryFeedback(validation);
+        } catch (error) {
+          lastError = error;
+          providerAttempts.push({
+            provider: provider.name,
+            attempt,
+            error: error.message || String(error),
+          });
+          retryFeedback = `- Provider error on previous attempt: ${error.message || String(error)}`;
         }
-        retryFeedback = buildRetryFeedback(validation);
-      } catch (error) {
-        lastError = error;
-        retryFeedback = `- Provider error on previous attempt: ${error.message || String(error)}`;
+      }
+
+      const currentBest = candidates.sort(chooseBetterCandidate).at(-1);
+      if (currentBest?.validation?.decision === "accept" && (currentBest.validation?.quality_score || 0) >= 90) {
+        break;
       }
     }
 
@@ -236,7 +229,8 @@ exports.handler = async (event) => {
       debrief_quality_status: qualityStatus,
       debrief_quality_notes: [...(bestCandidate.validation.errors || []), ...(bestCandidate.validation.warnings || [])].slice(0, 12),
       debrief_quality_score: bestCandidate.validation.quality_score || 0,
-      debrief_provider: provider.name,
+      debrief_provider: bestCandidate.providerName,
+      debrief_provider_attempts: providerAttempts,
       debrief_analyzed_at: debriefAnalyzedAt,
       updated_at: debriefAnalyzedAt,
     });
