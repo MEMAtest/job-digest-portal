@@ -1828,9 +1828,12 @@
 
 /* ── Interview Review ─────────────────────────────────────────── */
 .ir-upload { text-align:center; padding:40px 20px; }
+.ir-unavailable { text-align:center; padding:40px 20px; }
 .ir-upload-icon { font-size:48px; margin-bottom:12px; }
-.ir-upload h3 { margin-bottom:8px; }
-.ir-upload p { color:#64748b; margin-bottom:16px; max-width:420px; margin-left:auto; margin-right:auto; }
+.ir-upload h3,
+.ir-unavailable h3 { margin-bottom:8px; }
+.ir-upload p,
+.ir-unavailable p { color:#64748b; margin-bottom:16px; max-width:420px; margin-left:auto; margin-right:auto; }
 .ir-file-label { cursor:pointer; display:inline-block; }
 .ir-file-hint { font-size:12px; color:#94a3b8; margin-top:8px; }
 .ir-file-selected { margin-top:16px; display:flex; align-items:center; gap:12px; justify-content:center; }
@@ -1846,6 +1849,14 @@
 
 .ir-error { text-align:center; padding:40px 20px; color:#ef4444; }
 .ir-error p { margin-bottom:16px; }
+
+.spoken-service-note,
+.debrief-service-note {
+  margin-top: 12px;
+  color: #b45309;
+  font-size: 13px;
+  line-height: 1.5;
+}
 
 .ir-result { padding:4px 0; }
 .ir-overall { text-align:center; padding:24px 16px; border-bottom:1px solid #e2e8f0; margin-bottom:20px; }

@@ -434,19 +434,40 @@ export const closePrepMode = () => {
 
 const getRehearsalKey = (jobId, slug) => `prep_rehearsal_${jobId}_${slug}`;
 
+const describePrepServiceError = (error) => {
+  const raw = String(error?.message || error || "").trim();
+  const lower = raw.toLowerCase();
+
+  if (lower.includes("429") || lower.includes("quota") || lower.includes("billing")) {
+    return "Prep generation is temporarily unavailable because the AI provider quota is exhausted. Try again later.";
+  }
+
+  if (lower.includes("no prep generation provider configured")) {
+    return "Prep generation is not configured in production yet.";
+  }
+
+  return raw || "The prep service is unavailable right now.";
+};
+
 const renderSpokenAnswers = (container, job) => {
   if (!job.spoken_intro_60s) {
     container.innerHTML = `
       <div class="spoken-empty">
         <p>No spoken answers yet. Generate natural interview answers you can actually rehearse.</p>
         <button class="btn btn-primary generate-spoken-btn" data-job-id="${escapeHtml(job.id)}">Generate spoken answers</button>
+        <p class="spoken-service-note hidden" aria-live="polite"></p>
       </div>
     `;
     const btn = container.querySelector(".generate-spoken-btn");
+    const note = container.querySelector(".spoken-service-note");
     if (btn) {
       btn.addEventListener("click", async () => {
         btn.textContent = "Generating...";
         btn.disabled = true;
+        if (note) {
+          note.textContent = "";
+          note.classList.add("hidden");
+        }
         try {
           const res = await fetch("/.netlify/functions/generate-prep", {
             method: "POST",
@@ -467,7 +488,12 @@ const renderSpokenAnswers = (container, job) => {
           showToast("Spoken answers generated");
           renderSpokenAnswers(container, liveJob);
         } catch (err) {
-          showToast("Generation failed: " + err.message);
+          const message = describePrepServiceError(err);
+          showToast(message);
+          if (note) {
+            note.textContent = message;
+            note.classList.remove("hidden");
+          }
           btn.textContent = "Generate spoken answers";
           btn.disabled = false;
         }
@@ -795,11 +821,13 @@ const renderDebriefInputState = (container, job, prefillTranscript) => {
       <p>Paste the transcript to get question-by-question feedback, stronger spoken answers and specific round-two prep.</p>
       <textarea class="debrief-textarea" rows="12" placeholder="Paste the full interview transcript here…">${escapeHtml(prefillTranscript)}</textarea>
       <button class="btn btn-primary debrief-analyse-btn" data-job-id="${escapeHtml(job.id)}">Analyse interview</button>
+      <p class="debrief-service-note hidden" aria-live="polite"></p>
     </div>
   `;
 
   const btn = container.querySelector(".debrief-analyse-btn");
   const textarea = container.querySelector(".debrief-textarea");
+  const note = container.querySelector(".debrief-service-note");
   if (btn) {
     btn.addEventListener("click", async () => {
       const transcript = (textarea && textarea.value.trim()) || "";
@@ -809,6 +837,10 @@ const renderDebriefInputState = (container, job, prefillTranscript) => {
       }
       btn.textContent = "Analysing…";
       btn.disabled = true;
+      if (note) {
+        note.textContent = "";
+        note.classList.add("hidden");
+      }
       try {
         const res = await fetch("/.netlify/functions/generate-prep-from-transcript", {
           method: "POST",
@@ -828,7 +860,12 @@ const renderDebriefInputState = (container, job, prefillTranscript) => {
         showToast("Debrief complete");
         renderDebrief(container, liveJob);
       } catch (err) {
-        showToast("Analysis failed: " + err.message);
+        const message = describePrepServiceError(err);
+        showToast(message);
+        if (note) {
+          note.textContent = message;
+          note.classList.remove("hidden");
+        }
         btn.textContent = "Analyse interview";
         btn.disabled = false;
       }

@@ -14,6 +14,9 @@ import {
 const ACCEPTED_TYPES = ["audio/mp4", "audio/m4a", "audio/mpeg", "audio/wav", "audio/webm", "video/mp4"];
 const MAX_SIZE_MB = 200;
 const MAX_UPLOAD_RETRY_MS = 10000;
+const INTERVIEW_REVIEW_ENABLED = false;
+const INTERVIEW_REVIEW_UNAVAILABLE_MESSAGE =
+  "Interview Review is temporarily unavailable while production storage is being enabled.";
 
 let _unsubscribe = null;
 
@@ -272,6 +275,19 @@ const uploadAndAnalyse = async (container, job, file) => {
 
 const renderUploadUi = (container, job) => {
   stopPolling();
+
+  if (!INTERVIEW_REVIEW_ENABLED) {
+    container.innerHTML = `
+      <div class="ir-unavailable">
+        <div class="ir-upload-icon">🛠️</div>
+        <h3>Interview Review unavailable</h3>
+        <p>${escapeHtml(INTERVIEW_REVIEW_UNAVAILABLE_MESSAGE)}</p>
+        <p class="ir-file-hint">Use Debrief for transcript-based feedback until interview uploads are re-enabled.</p>
+      </div>
+    `;
+    return;
+  }
+
   container.innerHTML = `
     <div class="ir-upload">
       <div class="ir-upload-icon">🎙️</div>
