@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v22';
+const CACHE_VERSION = 'v23';
 const CACHE_NAME = `job-digest-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -25,6 +25,7 @@ const APP_SHELL = [
   '/app.autoApplyPrefs.js',
   '/app.autoApplyQueue.js',
   '/app.settings.js',
+  '/app.ilog.js',
   '/config.js',
   '/favicon.svg',
   '/manifest.webmanifest',
