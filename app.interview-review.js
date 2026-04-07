@@ -3,7 +3,6 @@ import { getApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.
 import {
   getStorage,
   ref,
-  setMaxUploadRetryTime,
   uploadBytesResumable,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 import {
@@ -249,7 +248,7 @@ const uploadAndAnalyse = async (container, job, file) => {
   for (const bucketName of bucketCandidates) {
     try {
       const storage = getStorage(getApp(), `gs://${bucketName}`);
-      setMaxUploadRetryTime(storage, MAX_UPLOAD_RETRY_MS);
+      storage.maxUploadRetryTime = MAX_UPLOAD_RETRY_MS;
       const storageRef = ref(storage, path);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
