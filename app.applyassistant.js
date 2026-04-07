@@ -81,7 +81,8 @@ const buildChecklistUpdate = (job, result) => {
   };
 };
 
-export const launchApplyAssistant = async (job) => {
+export const launchApplyAssistant = async (job, options = {}) => {
+  const { autoSubmit = false } = options;
   if (!job) return;
   if (!isApplyAssistantSupported(job)) {
     showToast("Apply Assistant supports Greenhouse, Lever, Ashby, and Workable only.");
@@ -120,7 +121,8 @@ export const launchApplyAssistant = async (job) => {
       return;
     }
 
-    const res = await fetch(`${LOCAL_ASSISTANT_BASE_URL}/start-application`, {
+    const endpoint = autoSubmit ? "/submit-approved" : "/start-application";
+    const res = await fetch(`${LOCAL_ASSISTANT_BASE_URL}${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(buildAssistantPayload(job, packResponse)),
@@ -128,6 +130,21 @@ export const launchApplyAssistant = async (job) => {
     const result = await res.json();
     if (!res.ok || !result.success) {
       throw new Error(result.error || "Local assistant launch failed");
+    }
+
+    if (autoSubmit && result.status === "submitted") {
+      const checklist = { ...(job.apply_checklist || {}), job_link_visited: true, application_submitted: true };
+      await persistAssistantState(job, {
+        apply_assistant_status: "submitted",
+        auto_apply_status: "applied",
+        apply_assistant_last_run_at: new Date().toISOString(),
+        apply_assistant_last_result: result,
+        apply_checklist: checklist,
+        updated_at: new Date().toISOString(),
+      });
+      rerender();
+      showToast("Application submitted successfully.");
+      return;
     }
 
     const checklist = buildChecklistUpdate(job, result);

@@ -208,3 +208,9 @@ export const finishWithoutSubmitting = async (page) => {
   }
   return false;
 };
+
+export const submitAndClose = async (page) => {
+  const submitBtn = page.locator('button[type="submit"], input[type="submit"]').last();
+  await submitBtn.click();
+  await page.waitForTimeout(2000);
+};

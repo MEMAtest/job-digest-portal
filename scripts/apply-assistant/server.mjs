@@ -36,7 +36,7 @@ const resolveAdapter = (atsFamily, jobUrl) => {
 };
 
 const launchApplicationSession = async (payload) => {
-  const { jobId, jobUrl, atsFamily, pack, role, company } = payload;
+  const { jobId, jobUrl, atsFamily, pack, role, company, autoSubmit = false } = payload;
   if (!jobId || !jobUrl || !pack?.answers) {
     throw new Error("Missing required job payload");
   }
@@ -46,12 +46,7 @@ const launchApplicationSession = async (payload) => {
     throw new Error("Unsupported ATS family");
   }
 
-  const files = await writeApplicationPack({
-    jobId,
-    role,
-    company,
-    pack,
-  });
+  const files = await writeApplicationPack({ jobId, role, company, pack });
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({ viewport: { width: 1400, height: 980 } });
@@ -62,6 +57,7 @@ const launchApplicationSession = async (payload) => {
     page,
     answers: pack.answers,
     cvPdfPath: files.pdfPath,
+    autoSubmit,
   });
 
   const sessionId = `${slugify(jobId)}-${Date.now()}`;
@@ -71,7 +67,7 @@ const launchApplicationSession = async (payload) => {
     success: true,
     sessionId,
     atsFamily,
-    status: result.status || "review_required",
+    status: result.status,
     filled: result.filled || [],
     skipped: result.skipped || [],
     notes: [...(result.notes || []), `CV PDF saved to ${files.pdfPath}`],
@@ -93,13 +89,28 @@ const server = http.createServer(async (req, res) => {
   if (req.url === "/start-application" && req.method === "POST") {
     try {
       const payload = await readBody(req);
-      const result = await launchApplicationSession(payload);
+      const result = await launchApplicationSession({ ...payload, autoSubmit: false });
       sendJson(res, 200, result);
     } catch (error) {
       sendJson(res, 500, {
         success: false,
         status: "unsupported_or_blocked",
         error: error.message || "Failed to start application session",
+      });
+    }
+    return;
+  }
+
+  if (req.url === "/submit-approved" && req.method === "POST") {
+    try {
+      const payload = await readBody(req);
+      const result = await launchApplicationSession({ ...payload, autoSubmit: true });
+      sendJson(res, 200, result);
+    } catch (error) {
+      sendJson(res, 500, {
+        success: false,
+        status: "submit_failed",
+        error: error.message || "Failed to submit approved application",
       });
     }
     return;

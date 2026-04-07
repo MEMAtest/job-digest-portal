@@ -1,3 +1,5 @@
+import { initAutoApplyQueue, renderAutoApplyQueue } from "./app.autoApplyQueue.js";
+import { initAutoApplyPrefs } from "./app.autoApplyPrefs.js";
 import {
   summaryLine,
   alertBanner,
@@ -88,6 +90,10 @@ const setActiveTab = (tabId) => {
   }
   if (topbarActions) {
     topbarActions.classList.toggle("hidden", !["dashboard", "live"].includes(tabId));
+  }
+  if (tabId === "auto-apply") {
+    const queueContainer = document.getElementById("auto-apply-queue-container");
+    if (queueContainer) renderAutoApplyQueue(queueContainer);
   }
   // CV Hub rendered eagerly on load; the cvpage tab reveals it
 };
@@ -592,3 +598,6 @@ const loadJobsAndNotify = async () => {
 };
 
 loadJobsAndNotify();
+
+initAutoApplyPrefs();
+initAutoApplyQueue();

@@ -52,6 +52,8 @@
           <button class="nav-item" data-tab="cvpage">CV</button>
           <button class="nav-item" data-tab="prep">Preparation</button>
           <button class="nav-item" data-tab="learn">Learn</button>
+          <button class="nav-item" data-tab="auto-apply">Auto Apply</button>
+          <button class="nav-item" data-tab="ilog">Interview Log</button>
         </nav>
           <div class="sidebar-footer">
             <div class="status-dot"></div>
@@ -269,8 +271,17 @@
           </section>
         </section>
 
+        <section class="tab-section hidden" data-tab="auto-apply">
+          <div id="auto-apply-queue-container"></div>
+          <div id="auto-apply-prefs-container"></div>
+        </section>
+
         <section class="tab-section hidden" data-tab="learn">
           <div id="learn-content" class="learn-content"></div>
+        </section>
+
+        <section class="tab-section hidden" data-tab="ilog">
+          <div id="ilog-content" class="ilog-content"></div>
         </section>
       </main>
 
@@ -301,6 +312,20 @@
           <button class="prep-tab" data-prep-tab="debrief">Debrief</button>
         </nav>
         <div id="prep-content" class="prep-content"></div>
+      </div>
+    </div>
+
+    <!-- No-Go Reason Modal -->
+    <div id="nogo-modal" class="nogo-modal hidden">
+      <div class="nogo-modal__backdrop" onclick="window._aaCloseNogoModal && window._aaCloseNogoModal()"></div>
+      <div class="nogo-modal__card">
+        <h3>Why did you reject this application?</h3>
+        <p id="nogo-modal-job-label" class="nogo-modal__job"></p>
+        <textarea id="nogo-reason-text" class="nogo-modal__textarea" placeholder="e.g. Salary not specified, contract role, not the right seniority…" rows="4"></textarea>
+        <div class="nogo-modal__actions">
+          <button class="btn btn-primary" onclick="window._aaSaveNogoReason && window._aaSaveNogoReason()">Save reason</button>
+          <button class="btn btn-secondary" onclick="window._aaCloseNogoModal && window._aaCloseNogoModal()">Skip</button>
+        </div>
       </div>
     </div>
 

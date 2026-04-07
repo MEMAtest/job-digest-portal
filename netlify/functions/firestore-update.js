@@ -1,7 +1,7 @@
 const { getFirestore } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
 
-const ALLOWED_COLLECTIONS = new Set(["jobs", "run_requests", "notifications", "job_stats", "role_suggestions", "candidate_prep", "push_subscriptions"]);
+const ALLOWED_COLLECTIONS = new Set(["jobs", "run_requests", "notifications", "job_stats", "role_suggestions", "candidate_prep", "push_subscriptions", "auto_apply_decisions", "settings"]);
 
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") return handleOptions();

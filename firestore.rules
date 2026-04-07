@@ -33,5 +33,13 @@ service cloud.firestore {
       allow read: if false;
       allow write: if false;
     }
+    match /auto_apply_decisions/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /settings/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

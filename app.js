@@ -9,4 +9,7 @@ import "./app.dashboard.js";
 import "./app.notifications.js";
 import "./app.settings.js";
 import "./app.learn.js";
+import "./app.autoApplyPrefs.js";
+import "./app.autoApplyQueue.js";
+import "./app.ilog.js";
 import "./app.bootstrap.js";

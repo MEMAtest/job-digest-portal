@@ -1,6 +1,6 @@
-import { waitForDom, uploadFile, fillStandardPersonFields, fillNarrativeFields, finishWithoutSubmitting } from "./common.mjs";
+import { waitForDom, uploadFile, fillStandardPersonFields, fillNarrativeFields, finishWithoutSubmitting, submitAndClose } from "./common.mjs";
 
-export const runGreenhouseAdapter = async ({ page, answers, cvPdfPath }) => {
+export const runGreenhouseAdapter = async ({ page, answers, cvPdfPath, autoSubmit = false }) => {
   await waitForDom(page);
   const filled = [];
   const skipped = [];
@@ -18,8 +18,13 @@ export const runGreenhouseAdapter = async ({ page, answers, cvPdfPath }) => {
   filled.push(...narrative.filled);
   skipped.push(...narrative.skipped);
 
+  if (autoSubmit) {
+    await submitAndClose(page);
+    notes.push("Form submitted automatically");
+    return { status: "submitted", filled, skipped, notes };
+  }
+
   await finishWithoutSubmitting(page);
   notes.push("Stopped before final submit");
-
   return { status: "review_required", filled, skipped, notes };
 };
