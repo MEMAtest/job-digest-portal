@@ -62,7 +62,15 @@ const closeNogoModal = () => {
 
 const openNogoModal = async (jobId) => {
   nogoJobId = jobId;
-  const job = state.jobs?.find((j) => j.id === jobId);
+  // Try state first; fall back to direct Firestore fetch (jobs may not be loaded yet on fresh page)
+  let job = state.jobs?.find((j) => j.id === jobId);
+  if (!job) {
+    try {
+      const r = await fetch(`/.netlify/functions/firestore-get?collection=jobs&id=${encodeURIComponent(jobId)}`);
+      const d = await r.json();
+      if (d?.data) job = d.data;
+    } catch {}
+  }
   const jobLabel = job ? `${escHtml(job.role || "")} @ ${escHtml(job.company || "")}` : escHtml(jobId);
 
   // Find the decision doc for this job
@@ -236,8 +244,8 @@ export const initAutoApplyQueue = () => {
   const params = new URLSearchParams(window.location.search);
   const nogoId = params.get("nogo");
   if (nogoId) {
-    // Slight delay to let state load
-    setTimeout(() => openNogoModal(nogoId), 500);
+    // Delay to let the page render before opening the modal
+    setTimeout(() => openNogoModal(nogoId), 800);
   }
 };
 

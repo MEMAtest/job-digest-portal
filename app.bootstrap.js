@@ -45,6 +45,8 @@ import {
   showToast,
   applyQuickFilter,
   isPostedToday,
+  isFreshPortalJob,
+  PORTAL_FRESH_HOURS,
   resetFilters,
   getJobAtsFamily,
   getJobSourceFamily,
@@ -154,7 +156,15 @@ const fetchProxyJson = async (url) => {
 };
 
 const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
-  state.jobs = jobs.map((job) => ({
+  const curatedJobs = jobs.filter((job) => {
+    const status = (job.application_status || "saved").toLowerCase();
+    if (status === "saved" || status === "new") {
+      return isFreshPortalJob(job);
+    }
+    return true;
+  });
+
+  state.jobs = curatedJobs.map((job) => ({
     ...job,
     source_family: job.source_family || getJobSourceFamily(job),
     ats_family: job.ats_family || getJobAtsFamily(job),
@@ -165,23 +175,29 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
 
   await loadBaseCvFromFirestore();
 
-  renderDashboardStats(jobs);
-  renderAppliedTracker(jobs);
-  renderPipelineView(jobs);
-  renderFollowUps(jobs);
-  renderFollowUpBanner(jobs);
+  renderDashboardStats(state.jobs);
+  renderAppliedTracker(state.jobs);
+  renderPipelineView(state.jobs);
+  renderFollowUps(state.jobs);
+  renderFollowUpBanner(state.jobs);
   renderFilters();
+  if (sortBySelect) sortBySelect.value = "posted";
+  if (statusSelect && state.jobs.some((job) => ["saved", "new"].includes((job.application_status || "saved").toLowerCase()))) {
+    statusSelect.value = "saved";
+  }
   renderJobs();
   renderApplyHub();
   renderCvHub();
-  renderTriagePrompt(jobs);
+  renderTriagePrompt(state.jobs);
 
   const nowLabel = new Date().toLocaleString();
   const freshTodayCount = state.jobs.filter((job) => {
     const s = (job.application_status || "saved").toLowerCase();
-    return isPostedToday(job) && (s === "new" || s === "saved");
+    return isFreshPortalJob(job) && (s === "new" || s === "saved");
   }).length;
-  if (summaryLine) summaryLine.textContent = `${jobs.length} roles loaded · ${freshTodayCount} fresh today · Last update ${nowLabel}`;
+  if (summaryLine) {
+    summaryLine.textContent = `${state.jobs.length} roles loaded · ${freshTodayCount} fresh in last ${PORTAL_FRESH_HOURS}h · Last update ${nowLabel}`;
+  }
   if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${nowLabel}`;
   if (lastUpdatedFooter) lastUpdatedFooter.textContent = `Updated: ${nowLabel}`;
 
@@ -200,7 +216,7 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
 const loadJobsViaProxy = async () => {
   try {
     setProxyMode(true);
-    const data = await fetchProxyJson("/.netlify/functions/jobs?limit=200");
+    const data = await fetchProxyJson("/.netlify/functions/jobs?limit=500");
     await applyLoadedJobs({
       jobs: data.jobs || [],
       stats: data.stats || [],
@@ -224,7 +240,7 @@ const loadJobsViaProxy = async () => {
 const loadJobsDirect = async () => {
   const firestore = ensureFirestoreConnection();
   const jobsRef = collection(firestore, collectionName);
-  const jobsQuery = query(jobsRef, orderBy("fit_score", "desc"), limit(200));
+  const jobsQuery = query(jobsRef, orderBy("updated_at", "desc"), limit(500));
   const snapshot = await getDocs(jobsQuery);
 
   const jobs = snapshot.docs.map((docSnap) => ({
@@ -474,7 +490,14 @@ if (manualLinkSubmit) {
   });
 }
 
-setActiveTab("dashboard");
+// Honour ?tab= query param and #auto-apply-queue hash from GO decision emails
+const _initialTab = (() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("tab")) return params.get("tab");
+  if (window.location.hash === "#auto-apply-queue") return "auto-apply";
+  return "dashboard";
+})();
+setActiveTab(_initialTab);
 
 const loadJobs = async () => {
   if (summaryLine) summaryLine.textContent = "Fetching latest roles…";

@@ -115,7 +115,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 302,
-      headers: { Location: `${siteUrl}/#auto-apply-queue` },
+      headers: { Location: `${siteUrl}/?tab=auto-apply` },
       body: "",
     };
   }
