@@ -241,6 +241,21 @@ export const initAutoApplyQueue = () => {
   }
 };
 
-// Expose close handler on window for inline HTML usage
+// Expose handlers on window for inline HTML usage and external modules
 window._aaCloseNogoModal = closeNogoModal;
 window._aaSaveNogoReason = saveNogoReason;
+window._aaRenderQueue = async () => {
+  const container = document.getElementById("auto-apply-queue-container");
+  if (!container) return;
+  // Refresh state.jobs from the server before re-rendering so newly queued jobs appear
+  try {
+    const res = await fetch("/.netlify/functions/jobs?limit=200");
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.jobs) && data.jobs.length > 0) {
+        state.jobs = data.jobs;
+      }
+    }
+  } catch {}
+  renderAutoApplyQueue(container);
+};

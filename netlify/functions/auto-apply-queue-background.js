@@ -243,7 +243,10 @@ exports.handler = async (event) => {
     }
 
     const prefs = prefsDoc.data();
-    if (!prefs.enabled) {
+    // Manual POST triggers bypass the enabled toggle; scheduled runs respect it
+    const body = event.body ? (() => { try { return JSON.parse(event.body); } catch { return {}; } })() : {};
+    const isManual = event.httpMethod === "POST" || body.manual === true;
+    if (!prefs.enabled && !isManual) {
       console.log("auto-apply-queue: disabled");
       return { statusCode: 200, body: JSON.stringify({ skipped: "disabled" }) };
     }

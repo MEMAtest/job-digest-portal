@@ -40,10 +40,10 @@ const triggerScan = async () => {
   const res = await fetch("/.netlify/functions/auto-apply-queue-background", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ manual: true }),
   });
-  if (!res.ok) throw new Error("Scan trigger failed");
-  return res.json();
+  // Background functions return 202 with empty body — treat 202 as success
+  if (res.status !== 202 && !res.ok) throw new Error("Scan trigger failed");
 };
 
 export const renderAutoApplyPrefs = (container) => {
@@ -163,9 +163,14 @@ export const renderAutoApplyPrefs = (container) => {
       scanBtn.textContent = "Scanning…";
       try {
         await triggerScan();
-        showToast("Scan triggered — review emails will arrive shortly.");
+        showStatus("Scan running in background — review emails will arrive within ~60s. Queue will refresh automatically.");
+        // Reload queue after 45s to pick up any newly queued jobs
+        setTimeout(() => {
+          const queueContainer = document.getElementById("auto-apply-queue-container");
+          if (queueContainer && window._aaRenderQueue) window._aaRenderQueue();
+        }, 45000);
       } catch (err) {
-        showToast(err.message || "Scan trigger failed");
+        showStatus(err.message || "Scan trigger failed", true);
       } finally {
         scanBtn.disabled = false;
         scanBtn.textContent = "Scan now";

@@ -24,7 +24,16 @@ const validateToken = (jobId, token) => {
   const secret = process.env.AUTO_APPLY_HMAC_SECRET;
   if (!secret) throw new Error("AUTO_APPLY_HMAC_SECRET not set");
   const expected = crypto.createHmac("sha256", secret).update(jobId).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(token, "hex"));
+  const expectedBuf = Buffer.from(expected, "hex");
+  // Decode token — if not valid hex or wrong length, reject without timing attack
+  let tokenBuf;
+  try {
+    tokenBuf = Buffer.from(token, "hex");
+  } catch {
+    return false;
+  }
+  if (tokenBuf.length !== expectedBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, tokenBuf);
 };
 
 exports.handler = async (event) => {
@@ -46,12 +55,13 @@ exports.handler = async (event) => {
   try {
     tokenValid = validateToken(jobId, token);
   } catch (err) {
-    console.error("Token validation error:", err);
+    console.error("Token validation error:", err.message);
+    // Only HMAC_SECRET missing causes a throw now
     return errorPage("Server configuration error. Please contact support.");
   }
 
   if (!tokenValid) {
-    return errorPage("This link has an invalid or tampered token. Please use the original email link.");
+    return errorPage("This link is invalid or has expired. Please use the original email link.");
   }
 
   let db;
