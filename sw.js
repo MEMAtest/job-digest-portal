@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v21';
+const CACHE_VERSION = 'v22';
 const CACHE_NAME = `job-digest-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -22,6 +22,8 @@ const APP_SHELL = [
   '/app.interview-review.js',
   '/app.learn.js',
   '/app.triage.js',
+  '/app.autoApplyPrefs.js',
+  '/app.autoApplyQueue.js',
   '/app.settings.js',
   '/config.js',
   '/favicon.svg',
