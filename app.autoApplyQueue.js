@@ -1,5 +1,6 @@
 import { state, showToast } from "./app.core.js";
 import { launchApplyAssistant } from "./app.applyassistant.js";
+import { buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
 
 const LOCAL_ASSISTANT_BASE_URL = "http://127.0.0.1:4319";
 
@@ -138,35 +139,94 @@ const renderPendingSection = (container, jobs) => {
   `;
 };
 
+const getQualityBadgeHtml = (job) => {
+  const qs = job.cv_validation?.quality_status || job.tailored_cv_sections?.quality_status || "";
+  const score = job.cv_validation?.quality_score || job.cv_validation?.metrics?.quality_score || "";
+  const atsCov = job.ats_keyword_coverage;
+  const atsHtml = atsCov
+    ? `<span class="aa-badge ${atsCov.score >= 80 ? "aa-badge--approved" : "aa-badge--pending"}" title="ATS keyword coverage">ATS ${atsCov.score}%</span>`
+    : "";
+  if (qs === "accepted") {
+    return `<span class="aa-badge aa-badge--approved" title="AI tailored CV">AI Tailored${score ? ` ${score}/100` : ""}</span>${atsHtml}`;
+  }
+  if (qs === "fallback_master") {
+    return `<span class="aa-badge aa-badge--pending" title="Master CV was used — tailored version was weaker">Master CV</span>${atsHtml}`;
+  }
+  return atsHtml;
+};
+
 const renderApprovedSection = (container, jobs) => {
   const approved = jobs.filter((j) => j.auto_apply_status === "approved");
   container.innerHTML = `
     <div class="aa-section">
       <h3 class="aa-section__title">Approved — Ready to Submit <span class="aa-badge aa-badge--approved">${approved.length}</span></h3>
-      ${approved.length > 0 ? `<p class="aa-section__hint">Click <strong>Auto-submit</strong> to let Playwright fill and submit the form automatically (requires the local Apply Assistant server running). Or click <strong>Apply manually</strong> to open the job and apply yourself.</p>` : ""}
+      ${approved.length > 0 ? `<p class="aa-section__hint"><strong>Open &amp; Fill Form</strong> opens the job in a browser and pre-fills all fields using your tailored CV — you review and click Submit yourself. Or use <strong>Apply manually</strong> to do it yourself without Playwright.</p>` : ""}
       ${approved.length === 0
         ? '<p class="aa-empty">No approved applications yet.</p>'
-        : approved.map((job) => `
-          <div class="aa-job-card">
+        : approved.map((job) => {
+          const qualityNotes = Array.isArray(job.tailored_cv_sections?.quality_notes) ? job.tailored_cv_sections.quality_notes : [];
+          const atsCov = job.ats_keyword_coverage;
+          return `
+          <div class="aa-job-card" data-job-id="${escHtml(job.id)}">
             <div class="aa-job-card__info">
               <div class="aa-job-card__role">${escHtml(job.role || "Role")}</div>
-              <div class="aa-job-card__company">${escHtml(job.company || "")}${job.fit_score ? ` · ${job.fit_score}/100` : ""}</div>
+              <div class="aa-job-card__company">${escHtml(job.company || "")}${job.fit_score ? ` · ${job.fit_score}/100` : ""}${job.ats_family ? ` · ${escHtml(job.ats_family)}` : ""}</div>
               ${job.auto_apply_decision_at ? `<div class="aa-job-card__meta">Approved ${formatDate(job.auto_apply_decision_at)}</div>` : ""}
-              ${job.ats_family ? `<div class="aa-job-card__meta">ATS: ${escHtml(job.ats_family)}</div>` : ""}
+              <div class="aa-job-card__badges">${getQualityBadgeHtml(job)}</div>
+              ${qualityNotes.length ? `<div class="aa-quality-notes">${qualityNotes.map((n) => `<span>${escHtml(n)}</span>`).join("")}</div>` : ""}
+              ${atsCov && atsCov.missing && atsCov.missing.length ? `<div class="aa-ats-missing">Missing keywords: ${escHtml(atsCov.missing.slice(0, 5).join(", "))}${atsCov.missing.length > 5 ? ` +${atsCov.missing.length - 5} more` : ""}</div>` : ""}
             </div>
             <div class="aa-job-card__actions">
-              <span class="aa-badge aa-badge--approved">Approved</span>
+              <button class="btn btn-secondary aa-preview-cv-btn" data-job-id="${escHtml(job.id)}">Preview CV</button>
               ${job.link ? `<a href="${escHtml(job.link)}" target="_blank" rel="noopener" class="btn btn-secondary aa-manual-btn" data-job-id="${escHtml(job.id)}">Apply manually</a>` : ""}
-              <button class="btn btn-primary aa-submit-btn" data-job-id="${escHtml(job.id)}" title="Requires local Apply Assistant server">Auto-submit</button>
+              <button class="btn btn-primary aa-fill-btn" data-job-id="${escHtml(job.id)}" title="Opens browser and pre-fills all fields — you review and submit">Open &amp; Fill Form</button>
             </div>
-          </div>`).join("")}
+            <div class="aa-cv-preview-panel hidden" data-preview-for="${escHtml(job.id)}"></div>
+            <div class="aa-fill-result hidden" data-result-for="${escHtml(job.id)}"></div>
+          </div>`;
+        }).join("")}
     </div>
   `;
+
+  container.querySelectorAll(".aa-preview-cv-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const jobId = btn.dataset.jobId;
+      const job = state.jobs?.find((j) => j.id === jobId);
+      const panel = container.querySelector(`.aa-cv-preview-panel[data-preview-for="${jobId}"]`);
+      if (!panel) return;
+      if (!panel.classList.contains("hidden")) {
+        panel.classList.add("hidden");
+        btn.textContent = "Preview CV";
+        return;
+      }
+      if (!job) { showToast("Job data not loaded yet."); return; }
+      btn.textContent = "Hide CV";
+      panel.classList.remove("hidden");
+      panel.innerHTML = '<div class="aa-cv-preview-loading">Loading CV…</div>';
+      try {
+        const cvEl = buildTailoredCvHtml(job);
+        panel.innerHTML = "";
+        const wrapper = document.createElement("div");
+        wrapper.className = "aa-cv-preview-content";
+        wrapper.appendChild(cvEl);
+        const dlBtn = document.createElement("button");
+        dlBtn.className = "btn btn-secondary aa-cv-dl-btn";
+        dlBtn.textContent = "Download PDF";
+        dlBtn.addEventListener("click", () => {
+          const dlEl = buildTailoredCvHtml(job);
+          renderPdfFromElement(dlEl, { filename: `Ade_Omosanya_CV_${job.company || "role"}.pdf` });
+        });
+        panel.appendChild(wrapper);
+        panel.appendChild(dlBtn);
+      } catch (err) {
+        panel.innerHTML = `<div class="aa-cv-preview-error">Could not render CV: ${escHtml(err.message)}</div>`;
+      }
+    });
+  });
 
   container.querySelectorAll(".aa-manual-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const jobId = btn.dataset.jobId;
-      // Mark as applied when user manually applies
       try {
         await fetch("/.netlify/functions/firestore-update", {
           method: "POST",
@@ -181,7 +241,7 @@ const renderApprovedSection = (container, jobs) => {
     });
   });
 
-  container.querySelectorAll(".aa-submit-btn").forEach((btn) => {
+  container.querySelectorAll(".aa-fill-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const jobId = btn.dataset.jobId;
       const job = state.jobs?.find((j) => j.id === jobId);
@@ -191,15 +251,27 @@ const renderApprovedSection = (container, jobs) => {
       btn.textContent = "Checking server…";
       const healthy = await checkServerHealth();
       if (!healthy) {
-        showToast("Local Apply Assistant not running. Use 'Apply manually' instead, or start the server with: npm run apply-assistant");
+        showToast("Local Apply Assistant not running. Use 'Apply manually' instead, or start with: npm run apply-assistant");
         btn.disabled = false;
-        btn.textContent = "Auto-submit";
+        btn.textContent = "Open & Fill Form";
         return;
       }
-      btn.textContent = "Submitting…";
-      await launchApplyAssistant(job, { autoSubmit: true });
+      btn.textContent = "Opening browser…";
+      const result = await launchApplyAssistant(job, { autoSubmit: false });
       btn.disabled = false;
-      btn.textContent = "Auto-submit";
+      btn.textContent = "Open & Fill Form";
+
+      // Show fill results on the card
+      if (result) {
+        const resultEl = container.querySelector(`.aa-fill-result[data-result-for="${jobId}"]`);
+        if (resultEl) {
+          const filled = Array.isArray(result.filled) ? result.filled.length : "?";
+          const skipped = Array.isArray(result.skipped) ? result.skipped.length : "?";
+          const cvUploaded = Array.isArray(result.filled) && result.filled.includes("resume_upload");
+          resultEl.innerHTML = `<span class="aa-fill-summary">Filled: ${filled} fields · Skipped: ${skipped} · CV ${cvUploaded ? "uploaded ✓" : "not uploaded"}</span>`;
+          resultEl.classList.remove("hidden");
+        }
+      }
     });
   });
 };

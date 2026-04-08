@@ -160,6 +160,7 @@ export const launchApplyAssistant = async (job, options = {}) => {
     });
     rerender();
     showToast("Browser opened. Review the form and submit manually.");
+    return result;
   } catch (error) {
     console.error("Apply Assistant launch failed:", error);
     await persistAssistantState(job, {

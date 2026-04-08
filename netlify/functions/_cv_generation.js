@@ -41,8 +41,12 @@ const buildCvPrompt = (profileText, job, styleProfilePrompt = "") => {
     "- No fabricated tools, sectors, products, teams or achievements\n" +
     "- No first-person pronouns in the summary\n" +
     "- No em dashes, arrows or decorative formatting. Use ATS-safe plain text only\n" +
-    "- Do not use the phrases: results-driven, proven track record, skilled in, adept at, strong understanding, strong commercial acumen, data-driven, strategic thinker, business growth, transformative platform, transformative workflow\n" +
+    "- Do not use the phrases: results-driven, proven track record, skilled in, adept at, strong understanding, strong commercial acumen, data-driven, strategic thinker, business growth, transformative platform, transformative workflow, complex problems, strong analytical, methodologies\n" +
     "- Summary should open with the role domain and operating scope, not abstract framing like 'Within the...' or 'My experience...'\n" +
+    "- No full stops at the end of bullet points\n" +
+    "- De-duplicate metrics: each significant number or percentage appears ONCE across the entire CV (summary, achievements, experience bullets). Where you would repeat it, reference the outcome qualitatively instead (e.g. 'eliminated the primary bottleneck' rather than repeating '55%')\n" +
+    "- At least half of all bullets must follow the action-then-outcome pattern: 'Did X; achieved Y' or 'Did X, improving Y'. Swap outcome-only bullets to include the action that drove the result\n" +
+    "- Include exactly 1-2 lines in the summary or key achievements that describe working style in a specific, operational way — e.g. 'Runs weekly deep-dive sessions with ops leads; publishes SteerCo-ready packs with owners and dates'\n" +
     `- ${styleProfilePrompt}\n\n` +
     `Master CV:\n${buildMasterCvPromptText()}\n\n` +
     (profileText ? `Supplemental candidate notes:\n${profileText}\n\n` : "") +
@@ -50,7 +54,8 @@ const buildCvPrompt = (profileText, job, styleProfilePrompt = "") => {
     `Title: ${job.role || ""}\n` +
     `Company: ${job.company || ""}\n` +
     `Location: ${job.location || ""}\n` +
-    `Summary: ${job.notes || job.description || job.role_summary || ""}\n`
+    `Key requirements: ${(Array.isArray(job.key_requirements) ? job.key_requirements.join("; ") : "")}\n` +
+    `Full description: ${job.description || job.role_summary || job.notes || ""}\n`
   );
 };
 

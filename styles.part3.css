@@ -3129,3 +3129,19 @@
   .ilog-q-text     { grid-column: 1; }
 }
 /* ─────────────────────────────────────────────────────────────── */
+
+/* ── Auto-Apply Queue: CV preview & quality additions ─────────── */
+.aa-job-card__badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.aa-quality-notes { margin-top: 4px; font-size: 11px; color: #92400e; }
+.aa-quality-notes span { display: block; }
+.aa-ats-missing { margin-top: 4px; font-size: 11px; color: #b45309; }
+.aa-cv-preview-panel { border-top: 1px solid #e2e8f0; margin-top: 12px; padding-top: 12px; overflow: auto; max-height: 600px; }
+.aa-cv-preview-panel.hidden { display: none; }
+.aa-cv-preview-content { font-size: 12px; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; background: #fff; }
+.aa-cv-preview-loading { padding: 16px; text-align: center; color: #94a3b8; }
+.aa-cv-preview-error { padding: 12px; color: #dc2626; font-size: 13px; }
+.aa-cv-dl-btn { margin-top: 10px; }
+.aa-fill-result { border-top: 1px solid #e2e8f0; margin-top: 8px; padding-top: 8px; }
+.aa-fill-result.hidden { display: none; }
+.aa-fill-summary { font-size: 12px; color: #16a34a; font-weight: 600; }
+/* ─────────────────────────────────────────────────────────────── */

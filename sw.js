@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v23';
+const CACHE_VERSION = 'v24';
 const CACHE_NAME = `job-digest-${CACHE_VERSION}`;
 
 const APP_SHELL = [

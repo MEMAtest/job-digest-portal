@@ -63,6 +63,28 @@ const generateToken = (jobId) => {
   return crypto.createHmac("sha256", secret).update(jobId).digest("hex");
 };
 
+const buildAtsKeywordCoverage = (job, tailoredSections) => {
+  const requirements = Array.isArray(job.key_requirements) ? job.key_requirements : [];
+  if (!requirements.length) return null;
+  const cvText = [
+    tailoredSections.summary || "",
+    ...(tailoredSections.key_achievements || []),
+    ...(tailoredSections.vistra_bullets || []),
+    ...(tailoredSections.ebury_bullets || []),
+    ...(tailoredSections.n26_bullets || []),
+  ].join(" ").toLowerCase();
+  const found = [];
+  const missing = [];
+  requirements.forEach((req) => {
+    const keywords = String(req).toLowerCase().split(/[\s,;/]+/).filter((w) => w.length > 3);
+    const hit = keywords.some((kw) => cvText.includes(kw));
+    if (hit) found.push(req);
+    else missing.push(req);
+  });
+  const score = requirements.length > 0 ? Math.round((found.length / requirements.length) * 100) : 100;
+  return { score, found: found.length, total: requirements.length, missing };
+};
+
 const buildEmailHtml = (job, pack, token, siteUrl) => {
   const answers = pack.answers || {};
   const tailoredSections = pack.tailoredCvSections || {};
@@ -76,6 +98,22 @@ const buildEmailHtml = (job, pack, token, siteUrl) => {
   const achievementBullets = achievements.length
     ? achievements.map((a) => `<li style="margin-bottom:6px;">${escHtml(String(a))}</li>`).join("")
     : "<li>See attached CV for full achievements</li>";
+
+  const cvValidation = pack.applicationPack?.cv_validation || job.cv_validation || {};
+  const qualityStatus = tailoredSections.quality_status || cvValidation.quality_status || "";
+  const qualityScore = cvValidation.quality_score || cvValidation.metrics?.quality_score || "";
+  const qualityNotes = Array.isArray(tailoredSections.quality_notes) ? tailoredSections.quality_notes : [];
+  const isAiTailored = qualityStatus === "accepted";
+  const qualityLabel = isAiTailored
+    ? `AI Tailored${qualityScore ? ` — Score: ${qualityScore}/100` : ""}`
+    : qualityStatus === "fallback_master" ? "Master CV used (AI tailoring fell back)" : "Generated";
+  const qualityColour = isAiTailored ? "#16a34a" : "#d97706";
+
+  const atsCoverage = buildAtsKeywordCoverage(job, tailoredSections);
+  const atsLabel = atsCoverage
+    ? `${atsCoverage.score}% (${atsCoverage.found}/${atsCoverage.total} requirements matched)`
+    : "Not checked";
+  const atsColour = atsCoverage && atsCoverage.score >= 80 ? "#16a34a" : "#d97706";
 
   const goUrl = `${siteUrl}/.netlify/functions/auto-apply-decision?jobId=${encodeURIComponent(job.id)}&token=${token}&decision=go`;
   const nogoUrl = `${siteUrl}/.netlify/functions/auto-apply-decision?jobId=${encodeURIComponent(job.id)}&token=${token}&decision=nogo`;
@@ -97,7 +135,11 @@ const buildEmailHtml = (job, pack, token, siteUrl) => {
       <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">Company</td><td style="font-weight:600;font-size:14px;">${escHtml(job.company || "")}</td></tr>
       <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">Salary</td><td style="font-size:14px;">${escHtml(job.salary_range || "Not stated")}</td></tr>
       <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">Fit Score</td><td style="font-size:14px;font-weight:700;color:#4f46e5;">${job.fit_score || 0}/100</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">CV Quality</td><td style="font-size:14px;font-weight:600;color:${qualityColour};">${escHtml(qualityLabel)}</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">ATS Coverage</td><td style="font-size:14px;font-weight:600;color:${atsColour};">${escHtml(atsLabel)}</td></tr>
     </table>
+    ${qualityNotes.length ? `<div style="background:#fef9c3;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#854d0e;"><strong>Quality notes:</strong><ul style="margin:6px 0 0;padding-left:18px;">${qualityNotes.map((n) => `<li>${escHtml(n)}</li>`).join("")}</ul></div>` : ""}
+    ${atsCoverage && atsCoverage.missing.length ? `<div style="background:#fef3c7;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;"><strong>Missing keywords:</strong> ${escHtml(atsCoverage.missing.slice(0, 5).join(", "))}${atsCoverage.missing.length > 5 ? ` +${atsCoverage.missing.length - 5} more` : ""}</div>` : ""}
     <a href="${escHtml(job.link || '#')}" style="display:inline-block;padding:8px 16px;background:#f1f5f9;border-radius:6px;color:#4f46e5;text-decoration:none;font-size:13px;font-weight:600;">View Job Listing →</a>
   </div>
 
@@ -303,6 +345,12 @@ exports.handler = async (event) => {
 
         const pack = await generatePackForJob(db, job);
         const token = generateToken(job.id);
+
+        // Store ATS keyword coverage so the UI can display it
+        const atsCoverage = buildAtsKeywordCoverage(job, pack.tailoredCvSections || {});
+        if (atsCoverage) {
+          await db.collection("jobs").doc(job.id).update({ ats_keyword_coverage: atsCoverage }).catch(() => {});
+        }
 
         const htmlBody = buildEmailHtml(job, pack, token, siteUrl);
 
