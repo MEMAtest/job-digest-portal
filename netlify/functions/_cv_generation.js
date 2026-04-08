@@ -55,7 +55,7 @@ const buildCvPrompt = (profileText, job, styleProfilePrompt = "") => {
     `Company: ${job.company || ""}\n` +
     `Location: ${job.location || ""}\n` +
     `Key requirements: ${(Array.isArray(job.key_requirements) ? job.key_requirements.join("; ") : "")}\n` +
-    `Full description: ${job.description || job.role_summary || job.notes || ""}\n`
+    `Full description: ${(job.description || job.role_summary || job.notes || "").slice(0, 3000)}\n`
   );
 };
 
@@ -264,6 +264,8 @@ const generateTailoredCvBundle = async ({ db, job, apiKey }) => {
         error: error.message || String(error),
         quality_status: "provider_error",
       });
+      // Don't retry auth failures (401/403) — wrong key won't work on next attempt either
+      if (!isRetryableProviderError(error)) break;
       continue;
     }
   }

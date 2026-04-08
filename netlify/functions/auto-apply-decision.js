@@ -24,15 +24,10 @@ const validateToken = (jobId, token) => {
   const secret = process.env.AUTO_APPLY_HMAC_SECRET;
   if (!secret) throw new Error("AUTO_APPLY_HMAC_SECRET not set");
   const expected = crypto.createHmac("sha256", secret).update(jobId).digest("hex");
+  // Explicit validation before Buffer.from — Node silently truncates invalid hex
+  if (!/^[0-9a-f]{64}$/i.test(token)) return false;
   const expectedBuf = Buffer.from(expected, "hex");
-  // Decode token — if not valid hex or wrong length, reject without timing attack
-  let tokenBuf;
-  try {
-    tokenBuf = Buffer.from(token, "hex");
-  } catch {
-    return false;
-  }
-  if (tokenBuf.length !== expectedBuf.length) return false;
+  const tokenBuf = Buffer.from(token, "hex");
   return crypto.timingSafeEqual(expectedBuf, tokenBuf);
 };
 

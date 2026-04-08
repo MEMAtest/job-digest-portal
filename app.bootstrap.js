@@ -157,6 +157,8 @@ const fetchProxyJson = async (url) => {
 
 const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
   const curatedJobs = jobs.filter((job) => {
+    // Always keep jobs in the auto-apply pipeline regardless of age
+    if (job?.auto_apply_status) return true;
     const status = (job.application_status || "saved").toLowerCase();
     if (status === "saved" || status === "new") {
       return isFreshPortalJob(job);
@@ -571,10 +573,8 @@ if (runNowBtn) runNowBtn.addEventListener("click", async () => {
   runNowBtn.disabled = true;
   runNowBtn.textContent = "Triggering…";
   if (runStatusLine) {
-  if (runStatusLine) {
     runStatusLine.textContent = "Sending run request…";
     runStatusLine.classList.remove("hidden");
-  }
   }
 
   try {

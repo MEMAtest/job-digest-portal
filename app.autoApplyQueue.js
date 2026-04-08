@@ -212,9 +212,13 @@ const renderApprovedSection = (container, jobs) => {
         const dlBtn = document.createElement("button");
         dlBtn.className = "btn btn-secondary aa-cv-dl-btn";
         dlBtn.textContent = "Download PDF";
-        dlBtn.addEventListener("click", () => {
-          const dlEl = buildTailoredCvHtml(job);
-          renderPdfFromElement(dlEl, { filename: `Ade_Omosanya_CV_${job.company || "role"}.pdf` });
+        dlBtn.addEventListener("click", async () => {
+          try {
+            const dlEl = buildTailoredCvHtml(job);
+            await renderPdfFromElement(dlEl, { filename: `Ade_Omosanya_CV_${job.company || "role"}.pdf` });
+          } catch (err) {
+            showToast("PDF download failed: " + (err.message || "unknown error"));
+          }
         });
         panel.appendChild(wrapper);
         panel.appendChild(dlBtn);

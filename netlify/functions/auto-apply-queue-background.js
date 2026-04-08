@@ -71,13 +71,19 @@ const buildAtsKeywordCoverage = (job, tailoredSections) => {
     ...(tailoredSections.key_achievements || []),
     ...(tailoredSections.vistra_bullets || []),
     ...(tailoredSections.ebury_bullets || []),
+    ...(tailoredSections.mema_bullets || []),
+    ...(tailoredSections.elucidate_bullets || []),
     ...(tailoredSections.n26_bullets || []),
   ].join(" ").toLowerCase();
   const found = [];
   const missing = [];
   requirements.forEach((req) => {
-    const keywords = String(req).toLowerCase().split(/[\s,;/]+/).filter((w) => w.length > 3);
-    const hit = keywords.some((kw) => cvText.includes(kw));
+    // Include short acronyms (KYC, AML, SQL, API ≥ 3 chars) and use word-boundary matching
+    const keywords = String(req).toLowerCase().split(/[\s,;/()]+/).filter((w) => w.length >= 3);
+    const hit = keywords.some((kw) => {
+      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`\\b${escaped}\\b`).test(cvText);
+    });
     if (hit) found.push(req);
     else missing.push(req);
   });
@@ -115,8 +121,8 @@ const buildEmailHtml = (job, pack, token, siteUrl) => {
     : "Not checked";
   const atsColour = atsCoverage && atsCoverage.score >= 80 ? "#16a34a" : "#d97706";
 
-  const goUrl = `${siteUrl}/.netlify/functions/auto-apply-decision?jobId=${encodeURIComponent(job.id)}&token=${token}&decision=go`;
-  const nogoUrl = `${siteUrl}/.netlify/functions/auto-apply-decision?jobId=${encodeURIComponent(job.id)}&token=${token}&decision=nogo`;
+  const goUrl = `${siteUrl}/.netlify/functions/auto-apply-decision?jobId=${encodeURIComponent(job.id)}&token=${encodeURIComponent(token)}&decision=go`;
+  const nogoUrl = `${siteUrl}/.netlify/functions/auto-apply-decision?jobId=${encodeURIComponent(job.id)}&token=${encodeURIComponent(token)}&decision=nogo`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -140,7 +146,7 @@ const buildEmailHtml = (job, pack, token, siteUrl) => {
     </table>
     ${qualityNotes.length ? `<div style="background:#fef9c3;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#854d0e;"><strong>Quality notes:</strong><ul style="margin:6px 0 0;padding-left:18px;">${qualityNotes.map((n) => `<li>${escHtml(n)}</li>`).join("")}</ul></div>` : ""}
     ${atsCoverage && atsCoverage.missing.length ? `<div style="background:#fef3c7;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;"><strong>Missing keywords:</strong> ${escHtml(atsCoverage.missing.slice(0, 5).join(", "))}${atsCoverage.missing.length > 5 ? ` +${atsCoverage.missing.length - 5} more` : ""}</div>` : ""}
-    <a href="${escHtml(job.link || '#')}" style="display:inline-block;padding:8px 16px;background:#f1f5f9;border-radius:6px;color:#4f46e5;text-decoration:none;font-size:13px;font-weight:600;">View Job Listing →</a>
+    <a href="${escHtml(/^https?:\/\//i.test(job.link || '') ? job.link : '#')}" style="display:inline-block;padding:8px 16px;background:#f1f5f9;border-radius:6px;color:#4f46e5;text-decoration:none;font-size:13px;font-weight:600;">View Job Listing →</a>
   </div>
 
   <div style="padding:0 28px 24px;">
@@ -363,7 +369,6 @@ exports.handler = async (event) => {
 
         const emailSentAt = new Date().toISOString();
         await db.collection("jobs").doc(job.id).update({
-          auto_apply_token: token,
           auto_apply_email_sent_at: emailSentAt,
           updated_at: emailSentAt,
         });
