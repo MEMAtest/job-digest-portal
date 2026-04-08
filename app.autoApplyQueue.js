@@ -143,6 +143,7 @@ const renderApprovedSection = (container, jobs) => {
   container.innerHTML = `
     <div class="aa-section">
       <h3 class="aa-section__title">Approved — Ready to Submit <span class="aa-badge aa-badge--approved">${approved.length}</span></h3>
+      ${approved.length > 0 ? `<p class="aa-section__hint">Click <strong>Auto-submit</strong> to let Playwright fill and submit the form automatically (requires the local Apply Assistant server running). Or click <strong>Apply manually</strong> to open the job and apply yourself.</p>` : ""}
       ${approved.length === 0
         ? '<p class="aa-empty">No approved applications yet.</p>'
         : approved.map((job) => `
@@ -151,14 +152,34 @@ const renderApprovedSection = (container, jobs) => {
               <div class="aa-job-card__role">${escHtml(job.role || "Role")}</div>
               <div class="aa-job-card__company">${escHtml(job.company || "")}${job.fit_score ? ` · ${job.fit_score}/100` : ""}</div>
               ${job.auto_apply_decision_at ? `<div class="aa-job-card__meta">Approved ${formatDate(job.auto_apply_decision_at)}</div>` : ""}
+              ${job.ats_family ? `<div class="aa-job-card__meta">ATS: ${escHtml(job.ats_family)}</div>` : ""}
             </div>
             <div class="aa-job-card__actions">
               <span class="aa-badge aa-badge--approved">Approved</span>
-              <button class="btn btn-primary aa-submit-btn" data-job-id="${escHtml(job.id)}">Submit now</button>
+              ${job.link ? `<a href="${escHtml(job.link)}" target="_blank" rel="noopener" class="btn btn-secondary aa-manual-btn" data-job-id="${escHtml(job.id)}">Apply manually</a>` : ""}
+              <button class="btn btn-primary aa-submit-btn" data-job-id="${escHtml(job.id)}" title="Requires local Apply Assistant server">Auto-submit</button>
             </div>
           </div>`).join("")}
     </div>
   `;
+
+  container.querySelectorAll(".aa-manual-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const jobId = btn.dataset.jobId;
+      // Mark as applied when user manually applies
+      try {
+        await fetch("/.netlify/functions/firestore-update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            collection: "jobs",
+            id: jobId,
+            data: { auto_apply_status: "applied", application_status: "applied", updated_at: new Date().toISOString() },
+          }),
+        });
+      } catch {}
+    });
+  });
 
   container.querySelectorAll(".aa-submit-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -170,15 +191,15 @@ const renderApprovedSection = (container, jobs) => {
       btn.textContent = "Checking server…";
       const healthy = await checkServerHealth();
       if (!healthy) {
-        showToast("Local Apply Assistant not running. Start it with: npm run apply-assistant");
+        showToast("Local Apply Assistant not running. Use 'Apply manually' instead, or start the server with: npm run apply-assistant");
         btn.disabled = false;
-        btn.textContent = "Submit now";
+        btn.textContent = "Auto-submit";
         return;
       }
       btn.textContent = "Submitting…";
       await launchApplyAssistant(job, { autoSubmit: true });
       btn.disabled = false;
-      btn.textContent = "Submit now";
+      btn.textContent = "Auto-submit";
     });
   });
 };
