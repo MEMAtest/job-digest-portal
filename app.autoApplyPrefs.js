@@ -91,6 +91,17 @@ export const renderAutoApplyPrefs = (container) => {
           <button id="aa-scan-now" class="btn btn-secondary">Scan now</button>
         </div>
         <div id="aa-prefs-status" class="aa-prefs-status hidden"></div>
+        <hr class="aa-prefs-divider" />
+        <div class="aa-prefs-scraper">
+          <div class="aa-prefs-scraper__info">
+            <strong>Job board scraper</strong>
+            <span>Fetches fresh listings from Greenhouse, Lever, WorkInStartups and other sources into the portal.</span>
+          </div>
+          <div class="aa-prefs-actions">
+            <button id="aa-run-scraper" class="btn btn-secondary">Run scraper</button>
+          </div>
+          <div id="aa-scraper-status" class="aa-prefs-status hidden"></div>
+        </div>
       </div>
     </div>
   `;
@@ -106,6 +117,8 @@ export const renderAutoApplyPrefs = (container) => {
   const saveBtn = container.querySelector("#aa-save-prefs");
   const scanBtn = container.querySelector("#aa-scan-now");
   const statusEl = container.querySelector("#aa-prefs-status");
+  const scraperBtn = container.querySelector("#aa-run-scraper");
+  const scraperStatusEl = container.querySelector("#aa-scraper-status");
 
   const showStatus = (msg, isError = false) => {
     if (!statusEl) return;
@@ -175,6 +188,87 @@ export const renderAutoApplyPrefs = (container) => {
         scanBtn.disabled = false;
         scanBtn.textContent = "Scan now";
       }
+    });
+  }
+
+  const showScraperStatus = (msg, isError = false) => {
+    if (!scraperStatusEl) return;
+    scraperStatusEl.textContent = msg;
+    scraperStatusEl.className = `aa-prefs-status ${isError ? "aa-prefs-status--error" : "aa-prefs-status--ok"}`;
+    scraperStatusEl.classList.remove("hidden");
+  };
+
+  const hideScraperStatus = () => scraperStatusEl?.classList.add("hidden");
+
+  if (scraperBtn) {
+    scraperBtn.addEventListener("click", async () => {
+      scraperBtn.disabled = true;
+      scraperBtn.textContent = "Queuing…";
+      showScraperStatus("Queuing scraper run — will start within 2 minutes…");
+
+      try {
+        const res = await fetch("/.netlify/functions/firestore-update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            collection: "run_requests",
+            id: "latest",
+            data: { status: "pending", triggered_by: "web", requested_at: new Date().toISOString() },
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to queue scraper run");
+      } catch (err) {
+        showScraperStatus(err.message || "Failed to queue run", true);
+        scraperBtn.disabled = false;
+        scraperBtn.textContent = "Run scraper";
+        return;
+      }
+
+      scraperBtn.textContent = "Running…";
+      let polls = 0;
+      const maxPolls = 20; // 5 minutes (20 × 15s)
+
+      const poll = setInterval(async () => {
+        polls++;
+        try {
+          const res = await fetch("/.netlify/functions/run-status?id=latest");
+          const json = await res.json();
+          const status = json?.data?.status;
+
+          if (status === "running") {
+            showScraperStatus("Scraper is running…");
+          } else if (status === "done") {
+            clearInterval(poll);
+            showScraperStatus("Scraper finished — refreshing jobs…");
+            scraperBtn.disabled = false;
+            scraperBtn.textContent = "Run scraper";
+            // Reload jobs list
+            try {
+              const jobsRes = await fetch("/.netlify/functions/jobs?limit=200");
+              if (jobsRes.ok) {
+                const data = await jobsRes.json();
+                if (Array.isArray(data?.jobs) && data.jobs.length > 0) {
+                  const { state } = await import("./app.core.js");
+                  state.jobs = data.jobs;
+                }
+              }
+            } catch {}
+            setTimeout(hideScraperStatus, 4000);
+          } else if (status === "error") {
+            clearInterval(poll);
+            showScraperStatus("Scraper run failed — check logs.", true);
+            scraperBtn.disabled = false;
+            scraperBtn.textContent = "Run scraper";
+          } else if (polls >= maxPolls) {
+            clearInterval(poll);
+            showScraperStatus("Timed out waiting for scraper. Check if run_watcher is running on your Mac.", true);
+            scraperBtn.disabled = false;
+            scraperBtn.textContent = "Run scraper";
+          }
+        } catch {
+          // ignore transient poll errors
+        }
+      }, 15000);
     });
   }
 };

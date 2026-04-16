@@ -2741,6 +2741,31 @@
   color: #991b1b;
 }
 
+.aa-prefs-divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 16px 0 12px;
+}
+
+.aa-prefs-scraper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aa-prefs-scraper__info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.aa-prefs-scraper__info strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
 /* ─────────────────────────────────────────────
    No-Go reason modal
 ───────────────────────────────────────────── */

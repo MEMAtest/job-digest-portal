@@ -60,6 +60,9 @@ GREENHOUSE_BOARDS = [
     "rapyd",
     "plaid",
     "marqeta",
+    "liberis",
+    "lyst",
+    "zego",
 ]
 
 LEVER_BOARDS = [
@@ -104,6 +107,9 @@ LEVER_BOARDS = [
     "actimize",
     "saphyre",
     "encompass",
+    "liberis",
+    "lyst",
+    "zego",
 ]
 
 SMARTRECRUITERS_COMPANIES = [
@@ -153,6 +159,13 @@ WORKABLE_ACCOUNTS = [
     "caxton",         # 27 live jobs (FX/payments)
     "yapily",         # 10 live jobs (open banking API)
 ]
+
+LOW_SIGNAL_BOARD_SOURCES = {
+    "JobServe",
+    "Totaljobs",
+    "CWJobs",
+    "Jobsite",
+}
 
 EXTRA_GREENHOUSE = [x.strip() for x in os.getenv("JOB_DIGEST_GREENHOUSE_BOARDS", "").split(",") if x.strip()]
 EXTRA_LEVER = [x.strip() for x in os.getenv("JOB_DIGEST_LEVER_BOARDS", "").split(",") if x.strip()]
@@ -223,5 +236,8 @@ JOB_BOARD_SOURCES = [
     {"name": "JobServe", "type": "html", "url": "https://jobserve.com/gb/en/Job-Search/"},
     {"name": "WorkInStartups", "type": "html", "url": "https://workinstartups.com"},
 ]
+
+if os.getenv("JOB_DIGEST_ENABLE_LOW_SIGNAL_BOARDS", "false").lower() != "true":
+    JOB_BOARD_SOURCES = [source for source in JOB_BOARD_SOURCES if source["name"] not in LOW_SIGNAL_BOARD_SOURCES]
 
 JOB_BOARD_URLS = {source["name"]: source["url"] for source in JOB_BOARD_SOURCES}
