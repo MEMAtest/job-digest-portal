@@ -184,11 +184,23 @@ export const setCollectionNames = (config = {}) => {
   notificationsCollection = config.notificationsCollection || notificationsCollection;
 };
 
+export const normalizeApplicationStatus = (value) => {
+  const status = String(value || "saved").trim().toLowerCase();
+  if (!status) return "saved";
+  if (status === "dismiss") return "dismissed";
+  if (status === "shortlist") return "shortlisted";
+  return status;
+};
+
+export const getApplicationStatus = (job) => normalizeApplicationStatus(job?.application_status);
+
 export const state = {
   jobs: [],
   sources: new Set(),
   sourceFamilies: new Set(),
   locations: new Set(),
+  dataMeta: null,
+  emptyStateReason: "",
   candidatePrep: {},
   roleSuggestions: null,
   activePrepJob: null,
@@ -376,9 +388,63 @@ export const parseDateValue = (value) => {
     const secs = value._seconds ?? value.seconds;
     if (typeof secs === "number") return new Date(secs * 1000);
   }
+  // Date-only strings (YYYY-MM-DD) are parsed by JS as UTC midnight, which shifts them
+  // one hour into the previous local day in BST. Force local-time parsing by appending a time.
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    const date = new Date(`${value.trim()}T00:00:00`);
+    if (!Number.isNaN(date.getTime())) return date;
+  }
   const date = new Date(value);
   if (!Number.isNaN(date.getTime())) return date;
   return null;
+};
+
+export const PORTAL_FRESH_HOURS = 24;
+
+export const getEffectivePortalFreshHours = () => {
+  const metaHours = Number(state.dataMeta?.window_hours || 0);
+  if (Number.isFinite(metaHours) && metaHours > 0) return metaHours;
+  return PORTAL_FRESH_HOURS;
+};
+
+const parseRelativeHours = (value) => {
+  const text = String(value || "").trim().toLowerCase();
+  if (!text) return null;
+  if (text === "new" || text.includes("newly posted") || text.includes("just now") || text.includes("today")) return 0;
+  if (text.includes("minute") || /\bmin\b/.test(text)) return 1 / 60;
+  if (text.includes("yesterday")) return 24;
+  const match = text.match(/(\d+)/);
+  const amount = match ? Number(match[1]) : null;
+  if (!amount) return null;
+  if (text.includes("hour")) return amount;
+  if (text.includes("day")) return amount * 24;
+  if (text.includes("week")) return amount * 7 * 24;
+  return null;
+};
+
+export const getJobRecencyDate = (job) => {
+  if (!job) return null;
+  return (
+    parseDateValue(job.posted_date) ||
+    parseDateValue(job.last_seen_at) ||
+    parseDateValue(job.created_at) ||
+    parseDateValue(job.updated_at)
+  );
+};
+
+export const isFreshPortalJob = (job, windowHours = PORTAL_FRESH_HOURS) => {
+  if (!job) return false;
+  const exactDate = parseDateValue(job.posted_date);
+  if (exactDate) {
+    return Date.now() - exactDate.getTime() <= windowHours * 3600000;
+  }
+  const relativeHours = parseRelativeHours(job.posted_raw || job.posted || "");
+  if (relativeHours !== null) {
+    return relativeHours <= windowHours;
+  }
+  const fallbackDate = parseDateValue(job.last_seen_at || job.created_at || job.updated_at);
+  if (!fallbackDate) return false;
+  return Date.now() - fallbackDate.getTime() <= windowHours * 3600000;
 };
 
 export const isPostedToday = (job) => {

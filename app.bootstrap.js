@@ -47,6 +47,9 @@ import {
   isPostedToday,
   isFreshPortalJob,
   PORTAL_FRESH_HOURS,
+  normalizeApplicationStatus,
+  getApplicationStatus,
+  getEffectivePortalFreshHours,
   resetFilters,
   getJobAtsFamily,
   getJobSourceFamily,
@@ -155,17 +158,70 @@ const fetchProxyJson = async (url) => {
   return res.json();
 };
 
-const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
-  const curatedJobs = jobs.filter((job) => {
+const parseMetaInt = (value, fallback = null) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const buildResolvedMeta = (jobs, meta = {}, source = "direct") => {
+  const windowHours = parseMetaInt(meta.window_hours, PORTAL_FRESH_HOURS);
+  const normalizedJobs = jobs.map((job) => ({
+    ...job,
+    application_status: normalizeApplicationStatus(job?.application_status),
+  }));
+  const savedNewTotal = normalizedJobs.filter((job) => ["saved", "new"].includes(getApplicationStatus(job))).length;
+  const freshSavedNewCount = normalizedJobs.filter(
+    (job) => ["saved", "new"].includes(getApplicationStatus(job)) && isFreshPortalJob(job, windowHours)
+  ).length;
+  const collection = meta.collection || collectionName;
+
+  return {
+    source,
+    project_id: meta.project_id || window.FIREBASE_CONFIG?.projectId || "",
+    collection,
+    window_hours: windowHours,
+    min_score: meta.min_score ?? null,
+    company_search_limit: meta.company_search_limit ?? null,
+    job_board_count: meta.job_board_count ?? null,
+    workday_feed_count: meta.workday_feed_count ?? null,
+    queried_docs: meta.queried_docs ?? normalizedJobs.length,
+    returned_jobs: meta.returned_jobs ?? normalizedJobs.length,
+    saved_new_total: meta.saved_new_total ?? savedNewTotal,
+    fresh_saved_new_count: meta.fresh_saved_new_count ?? freshSavedNewCount,
+    stale_saved_new_count: meta.stale_saved_new_count ?? Math.max(savedNewTotal - freshSavedNewCount, 0),
+    empty_reason:
+      meta.empty_reason ||
+      (freshSavedNewCount === 0 ? `0 fresh saved/new jobs in collection ${collection} within last ${windowHours}h.` : ""),
+    generated_at: meta.generated_at || new Date().toISOString(),
+  };
+};
+
+const buildDatasetLabel = (meta) => {
+  const projectId = meta?.project_id || window.FIREBASE_CONFIG?.projectId || "unknown-project";
+  const collection = meta?.collection || collectionName;
+  const source = meta?.source || "direct";
+  return `${projectId}/${collection} via ${source}`;
+};
+
+const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep, meta }) => {
+  const normalizedJobs = jobs.map((job) => ({
+    ...job,
+    application_status: normalizeApplicationStatus(job?.application_status),
+  }));
+  const resolvedMeta = buildResolvedMeta(normalizedJobs, meta, meta?.source || (useProxy ? "proxy" : "direct"));
+  const freshWindowHours = parseMetaInt(resolvedMeta.window_hours, PORTAL_FRESH_HOURS);
+  const curatedJobs = normalizedJobs.filter((job) => {
     // Always keep jobs in the auto-apply pipeline regardless of age
     if (job?.auto_apply_status) return true;
-    const status = (job.application_status || "saved").toLowerCase();
+    const status = getApplicationStatus(job);
     if (status === "saved" || status === "new") {
-      return isFreshPortalJob(job);
+      return isFreshPortalJob(job, freshWindowHours);
     }
     return true;
   });
 
+  state.dataMeta = resolvedMeta;
+  state.emptyStateReason = resolvedMeta.empty_reason || "";
   state.jobs = curatedJobs.map((job) => ({
     ...job,
     source_family: job.source_family || getJobSourceFamily(job),
@@ -184,7 +240,7 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
   renderFollowUpBanner(state.jobs);
   renderFilters();
   if (sortBySelect) sortBySelect.value = "posted";
-  if (statusSelect && state.jobs.some((job) => ["saved", "new"].includes((job.application_status || "saved").toLowerCase()))) {
+  if (statusSelect && state.jobs.some((job) => ["saved", "new"].includes(getApplicationStatus(job)))) {
     statusSelect.value = "saved";
   }
   renderJobs();
@@ -193,15 +249,34 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep }) => {
   renderTriagePrompt(state.jobs);
 
   const nowLabel = new Date().toLocaleString();
-  const freshTodayCount = state.jobs.filter((job) => {
-    const s = (job.application_status || "saved").toLowerCase();
-    return isFreshPortalJob(job) && (s === "new" || s === "saved");
+  const generatedAt = new Date(resolvedMeta.generated_at || Date.now());
+  const generatedAtLabel = Number.isNaN(generatedAt.getTime()) ? nowLabel : generatedAt.toLocaleString();
+  const freshInboxCount = state.jobs.filter((job) => {
+    const status = getApplicationStatus(job);
+    return isFreshPortalJob(job, freshWindowHours) && (status === "new" || status === "saved");
   }).length;
+  const datasetLabel = buildDatasetLabel(resolvedMeta);
   if (summaryLine) {
-    summaryLine.textContent = `${state.jobs.length} roles loaded · ${freshTodayCount} fresh in last ${PORTAL_FRESH_HOURS}h · Last update ${nowLabel}`;
+    summaryLine.textContent = `${state.jobs.length} roles loaded · ${freshInboxCount} fresh inbox in last ${freshWindowHours}h · ${datasetLabel} · Updated ${generatedAtLabel}`;
   }
-  if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${nowLabel}`;
-  if (lastUpdatedFooter) lastUpdatedFooter.textContent = `Updated: ${nowLabel}`;
+  if (runStatusLine) {
+    const parts = [datasetLabel, `window ${freshWindowHours}h`];
+    if (resolvedMeta.min_score !== null && resolvedMeta.min_score !== undefined) {
+      parts.push(`min fit ${resolvedMeta.min_score}%`);
+    }
+    if (resolvedMeta.company_search_limit !== null && resolvedMeta.company_search_limit !== undefined) {
+      parts.push(`company batch ${resolvedMeta.company_search_limit}`);
+    }
+    if (resolvedMeta.job_board_count !== null && resolvedMeta.job_board_count !== undefined) {
+      parts.push(`boards ${resolvedMeta.job_board_count}`);
+    }
+    if (resolvedMeta.workday_feed_count !== null && resolvedMeta.workday_feed_count !== undefined) {
+      parts.push(`workday feeds ${resolvedMeta.workday_feed_count}`);
+    }
+    runStatusLine.textContent = parts.join(" · ");
+  }
+  if (lastUpdatedLabel) lastUpdatedLabel.textContent = `Updated: ${generatedAtLabel}`;
+  if (lastUpdatedFooter) lastUpdatedFooter.textContent = `Updated: ${generatedAtLabel}`;
 
   if (stats && Array.isArray(stats)) {
     renderSourceStats(stats);
@@ -224,6 +299,7 @@ const loadJobsViaProxy = async () => {
       stats: data.stats || [],
       suggestions: data.suggestions || null,
       candidatePrep: data.candidatePrep || null,
+      meta: { ...(data.meta || {}), source: "proxy" },
     });
     if (alertBanner && alertBanner.textContent.toLowerCase().includes("browser blocked firestore")) {
       clearAlertBanner();
@@ -290,7 +366,18 @@ const loadJobsDirect = async () => {
   }
 
   setProxyMode(false);
-  await applyLoadedJobs({ jobs, stats, suggestions, candidatePrep });
+  await applyLoadedJobs({
+    jobs,
+    stats,
+    suggestions,
+    candidatePrep,
+    meta: {
+      source: "direct",
+      project_id: window.FIREBASE_CONFIG?.projectId || "",
+      collection: collectionName,
+      window_hours: getEffectivePortalFreshHours(),
+    },
+  });
 
   if (warnParts.length && alertBanner) {
     const detailList = warnParts
@@ -505,20 +592,18 @@ const loadJobs = async () => {
   if (summaryLine) summaryLine.textContent = "Fetching latest roles…";
   clearAlertBanner();
 
-  if (!window.FIREBASE_CONFIG) {
-    if (summaryLine) summaryLine.textContent = "Missing Firebase config. Add config.js first.";
-    if (alertBanner) {
-      alertBanner.classList.remove("hidden");
-      alertBanner.innerHTML =
-        "<strong>Setup required:</strong> Add your Firebase config in <code>config.js</code>.";
-    }
-    return;
-  }
+  const proxyOk = await loadJobsViaProxy();
+  if (proxyOk) return;
 
   try {
-    if (useProxy) {
-      const proxyOk = await loadJobsViaProxy();
-      if (proxyOk) return;
+    if (!window.FIREBASE_CONFIG) {
+      if (summaryLine) summaryLine.textContent = "Missing Firebase config. Add config.js first.";
+      if (alertBanner) {
+        alertBanner.classList.remove("hidden");
+        alertBanner.innerHTML =
+          "<strong>Setup required:</strong> Add your Firebase config in <code>config.js</code>.";
+      }
+      return;
     }
 
     await loadJobsDirect();

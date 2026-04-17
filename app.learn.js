@@ -361,116 +361,208 @@ const LEARN_GUIDES = [
     ],
   },
   {
-    id: "api-integration-patterns",
-    title: "API Integration Patterns",
+    id: "how-apis-work",
+    title: "How APIs Work",
     icon: "🔌",
     category: "platforms",
-    blurb: "The practical patterns behind onboarding APIs, vendor dependencies and operational resilience.",
+    blurb: "What APIs actually are, how requests and responses work, and how data flows between platforms you have delivered on.",
     slides: [
       {
-        title: "Vendor and endpoint landscape",
-        visual: matrixDiagram(
-          [
-            { title: "Core systems", items: ["CLM", "CRM", "Workflow"] },
-            { title: "Control vendors", items: ["Screening", "Risk", "Identity"] },
-            { title: "Outputs", items: ["Cases", "MI", "Activation"] },
-          ],
-          "The product problem is coordinating dependencies, not just wiring endpoints together.",
-        ),
+        title: "What is an API?",
+        visual: flowDiagram(["Building A (your app)", "Courier (API)", "Building B (their system)"], {
+          caption: "An API is a courier: it carries requests and returns responses between two systems.",
+          tones: ["primary", "warning", "success"],
+        }),
         explanation: paragraphs(
-          "Integration patterns are driven by workflow intent. Each system needs a clear contract: what it owns, what it receives and what it returns into the journey.",
-          "That is how you prevent brittle dependencies and duplicated logic.",
+          "An API (Application Programming Interface) is a defined contract between two systems. One system sends a request; the other processes it and sends back a response.",
+          "Think of two office buildings. Building A needs data from Building B. Instead of direct access, a courier (the API) carries the request over and brings back exactly what was asked for — no more, no less.",
         ),
       },
       {
-        title: "Payload and field design",
-        visual: flowDiagram(["Source payload", "Validation layer", "Canonical model", "Vendor-specific mapping"], {
-          caption: "A canonical model reduces rework when platforms or providers change.",
+        title: "GET vs POST — the two main verbs",
+        visual: compareDiagram({
+          beforeTitle: "GET — fetch data",
+          beforeItems: ["Read-only", "No body sent", "e.g. retrieve client record", "Safe to repeat"],
+          afterTitle: "POST — send data",
+          afterItems: ["Creates or updates", "Body contains payload", "e.g. submit KYC form", "Has side effects"],
+          caption: "Choosing the right verb keeps integrations predictable and auditable.",
+        }),
+        explanation: paragraphs(
+          "GET requests read data without changing anything. POST requests send data to create or trigger something.",
+          "In a KYC flow, a GET retrieves the client risk profile; a POST submits the completed CDD form. Knowing the difference matters when writing acceptance criteria and debugging failures.",
+        ),
+      },
+      {
+        title: "Request and response anatomy",
+        visual: flowDiagram(["Headers (auth, format)", "URL + method", "Body (payload)", "→ API →", "Status code + response body"], {
+          caption: "A 200 means success. A 400 means bad request. A 500 means the server failed.",
           direction: "col",
+          tones: ["", "", "primary", "warning", "success"],
+        }),
+        explanation: paragraphs(
+          "Every API call has the same anatomy: a URL (where to call), a method (what to do), headers (who you are, what format), and optionally a body (the data you are sending).",
+          "The response tells you whether it worked. Status codes in the 200s mean success; 400s mean the caller did something wrong; 500s mean the server failed.",
+        ),
+      },
+      {
+        title: "Authentication — how systems trust each other",
+        visual: matrixDiagram(
+          [
+            { title: "API Keys", items: ["Simple token", "Passed in header", "Used at Ebury/Napier"] },
+            { title: "OAuth 2.0", items: ["Token exchange", "Scoped access", "Common in SaaS"] },
+            { title: "mTLS", items: ["Certificate-based", "Both sides verified", "High-security flows"] },
+          ],
+          "Auth method should match the sensitivity of data crossing the boundary.",
+        ),
+        explanation: paragraphs(
+          "APIs need a way to verify that the caller is who they say they are. API keys are the simplest — a shared secret passed in each request.",
+          "OAuth is more sophisticated: the caller first exchanges credentials for a short-lived token, then uses that token. In regulated fintech, cert-based mutual TLS (mTLS) is used where both sides must prove identity.",
+        ),
+      },
+      {
+        title: "Salesforce ↔ Fenergo data flow",
+        visual: `<div class="diagram"><div class="diagram-row" style="align-items:flex-start;gap:16px;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:center;">
+            <div class="diagram-box diagram-box--primary" style="min-width:140px;text-align:center;"><strong>Salesforce</strong><br><span style="font-size:12px;color:#64748b;">CRM — client records, accounts, contacts</span></div>
+            <div style="font-size:12px;color:#64748b;">POST /clients → Fenergo</div>
+            <div style="font-size:12px;color:#64748b;">GET /risk-profile ← Fenergo</div>
+          </div>
+          <div class="diagram-arrow" style="align-self:center;font-size:22px;">⇄</div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:center;">
+            <div class="diagram-box diagram-box--success" style="min-width:140px;text-align:center;"><strong>Fenergo</strong><br><span style="font-size:12px;color:#64748b;">CLM — KYC workflow, risk decisions, approvals</span></div>
+            <div style="font-size:12px;color:#64748b;">50k records migrated</div>
+            <div style="font-size:12px;color:#64748b;">Bi-directional sync</div>
+          </div>
+        </div><div class="diagram-caption">Salesforce owns the client relationship; Fenergo owns the compliance workflow. The API keeps them in sync.</div></div>`,
+        explanation: paragraphs(
+          "In the Ebury migration, Salesforce held 50,000 client records. Fenergo needed those records to run KYC workflows — but neither system should hold the other's data redundantly.",
+          "The API integration meant Salesforce stayed the CRM source of truth while Fenergo pulled what it needed to drive compliance decisions. Changes in one system propagated to the other via the API contract.",
+        ),
+      },
+      {
+        title: "Webhooks — APIs that push instead of pull",
+        visual: flowDiagram(["Event happens in System B", "Webhook fires automatically", "System A receives notification", "System A acts on it"], {
+          caption: "Webhooks remove the need for System A to keep polling for updates.",
           tones: ["", "warning", "primary", "success"],
         }),
         explanation: paragraphs(
-          "The most important design choice is usually the canonical model. If every integration maps directly to every other system, change becomes expensive. If the data contract is explicit, platform evolution gets easier.",
-          "That is a product architecture decision, not just an engineering concern.",
+          "Normal APIs require the caller to ask: 'has anything changed?' Webhooks flip this — System B calls System A the moment something happens.",
+          "In a KYC context, a webhook might fire when a screening check completes in Napier, automatically updating the case status in Fenergo without any manual polling.",
         ),
       },
       {
         title: "Error handling and retries",
-        visual: funnelDiagram(["Primary request", "Validation failure", "Retry or repair", "Exception queue", "Resolution"], "Resilience needs explicit paths for both transient and structural failures."),
+        visual: funnelDiagram(
+          ["API call made", "Timeout / 500 error", "Retry (with backoff)", "Still failing → dead-letter queue", "Ops notified → manual resolution"],
+          "Good error design keeps failures visible and recoverable — operations should never absorb API failures silently.",
+        ),
         explanation: paragraphs(
-          "API work should assume failure. The system needs different responses for timeouts, malformed payloads, upstream outages and policy conflicts. Otherwise operations absorbs the ambiguity manually.",
-          "Good error design keeps failures visible and recoverable.",
+          "Integrations should never assume success. Transient failures (network blip, server restart) should be retried automatically with backoff. Structural failures (bad payload, auth expired) need different handling — retrying a 400 will never work.",
+          "Dead-letter queues catch failures that exhaust retries, making them visible for ops resolution without losing the original request.",
         ),
       },
       {
-        title: "Reporting outputs and dependency management",
-        visual: compareDiagram({
-          beforeTitle: "Weak integration governance",
-          beforeItems: ["Opaque failures", "No owner", "Patchy MI"],
-          afterTitle: "Managed integration stack",
-          afterItems: ["Named owners", "Error telemetry", "Decision-grade reporting"],
-          caption: "Operational resilience depends on named ownership across system boundaries.",
-        }),
+        title: "How to talk about APIs in interviews",
+        visual: matrixDiagram(
+          [
+            { title: "As a PM, you own", items: ["The contract (what data, what format)", "Acceptance criteria for each endpoint", "Error handling requirements", "Monitoring and alerting spec"] },
+            { title: "You do not own", items: ["Implementation language", "Framework choice", "Internal server logic"] },
+          ],
+          "PMs own the interface contract and operational outcomes — not the implementation details.",
+        ),
         explanation: paragraphs(
-          "Once multiple platforms contribute to one onboarding flow, dependency management becomes a management problem. It needs service expectations, named owners, monitoring signals and a decision process for defects and vendor changes.",
-          "That is how integration patterns stay workable at scale.",
+          "When asked about APIs in interviews, frame your answer around product ownership: what data crosses the boundary, what the success and failure criteria are, and how you ensured the integration stayed reliable in production.",
+          "The Salesforce→Fenergo migration is your best example: you defined the field mapping, the data contract, the cutover acceptance criteria, and the monitoring approach for 50k records.",
         ),
       },
     ],
   },
   {
-    id: "mi-reporting-stack",
-    title: "MI and Reporting Stack",
+    id: "regtech-stack",
+    title: "RegTech Stack at a Glance",
     icon: "📊",
     category: "platforms",
-    blurb: "How operational MI supports control decisions, backlog prioritisation and executive visibility.",
+    blurb: "How Salesforce, Fenergo, Napier and Enate connect — and the data that flows between all four.",
     slides: [
       {
-        title: "Power BI and Fabric reporting view",
-        visual: flowDiagram(["Source systems", "Modelled data layer", "Power BI dashboards", "Executive and ops decisions"], {
-          caption: "Useful MI starts with modelled operational definitions, not dashboard styling.",
-          tones: ["", "primary", "primary", "success"],
-        }),
-        explanation: paragraphs(
-          "MI becomes powerful when the business trusts the definitions behind it. Lead time, queue age, exception volume and risk outcomes all need stable calculation logic before they can support decision-making.",
-          "That is why reporting architecture belongs close to process ownership.",
-        ),
-      },
-      {
-        title: "Operational metrics and dashboards",
+        title: "The four platforms and what each owns",
         visual: matrixDiagram(
           [
-            { title: "Flow", items: ["Cycle time", "Stage ageing", "Rework"] },
-            { title: "Controls", items: ["EDD rate", "Screening alerts", "Approvals"] },
-            { title: "Delivery", items: ["Backlog", "Defects", "Release impact"] },
+            { title: "Salesforce", items: ["CRM", "Client records", "Relationship data"] },
+            { title: "Fenergo", items: ["CLM", "KYC workflow", "Risk decisions"] },
+            { title: "Napier", items: ["AML screening", "Alert generation", "Watchlist matching"] },
+            { title: "Enate", items: ["Orchestration", "Work queues", "Task routing"] },
           ],
-          "A useful dashboard ties workflow, control and delivery signals together.",
+          "Each platform owns a distinct layer. The integration problem is keeping them coherent.",
         ),
         explanation: paragraphs(
-          "Dashboards should help answer action-oriented questions: where is work stuck, what changed this week, which controls are driving load and what intervention should happen next.",
-          "Reporting that cannot drive an action is usually too abstract.",
+          "The RegTech stack is not one system — it is four systems with distinct responsibilities that need to stay in sync.",
+          "Salesforce owns the client relationship. Fenergo owns the compliance workflow. Napier generates AML alerts. Enate orchestrates the work that humans need to do across all three.",
         ),
       },
       {
-        title: "Regulatory visibility",
+        title: "How data flows across the full stack",
+        visual: `<div class="diagram"><div class="diagram-row" style="flex-wrap:wrap;gap:8px;justify-content:center;align-items:center;">
+          <div class="diagram-box diagram-box--primary" style="text-align:center;min-width:110px;"><strong>Salesforce</strong><br><span style="font-size:11px;color:#64748b;">Client record created</span></div>
+          <div class="diagram-arrow">→</div>
+          <div class="diagram-box diagram-box--success" style="text-align:center;min-width:110px;"><strong>Fenergo</strong><br><span style="font-size:11px;color:#64748b;">KYC case opened</span></div>
+          <div class="diagram-arrow">→</div>
+          <div class="diagram-box diagram-box--warning" style="text-align:center;min-width:110px;"><strong>Napier</strong><br><span style="font-size:11px;color:#64748b;">Screening run</span></div>
+          <div class="diagram-arrow">→</div>
+          <div class="diagram-box" style="text-align:center;min-width:110px;border-color:#8b5cf6;background:#f5f3ff;"><strong>Enate</strong><br><span style="font-size:11px;color:#64748b;">Work item routed</span></div>
+        </div><div class="diagram-caption">A new client onboarding triggers all four platforms in sequence. Delays in any one block the whole journey.</div></div>`,
+        explanation: paragraphs(
+          "When a new client is created in Salesforce, Fenergo opens a KYC case. Fenergo triggers Napier to run screening checks. If Napier raises an alert, Enate routes it to the right analyst queue.",
+          "This is why integration ownership matters: a failure at any handoff point silently stalls onboarding unless you have explicit monitoring at each boundary.",
+        ),
+      },
+      {
+        title: "Where each system sits in the client lifecycle",
+        visual: funnelDiagram(
+          ["Prospect captured → Salesforce", "Onboarding triggered → Fenergo CLM", "Screening completed → Napier", "Analyst review routed → Enate", "Client activated → back to Salesforce"],
+          "The full lifecycle crosses all four platforms. No single system owns the end-to-end journey.",
+        ),
+        explanation: paragraphs(
+          "The client lifecycle is not owned by one system. Salesforce holds the relationship at the start and end. Fenergo holds the compliance decision in the middle. Napier and Enate handle the control layer that sits between collection and decision.",
+          "As a PM, you need to understand these boundaries to write requirements that do not assume one system will do what another one owns.",
+        ),
+      },
+      {
+        title: "Integration failure points — where things break",
         visual: compareDiagram({
-          beforeTitle: "Low-visibility state",
-          beforeItems: ["Lagging updates", "Manual packs", "Weak traceability"],
-          afterTitle: "Visible control state",
-          afterItems: ["Evidence-backed metrics", "Drill-down", "Named remediation owners"],
-          caption: "Regulatory reporting needs traceability into operational facts.",
+          beforeTitle: "Common failure modes",
+          beforeItems: [
+            "SF→Fenergo: field mismatch stalls case open",
+            "Fenergo→Napier: screening not triggered on update",
+            "Napier→Enate: alert lost between queues",
+            "No monitoring → silent failure",
+          ],
+          afterTitle: "Managed integration",
+          afterItems: [
+            "Canonical field map with owner",
+            "Event triggers documented and tested",
+            "Dead-letter queue with ops alert",
+            "Dashboard per boundary",
+          ],
+          caption: "Managed integrations have named owners, explicit contracts and visible failure states.",
         }),
         explanation: paragraphs(
-          "For regulated operations, MI is not just internal management tooling. It also needs to support remediation, audit follow-up and regulator-facing confidence that the process is understood and governed.",
-          "That changes the standard for data lineage and documentation.",
+          "Most onboarding delays in regulated fintechs trace back to integration failures — not slow analysts. The handoff between systems is where data goes missing, events fail to fire, or queues back up silently.",
+          "The fix is not more testing alone. It is explicit ownership of each boundary, documented contracts, and monitoring that alerts before operations absorbs the failure manually.",
         ),
       },
       {
-        title: "Decision-making loops",
-        visual: funnelDiagram(["Observe", "Diagnose", "Prioritise", "Change", "Measure"], "MI is most valuable when it feeds a repeatable governance loop."),
+        title: "How to talk about this stack in interviews",
+        visual: matrixDiagram(
+          [
+            { title: "Platforms you have delivered on", items: ["Salesforce (CRM layer)", "Fenergo (CLM — KYC/AML workflows)", "Napier (AML screening, alert tuning)", "Enate (orchestration and queue design)"] },
+            { title: "Your integration contribution", items: ["50k records Salesforce→Fenergo", "Napier threshold tuning → 38% FP reduction at Ebury", "Enate queue design for analyst routing", "End-to-end onboarding journey ownership"] },
+          ],
+          "You have touched all four layers. That is unusually broad for a PM — use it.",
+        ),
         explanation: paragraphs(
-          "The reporting stack becomes durable when it is built into governance rhythm: weekly ops review, monthly steering, remediation tracking and release impact review.",
-          "That closes the loop between data, product and operating performance.",
+          "Most PMs have depth in one platform. You have worked across all four layers of the RegTech stack — CRM, CLM, screening and orchestration. That breadth is a differentiator in senior fintech PM interviews.",
+          "Frame it as: 'I owned the product across the full client onboarding stack — from CRM capture in Salesforce through KYC workflow in Fenergo, AML screening in Napier, and analyst routing via Enate.' Then anchor it with a metric.",
         ),
       },
     ],

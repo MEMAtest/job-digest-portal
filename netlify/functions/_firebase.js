@@ -53,4 +53,13 @@ const getStorageBucketCandidates = () => {
   return buildStorageBucketCandidates(creds);
 };
 
-module.exports = { getFirestore, getStorageBucket, getStorageBucketCandidates };
+const getFirebaseRuntimeMeta = () => {
+  const creds = parseServiceAccount();
+  return {
+    projectId: creds.project_id || creds.projectId || "",
+    clientEmail: creds.client_email || creds.clientEmail || "",
+    storageBucketCandidates: buildStorageBucketCandidates(creds),
+  };
+};
+
+module.exports = { getFirestore, getStorageBucket, getStorageBucketCandidates, getFirebaseRuntimeMeta };

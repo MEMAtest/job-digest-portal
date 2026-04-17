@@ -34,6 +34,11 @@ import {
   uniqueCompanyOnly,
   applyQuickFilter,
   isPostedToday,
+  isFreshPortalJob,
+  normalizeApplicationStatus,
+  getApplicationStatus,
+  getEffectivePortalFreshHours,
+  getJobRecencyDate,
   parseDateValue,
   resetFilters,
   getJobSourceFamily,
@@ -336,15 +341,16 @@ const handleBulkAction = async (action) => {
 
   const ids = [...state.selectedJobs];
   const now = new Date().toISOString();
+  const normalizedAction = normalizeApplicationStatus(action);
 
   for (const jobId of ids) {
     const job = state.jobs.find((j) => j.id === jobId);
     if (!job) continue;
-    job.application_status = action;
+    job.application_status = normalizedAction;
     if (db) {
       try {
         await updateDoc(doc(db, collectionName, job.id), {
-          application_status: action,
+          application_status: normalizedAction,
           updated_at: now,
         });
       } catch (err) {
@@ -364,7 +370,7 @@ const handleBulkAction = async (action) => {
   updateBulkBar();
   renderJobs();
   if (state.handlers.renderApplyHub) state.handlers.renderApplyHub();
-  const label = action.replace(/_/g, " ");
+  const label = normalizedAction.replace(/_/g, " ");
   showConfirmToast(
     `${ids.length} job${ids.length > 1 ? "s" : ""} → ${label}`,
     "Undo",
@@ -398,9 +404,10 @@ export const getFilteredJobs = () => {
   const statusFilter = statusSelect.value;
   const ukOnly = ukOnlyCheckbox.checked;
   const maxApplicants = Number(maxApplicantsSelect?.value || 0);
+  const freshWindowHours = getEffectivePortalFreshHours();
 
   let filtered = state.jobs.filter((job) => {
-    const jobStatus = (job.application_status || "saved").toLowerCase();
+    const jobStatus = getApplicationStatus(job);
     const fitScore = Number(job.fit_score || 0);
     const matchesFit = fitScore >= minFit;
     const matchesSource = !sourceFilter || job.source === sourceFilter;
@@ -410,6 +417,7 @@ export const getFilteredJobs = () => {
     const matchesUkOnly = !ukOnly || isUkOrRemote(job.location);
     const matchesQuick = !quickFilterPredicate || quickFilterPredicate(job);
     const matchesDismissed = statusFilter === "dismissed" || jobStatus !== "dismissed";
+    const matchesFreshness = !["saved", "new"].includes(jobStatus) || isFreshPortalJob(job, freshWindowHours);
     const matchesApplicants = !maxApplicants || (() => {
       const count = parseApplicantCount(job.applicant_count);
       return count === null || count < maxApplicants;
@@ -424,6 +432,7 @@ export const getFilteredJobs = () => {
       matchesUkOnly &&
       matchesQuick &&
       matchesDismissed &&
+      matchesFreshness &&
       matchesApplicants
     );
   });
@@ -459,14 +468,14 @@ export const getFilteredJobs = () => {
         if (salDelta !== 0) return salDelta;
       }
       if (sortMode === "posted") {
-        const rightDate = parseDateValue(right.posted_date || right.updated_at)?.getTime() || 0;
-        const leftDate = parseDateValue(left.posted_date || left.updated_at)?.getTime() || 0;
+        const rightDate = getJobRecencyDate(right)?.getTime() || 0;
+        const leftDate = getJobRecencyDate(left)?.getTime() || 0;
         if (rightDate !== leftDate) return rightDate - leftDate;
       }
       const fitDelta = Number(right.fit_score || 0) - Number(left.fit_score || 0);
       if (fitDelta !== 0) return fitDelta;
-      const rightDate = parseDateValue(right.posted_date || right.updated_at)?.getTime() || 0;
-      const leftDate = parseDateValue(left.posted_date || left.updated_at)?.getTime() || 0;
+      const rightDate = getJobRecencyDate(right)?.getTime() || 0;
+      const leftDate = getJobRecencyDate(left)?.getTime() || 0;
       return rightDate - leftDate;
     });
 
@@ -509,7 +518,7 @@ const formatStatusLabel = (statusValue) => {
 };
 
 const buildStatusLine = (job) => {
-  const statusValue = (job.application_status || "saved").toLowerCase();
+  const statusValue = getApplicationStatus(job);
   const statusLabel = formatStatusLabel(statusValue);
   const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
   const dateSuffix = statusValue === "applied" && appliedDate ? ` · ${appliedDate}` : "";
@@ -601,7 +610,7 @@ const renderJobDetail = (job, detailEl) => {
   const starStories = formatList(job.star_stories || []);
   const prepQaBlocks = buildPrepQa(job);
   const scorecardList = formatList(job.scorecard || []);
-  const statusValue = (job.application_status || "saved").toLowerCase();
+  const statusValue = getApplicationStatus(job);
   const statusLabel = formatStatusLabel(statusValue);
   const appliedDate = job.application_date ? job.application_date.slice(0, 10) : "";
   const lastTouchDate = job.last_touch_date ? job.last_touch_date.slice(0, 10) : "";
@@ -1254,7 +1263,22 @@ export const renderJobs = () => {
   }
 
   if (!filtered.length) {
-    detailEl.innerHTML = `<div class="job-detail-empty">No roles match these filters yet. Try lowering the fit threshold or clearing filters.</div>`;
+    const hasFilterConstraints =
+      Boolean(queryNorm) ||
+      Boolean(sourceSelect?.value) ||
+      Boolean(sourceFamilySelect?.value) ||
+      Boolean(locationSelect?.value) ||
+      Boolean(ukOnlyCheckbox?.checked) ||
+      Boolean(quickFilterPredicate) ||
+      Boolean(uniqueCompanyOnly) ||
+      Number(minFitSelect?.value || 0) > 0 ||
+      Number(maxApplicantsSelect?.value || 0) > 0 ||
+      Boolean(statusSelect?.value && statusSelect.value !== "saved");
+    const emptyMessage =
+      !hasFilterConstraints && state.emptyStateReason && (!statusSelect?.value || statusSelect.value === "saved")
+        ? state.emptyStateReason
+        : "No roles match these filters yet. Try lowering the fit threshold or clearing filters.";
+    detailEl.innerHTML = `<div class="job-detail-empty">${escapeHtml(emptyMessage)}</div>`;
     return;
   }
 
@@ -1263,7 +1287,7 @@ export const renderJobs = () => {
   }
 
   filtered.forEach((job) => {
-    const statusValue = (job.application_status || "saved").toLowerCase();
+    const statusValue = getApplicationStatus(job);
     const statusLabel = formatStatusLabel(statusValue);
     const postedDisplay = formatPostedMeta(job);
     const applicantDisplay = job.applicant_count ? ` · ${job.applicant_count} applicants` : "";

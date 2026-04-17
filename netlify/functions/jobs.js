@@ -1,7 +1,15 @@
-const { getFirestore } = require("./_firebase");
+const { getFirestore, getFirebaseRuntimeMeta } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
 
 const FRESH_WINDOW_HOURS = Math.max(parseInt(process.env.JOB_DIGEST_WINDOW_HOURS || "24", 10) || 24, 1);
+const DEFAULT_MIN_SCORE = parseInt(process.env.JOB_DIGEST_MIN_SCORE || "70", 10) || 70;
+const DEFAULT_COMPANY_SEARCH_LIMIT = Math.max(parseInt(process.env.JOB_DIGEST_COMPANY_SEARCH_LIMIT || "0", 10) || 0, 0);
+
+const parseOptionalInt = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const parseDateValue = (value) => {
   if (!value) return null;
@@ -33,6 +41,19 @@ const parseRelativeHours = (value) => {
   return null;
 };
 
+const normalizeApplicationStatus = (value) => {
+  const status = String(value || "saved").trim().toLowerCase();
+  if (!status) return "saved";
+  if (status === "dismiss") return "dismissed";
+  if (status === "shortlist") return "shortlisted";
+  return status;
+};
+
+const normalizeJob = (job) => ({
+  ...job,
+  application_status: normalizeApplicationStatus(job?.application_status),
+});
+
 const isFreshPortalJob = (job, windowHours = FRESH_WINDOW_HOURS) => {
   const postedDate = parseDateValue(job?.posted_date);
   if (postedDate) {
@@ -50,11 +71,42 @@ const isFreshPortalJob = (job, windowHours = FRESH_WINDOW_HOURS) => {
 const shouldIncludePortalJob = (job) => {
   // Always include jobs in the auto-apply pipeline regardless of age
   if (job?.auto_apply_status) return true;
-  const status = String(job?.application_status || "saved").toLowerCase();
+  const status = normalizeApplicationStatus(job?.application_status);
   if (status === "saved" || status === "new") {
     return isFreshPortalJob(job);
   }
   return true;
+};
+
+const buildJobsMeta = ({ collectionName, queriedJobs, returnedJobs }) => {
+  const runtimeMeta = getFirebaseRuntimeMeta();
+  const savedNewTotal = queriedJobs.filter((job) => ["saved", "new"].includes(job.application_status)).length;
+  const freshSavedNewCount = queriedJobs.filter(
+    (job) => ["saved", "new"].includes(job.application_status) && isFreshPortalJob(job)
+  ).length;
+  const staleSavedNewCount = Math.max(savedNewTotal - freshSavedNewCount, 0);
+  const emptyReason =
+    freshSavedNewCount === 0
+      ? `0 fresh saved/new jobs in collection ${collectionName} within last ${FRESH_WINDOW_HOURS}h.`
+      : "";
+
+  return {
+    source: "proxy",
+    project_id: runtimeMeta.projectId || process.env.FIREBASE_PROJECT_ID || "",
+    collection: collectionName,
+    window_hours: FRESH_WINDOW_HOURS,
+    min_score: DEFAULT_MIN_SCORE,
+    company_search_limit: DEFAULT_COMPANY_SEARCH_LIMIT,
+    job_board_count: parseOptionalInt(process.env.JOB_DIGEST_JOB_BOARD_COUNT || process.env.JOB_DIGEST_ACTIVE_JOB_BOARD_COUNT),
+    workday_feed_count: parseOptionalInt(process.env.JOB_DIGEST_WORKDAY_FEED_COUNT || process.env.JOB_DIGEST_WORKDAY_COUNT),
+    queried_docs: queriedJobs.length,
+    returned_jobs: returnedJobs.length,
+    saved_new_total: savedNewTotal,
+    fresh_saved_new_count: freshSavedNewCount,
+    stale_saved_new_count: staleSavedNewCount,
+    empty_reason: emptyReason,
+    generated_at: new Date().toISOString(),
+  };
 };
 
 exports.handler = async (event) => {
@@ -74,10 +126,12 @@ exports.handler = async (event) => {
     const prepCollection = process.env.FIREBASE_CANDIDATE_PREP_COLLECTION || "candidate_prep";
 
     const jobsSnap = await db.collection(collectionName).orderBy("updated_at", "desc").limit(queryLimit).get();
-    const jobs = jobsSnap.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
+    const queriedJobs = jobsSnap.docs
+      .map((doc) => normalizeJob({ id: doc.id, ...doc.data() }));
+    const jobs = queriedJobs
       .filter(shouldIncludePortalJob)
       .slice(0, limit);
+    const meta = buildJobsMeta({ collectionName, queriedJobs, returnedJobs: jobs });
 
     const statsSnap = await db.collection(statsCollection).orderBy("date", "desc").limit(7).get();
     const stats = statsSnap.docs.map((doc) => doc.data());
@@ -88,7 +142,7 @@ exports.handler = async (event) => {
     const prepSnap = await db.collection(prepCollection).orderBy("date", "desc").limit(1).get();
     const candidatePrep = prepSnap.docs[0]?.data() || null;
 
-    return withCors({ jobs, stats, suggestions, candidatePrep });
+    return withCors({ jobs, stats, suggestions, candidatePrep, meta });
   } catch (error) {
     console.error("jobs function error", error);
     return withCors({ error: error.message || "Failed to load jobs" }, 500);
