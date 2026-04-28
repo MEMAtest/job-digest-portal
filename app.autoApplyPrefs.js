@@ -10,7 +10,7 @@ const DEFAULT_PREFS = {
   require_salary_stated: false,
   exclude_keywords: [],
   exclude_companies: [],
-  email_to: "demolaomosanya@gmail.com",
+  email_to: "ademolaomosanya@gmail.com",
 };
 
 const loadPrefs = async () => {
@@ -84,7 +84,7 @@ export const renderAutoApplyPrefs = (container) => {
         </div>
         <div class="aa-prefs-field">
           <label for="aa-pref-email-to">Send review emails to</label>
-          <input type="email" id="aa-pref-email-to" placeholder="demolaomosanya@gmail.com" />
+          <input type="email" id="aa-pref-email-to" placeholder="ademolaomosanya@gmail.com" />
         </div>
         <div class="aa-prefs-actions">
           <button id="aa-save-prefs" class="btn btn-primary">Save preferences</button>
@@ -136,7 +136,7 @@ export const renderAutoApplyPrefs = (container) => {
     if (requireSalaryCb) requireSalaryCb.checked = prefs.require_salary_stated;
     if (excludeKeywordsInput) excludeKeywordsInput.value = (prefs.exclude_keywords || []).join(", ");
     if (excludeCompaniesInput) excludeCompaniesInput.value = (prefs.exclude_companies || []).join(", ");
-    if (emailToInput) emailToInput.value = prefs.email_to || "demolaomosanya@gmail.com";
+    if (emailToInput) emailToInput.value = prefs.email_to || "ademolaomosanya@gmail.com";
   });
 
   if (minFitRange) {
@@ -157,7 +157,7 @@ export const renderAutoApplyPrefs = (container) => {
           require_salary_stated: requireSalaryCb?.checked ?? false,
           exclude_keywords: (excludeKeywordsInput?.value || "").split(",").map((s) => s.trim()).filter(Boolean),
           exclude_companies: (excludeCompaniesInput?.value || "").split(",").map((s) => s.trim()).filter(Boolean),
-          email_to: emailToInput?.value?.trim() || "demolaomosanya@gmail.com",
+          email_to: emailToInput?.value?.trim() || "ademolaomosanya@gmail.com",
         };
         await savePrefs(prefs);
         showStatus("Preferences saved.");
