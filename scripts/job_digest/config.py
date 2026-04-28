@@ -9,6 +9,30 @@ from typing import Dict, List
 
 from . import keywords as kw
 
+
+def _load_env_defaults(paths: list[Path]) -> None:
+    for path in paths:
+        if not path.exists():
+            continue
+        try:
+            for raw_line in path.read_text(encoding="utf-8").splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ and len(value) < 300:
+                    os.environ[key] = value
+        except Exception:
+            continue
+
+
+_load_env_defaults([
+    Path.home() / ".job_digest.env",
+    Path(__file__).resolve().parents[1] / ".env",
+])
+
 try:
     import pdfplumber
 except Exception:  # noqa: BLE001
