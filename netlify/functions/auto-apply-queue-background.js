@@ -338,7 +338,7 @@ exports.handler = async (event) => {
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
 
-    const emailTo = prefs.email_to || process.env.SMTP_USER || "demolaomosanya@gmail.com";
+    const emailTo = prefs.email_to || process.env.TO_EMAIL || process.env.SMTP_USER || "demolaomosanya@gmail.com";
     const results = [];
 
     for (const job of candidates) {
