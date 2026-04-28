@@ -180,7 +180,12 @@ try {
   const funnelPills = await page.locator("#applied-tracker .funnel__pill").count();
   record("Dashboard funnel headline pills render", funnelPills >= 2, `pills=${funnelPills}`);
 
-  const triageButton = page.getByRole("button", { name: /Start triaging/i });
+  let triageButton = page.getByRole("button", { name: /Start triaging/i });
+  if (!(await triageButton.count())) {
+    await page.getByRole("button", { name: "Live Roles" }).click();
+    await page.waitForTimeout(500);
+    triageButton = page.getByRole("button", { name: /Start triaging/i });
+  }
   if (await triageButton.count()) {
     await triageButton.click();
     await page.waitForSelector("#triage-overlay:not(.hidden)", { timeout: 10000 });
