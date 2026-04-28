@@ -65,7 +65,7 @@ def main():
     with LOG_PATH.open("a") as log_fh:
         log_fh.write(f"\n--- run_watcher triggered at {datetime.now(timezone.utc).isoformat()} ---\n")
         result = subprocess.run(
-            [sys.executable, str(SCRIPT)],
+            [sys.executable, str(SCRIPT), "--skip-enrichment", "--skip-post-hooks"],
             env={**os.environ, "JOB_DIGEST_FORCE_RUN": "true"},
             stdout=log_fh,
             stderr=subprocess.STDOUT,
