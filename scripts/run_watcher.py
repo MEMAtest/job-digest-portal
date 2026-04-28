@@ -4,15 +4,25 @@ import base64, json, os, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-def _load_dotenv():
-    env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
+def _load_env_defaults() -> None:
+    """Load scheduler defaults for both Firestore polling and digest email sends."""
+    env_paths = [
+        Path.home() / ".job_digest.env",
+        Path(__file__).parent / ".env",
+    ]
+    for env_path in env_paths:
+        if not env_path.exists():
+            continue
+        try:
+            lines = env_path.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            continue
+        for line in lines:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, _, v = line.partition("=")
-                os.environ.setdefault(k.strip(), v.strip())
-_load_dotenv()
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+_load_env_defaults()
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -35,11 +45,19 @@ def main():
         print(f"Firestore init failed: {e}"); sys.exit(1)
 
     ref = client.collection(RUN_COL).document("latest")
-    doc = ref.get()
+    try:
+        doc = ref.get(timeout=10)
+    except Exception as e:
+        print(f"Firestore poll skipped: {e}")
+        return
     if not doc.exists or doc.to_dict().get("status") != "pending":
         return  # nothing to do
 
-    ref.update({"status": "running", "started_at": datetime.now(timezone.utc).isoformat()})
+    try:
+        ref.update({"status": "running", "started_at": datetime.now(timezone.utc).isoformat()}, timeout=10)
+    except Exception as e:
+        print(f"Firestore status update failed before run: {e}")
+        return
 
     LOG_PATH = Path(__file__).parent / "digests" / "daily_job_search_forced.log"
     LOG_PATH.parent.mkdir(exist_ok=True)
@@ -69,7 +87,10 @@ def main():
     if result.returncode != 0:
         update_payload["error_tail"] = tail
 
-    ref.update(update_payload)
+    try:
+        ref.update(update_payload, timeout=10)
+    except Exception as e:
+        print(f"Firestore status update failed after run: {e}")
     print(f"Run complete: exit {result.returncode}")
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ const nodemailer = require("nodemailer");
 
 const DEFAULT_APPLICATION_PROFILE = {
   fullName: "Ade Omosanya",
-  email: "ademolaomosanya@gmail.com",
+  email: "demolaomosanya@gmail.com",
   phone: "07920497486",
   location: "London, United Kingdom",
   linkedinUrl: "",
@@ -338,7 +338,7 @@ exports.handler = async (event) => {
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
 
-    const emailTo = prefs.email_to || process.env.SMTP_USER || "ademolaomosanya@gmail.com";
+    const emailTo = prefs.email_to || process.env.SMTP_USER || "demolaomosanya@gmail.com";
     const results = [];
 
     for (const job of candidates) {

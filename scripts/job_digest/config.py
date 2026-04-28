@@ -84,7 +84,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASS = os.getenv("SMTP_PASS", "")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "")
-TO_EMAIL = os.getenv("TO_EMAIL", "ademolaomosanya@gmail.com")
+TO_EMAIL = os.getenv("TO_EMAIL", "demolaomosanya@gmail.com")
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "") or os.getenv("JOB_DIGEST_GEMINI_KEY", "")
 GEMINI_MODEL = os.getenv("JOB_DIGEST_GEMINI_MODEL", "gemini-1.5-flash")
