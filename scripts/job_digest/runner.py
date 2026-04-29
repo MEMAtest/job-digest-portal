@@ -538,6 +538,15 @@ def is_linkedin_within_window(posted_display: str, posted_raw: str, posted_date:
     return False
 
 
+def is_linkedin_included_company(company: str) -> bool:
+    normalized = canonicalize_company_name(company).lower() or (company or "").strip().lower()
+    return normalized in config.LINKEDIN_INCLUDED_COMPANIES
+
+
+def should_keep_linkedin_company(company: str) -> bool:
+    return should_keep_role_company(company, "Aggregator", "LinkedIn") or is_linkedin_included_company(company)
+
+
 def run_step(label: str, fn):
     started = time.perf_counter()
     log_trace(f"[step] {label}...")
@@ -737,7 +746,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
         if not is_relevant_location(location, desc_text):
             drop("location", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
-        if not should_keep_role_company(company, "Aggregator", "LinkedIn"):
+        if not should_keep_linkedin_company(company):
             drop("company", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
 
@@ -767,6 +776,8 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
         fit = assess_fit(full_text, company, "Aggregator", "LinkedIn")
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "Aggregator", "LinkedIn")
+        if is_target_firm(company) or is_linkedin_included_company(company):
+            min_score = min(min_score, 65)
         if score < min_score:
             drop(
                 "score",

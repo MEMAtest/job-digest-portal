@@ -57,6 +57,14 @@ MIN_SCORE = int(os.getenv("JOB_DIGEST_MIN_SCORE", "70"))
 MAX_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MAX_EMAIL_ROLES", "12"))
 MIN_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MIN_EMAIL_ROLES", "10"))
 LINKEDIN_TARGET_WINDOW_HOURS = int(os.getenv("JOB_DIGEST_LINKEDIN_TARGET_WINDOW_HOURS", "72"))
+LINKEDIN_INCLUDED_COMPANIES = {
+    item.strip().lower()
+    for item in os.getenv(
+        "JOB_DIGEST_LINKEDIN_INCLUDED_COMPANIES",
+        "chainlink labs,checkout.com,fiserv,ki,napier ai,western union,x4 technology",
+    ).split(",")
+    if item.strip()
+}
 COMPANY_SEARCH_LIMIT = int(os.getenv("JOB_DIGEST_COMPANY_SEARCH_LIMIT", "0"))
 STALE_DAYS = int(os.getenv("JOB_DIGEST_STALE_DAYS", "14"))
 AUTO_DISMISS_BELOW = int(os.getenv("JOB_DIGEST_AUTO_DISMISS_BELOW", "0"))

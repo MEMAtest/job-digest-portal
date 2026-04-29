@@ -97,6 +97,20 @@ SEARCH_KEYWORDS = [
     "regulatory transformation manager",
     "onboarding transformation manager",
     "product operations manager",
+    "product manager risk fraud",
+    "product manager banking capital markets",
+    "product manager alternative payment methods",
+    "product manager aml screening",
+    "payment product management",
+    "head of product insurance",
+    "senior product manager fraud risk",
+    "staff product manager payments",
+    "chainlink labs product manager",
+    "checkout.com staff product manager",
+    "napier ai product manager",
+    "x4 technology senior product manager",
+    "fiserv product manager risk fraud",
+    "ki head of product",
 ]
 
 BOARD_KEYWORDS = [
