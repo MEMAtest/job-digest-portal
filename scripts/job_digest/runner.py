@@ -630,6 +630,31 @@ def write_digest_outputs(records: list[JobRecord], *, suffix: str = "") -> tuple
     return out_xlsx, out_csv
 
 
+def record_identity(record: JobRecord) -> str:
+    if record.link:
+        return f"link:{record.link}"
+    return f"role:{record.company.lower()}::{record.role.lower()}::{record.location.lower()}"
+
+
+def build_delivery_records(new_records: list[JobRecord], qualified_records: list[JobRecord]) -> list[JobRecord]:
+    """Build the email/digest list: new roles first, then qualified seen roles to fill the block."""
+    max_roles = max(config.MAX_EMAIL_ROLES, config.MIN_EMAIL_ROLES)
+    target_roles = min(max_roles, max(config.MIN_EMAIL_ROLES, len(new_records)))
+    selected: list[JobRecord] = []
+    selected_keys: set[str] = set()
+
+    for record in list(new_records) + list(qualified_records):
+        key = record_identity(record)
+        if key in selected_keys:
+            continue
+        selected.append(record)
+        selected_keys.add(key)
+        if len(selected) >= target_roles:
+            break
+
+    return selected
+
+
 def print_source_yield(records: list[JobRecord]) -> None:
     source_counts: dict[str, int] = {}
     for record in records:
@@ -1367,6 +1392,11 @@ def main(
         records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
+    delivery_records = records if ignore_seen_cache else build_delivery_records(records, pre_seen_records)
+    RUN_SUMMARY["delivery_roles"] = len(delivery_records)
+    RUN_SUMMARY["new_roles"] = len(records)
+    RUN_SUMMARY["delivery_top_up_roles"] = max(0, len(delivery_records) - len(records))
+
     digest_suffix = "_scrape_only" if scrape_only else ""
     if validation_digest:
         digest_suffix = "_validation"
@@ -1374,7 +1404,7 @@ def main(
         digest_suffix += "_ignore_seen"
     out_xlsx, out_csv = run_step(
         "write_digest_outputs",
-        lambda: write_digest_outputs(records, suffix=digest_suffix),
+        lambda: write_digest_outputs(delivery_records, suffix=digest_suffix),
     )
     RUN_SUMMARY["completed"] = True
     RUN_SUMMARY["validation_digest_written"] = bool(validation_digest or ignore_seen_cache)
@@ -1395,10 +1425,13 @@ def main(
 
     if scrape_only:
         print(f"Digest generated: {out_xlsx}")
-        print(f"Roles found: {len(records)}")
+        print(f"Roles found: {len(delivery_records)}")
+        if len(delivery_records) != len(records):
+            print(f"New roles found: {len(records)}")
+            print(f"Qualified top-up roles: {len(delivery_records) - len(records)}")
         if not records and int(RUN_SUMMARY.get("pre_seen_kept", 0) or 0) > 0 and not (validation_digest or ignore_seen_cache):
             print("Production digest empty because all kept roles were already seen.")
-        print_source_yield(records)
+        print_source_yield(delivery_records)
         print_source_health_summary()
         print_seen_cache_summary(validation_digest_path=str(out_csv) if (validation_digest or ignore_seen_cache) else "")
         print_recent_digest_forecast()
@@ -1442,19 +1475,29 @@ def main(
     except Exception:
         pass
 
-    top_pick = select_top_pick(records)
-    top_records = records[: config.MAX_EMAIL_ROLES]
+    top_pick = select_top_pick(delivery_records)
+    top_records = delivery_records[: max(config.MAX_EMAIL_ROLES, config.MIN_EMAIL_ROLES)]
     if top_pick and top_pick not in top_records:
         top_records = [top_pick] + top_records
-        top_records = top_records[: config.MAX_EMAIL_ROLES]
+        top_records = top_records[: max(config.MAX_EMAIL_ROLES, config.MIN_EMAIL_ROLES)]
     html_body = build_email_html(top_records, config.WINDOW_HOURS)
+    delivery_summary_html = (
+        "<div style='background:#ECFDF5; border:1px solid #BBF7D0; padding:10px; "
+        "border-radius:8px; margin-bottom:14px; font-size:14px; color:#064E3B;'>"
+        f"<strong>New roles:</strong> {len(records)} &nbsp; "
+        f"<strong>Qualified roles shown:</strong> {len(top_records)}"
+        "</div>"
+    )
+    if "<h2" in html_body:
+        html_body = html_body.replace("</h2>", "</h2>" + delivery_summary_html, 1)
     if pipeline_summary_html and "<h2" in html_body:
         html_body = html_body.replace("</h2>", "</h2>" + pipeline_summary_html, 1)
     text_lines = [
         f"Daily job digest (last {config.WINDOW_HOURS} hours).",
         f"Preferences: {config.PREFERENCES}",
         f"Sources checked: {build_sources_summary()}",
-        f"Roles found: {len(records)}",
+        f"New roles found: {len(records)}",
+        f"Qualified roles shown: {len(top_records)}",
         "",
     ]
     if top_pick:
@@ -1512,8 +1555,11 @@ def main(
         save_run_state(config.RUN_STATE_PATH, state)
 
     print(f"Digest generated: {out_xlsx}")
-    print(f"Roles found: {len(records)}")
-    print_source_yield(records)
+    print(f"Roles found: {len(delivery_records)}")
+    if len(delivery_records) != len(records):
+        print(f"New roles found: {len(records)}")
+        print(f"Qualified top-up roles: {len(delivery_records) - len(records)}")
+    print_source_yield(delivery_records)
     print_source_health_summary()
     print_recent_digest_forecast()
 
