@@ -652,6 +652,10 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
     details_started = time.monotonic()
     detail_jobs_processed = 0
 
+    def drop(reason: str, payload: dict) -> None:
+        diag["dropped"][reason] += 1
+        add_source_diagnostic_example(diag, reason, payload)
+
     def details_deadline_reached() -> bool:
         if LINKEDIN_DETAILS_DEADLINE_SECONDS <= 0:
             return False
@@ -662,6 +666,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
         company = canonical_company(job.get("company", ""))
         location = job.get("location", "")
         if not is_relevant_title(title):
+            drop("title", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
 
         if LINKEDIN_MAX_DETAIL_JOBS > 0 and detail_jobs_processed >= LINKEDIN_MAX_DETAIL_JOBS:
@@ -688,10 +693,13 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
         company = canonical_company(company)
         applicant_text = detail.get("applicant_text", "")
         if not is_relevant_title(title):
+            drop("title", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not is_relevant_location(location, desc_text):
+            drop("location", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not should_keep_role_company(company, "Aggregator", "LinkedIn"):
+            drop("company", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(
@@ -701,6 +709,18 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
             }
         )
         if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            drop(
+                "window",
+                {
+                    "company": company,
+                    "title": title,
+                    "location": location,
+                    "posted": posted_display,
+                    "posted_raw": posted_raw,
+                    "posted_date": posted_date,
+                    "link": job.get("link", ""),
+                },
+            )
             continue
 
         summary = desc_text[:2500]
@@ -709,6 +729,17 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "Aggregator", "LinkedIn")
         if score < min_score:
+            drop(
+                "score",
+                {
+                    "company": company,
+                    "title": title,
+                    "location": location,
+                    "score": score,
+                    "min_score": min_score,
+                    "link": job.get("link", ""),
+                },
+            )
             continue
 
         records.append(
