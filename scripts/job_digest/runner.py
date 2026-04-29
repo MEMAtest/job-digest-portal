@@ -524,6 +524,20 @@ def is_custom_careers_relevant_location(location: str, summary: str, company: st
     )
 
 
+def is_linkedin_within_window(posted_display: str, posted_raw: str, posted_date: str, company: str) -> bool:
+    if parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        return True
+    if is_target_firm(company):
+        if not posted_raw and not posted_date:
+            return True
+        return parse_posted_within_window(
+            posted_raw or posted_display,
+            posted_date,
+            max(config.WINDOW_HOURS, config.LINKEDIN_TARGET_WINDOW_HOURS),
+        )
+    return False
+
+
 def run_step(label: str, fn):
     started = time.perf_counter()
     log_trace(f"[step] {label}...")
@@ -733,7 +747,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
                 "posted_date": detail.get("posted_date", "") or job.get("posted_date", ""),
             }
         )
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        if not is_linkedin_within_window(posted_display, posted_raw, posted_date, company):
             drop(
                 "window",
                 {
