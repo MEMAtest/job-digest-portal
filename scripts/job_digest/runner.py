@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import os
+import re
 import signal
 import statistics
 import time
@@ -81,6 +82,7 @@ from .summary import build_email_html, build_sources_summary, send_email
 from .utils import (
     canonicalize_company_name,
     canonicalize_posted_fields,
+    canonical_job_link,
     filter_new_records,
     is_target_firm,
     load_run_state,
@@ -111,6 +113,7 @@ RUNNER_TRACE_LOG = config.DIGEST_DIR / "runner_trace.log"
 CUSTOM_CAREERS_MIN_SCORE = int(os.getenv("JOB_DIGEST_CUSTOM_CAREERS_MIN_SCORE", "60") or "60")
 SOURCE_DIAGNOSTICS_ENABLED = os.getenv("JOB_DIGEST_CUSTOM_DIAGNOSTICS", "false").lower() == "true"
 SOURCE_DIAGNOSTICS_LIMIT = int(os.getenv("JOB_DIGEST_CUSTOM_DIAGNOSTICS_LIMIT", "100") or "100")
+SOURCE_DIAGNOSTIC_SAMPLE_LIMIT = max(1, min(SOURCE_DIAGNOSTICS_LIMIT, 5))
 SOURCE_HEALTH_WEAK_YIELD_MIN_RAW = int(os.getenv("JOB_DIGEST_WEAK_YIELD_MIN_RAW", "10") or "10")
 SOURCE_HEALTH_WEAK_YIELD_RATIO = float(os.getenv("JOB_DIGEST_WEAK_YIELD_RATIO", "0.15") or "0.15")
 RECENT_DIGEST_SAMPLE_SIZE = int(os.getenv("JOB_DIGEST_FORECAST_SAMPLE_SIZE", "10") or "10")
@@ -164,6 +167,7 @@ SOURCE_STAGE_NAME_MAP = {
     "smartrecruiters": "SmartRecruiters",
     "ashby": "Ashby",
     "workable": "Workable",
+    "workday": "Workday",
 }
 
 
@@ -184,7 +188,17 @@ def log_trace(message: str) -> None:
 def _diagnostic_enabled_for(source_name: str) -> bool:
     if SOURCE_DIAGNOSTICS_ENABLED:
         return True
-    return source_name in {"CustomCareers", "IndeedUK", "LinkedIn", "Greenhouse", "Lever", "SmartRecruiters", "Ashby", "Workable"}
+    return source_name in {
+        "CustomCareers",
+        "IndeedUK",
+        "LinkedIn",
+        "Greenhouse",
+        "Lever",
+        "SmartRecruiters",
+        "Ashby",
+        "Workable",
+        "Workday",
+    }
 
 
 def reset_source_diagnostics() -> None:
@@ -209,6 +223,7 @@ def init_source_diagnostic(source_name: str, raw_count: int) -> dict:
             "seen_filtered": 0,
             "mode": "",
             "query_count": 0,
+            "page_count": 0,
             "company_query_count": 0,
             "adjacent_query_count": 0,
             "notes": [],
@@ -224,7 +239,7 @@ def add_source_diagnostic_example(diag: dict, category: str, payload: dict) -> N
     if not _diagnostic_enabled_for(diag.get("source_name", "")):
         return
     examples = diag["examples"].setdefault(category, [])
-    if len(examples) < SOURCE_DIAGNOSTICS_LIMIT:
+    if len(examples) < SOURCE_DIAGNOSTIC_SAMPLE_LIMIT:
         examples.append(payload)
 
 
@@ -270,6 +285,7 @@ def merge_runtime_source_events() -> None:
         if event.get("mode"):
             diag["mode"] = event.get("mode")
         diag["query_count"] = max(int(diag.get("query_count", 0) or 0), int(event.get("query_count", 0) or 0))
+        diag["page_count"] = max(int(diag.get("page_count", 0) or 0), int(event.get("page_count", 0) or 0))
         diag["company_query_count"] = max(
             int(diag.get("company_query_count", 0) or 0), int(event.get("company_query_count", 0) or 0)
         )
@@ -386,6 +402,8 @@ def print_source_health_summary() -> None:
             parts.append(f"mode={diag['mode']}")
         if diag.get("query_count"):
             parts.append(f"queries={diag['query_count']}")
+        if diag.get("page_count"):
+            parts.append(f"pages={diag['page_count']}")
         if diag.get("company_query_count"):
             parts.append(f"company_queries={diag['company_query_count']}")
         if diag.get("adjacent_query_count"):
@@ -482,6 +500,41 @@ def print_recent_digest_forecast() -> None:
     print("--- End Expected Roles ---")
 
 
+def build_source_diagnostics_artifact() -> dict[str, dict]:
+    payload: dict[str, dict] = {}
+    indeed_diag = SOURCE_DIAGNOSTICS.get("IndeedUK")
+    if indeed_diag:
+        payload["IndeedUK"] = {
+            "mode": indeed_diag.get("mode") or "browser",
+            "raw": int(indeed_diag.get("raw", 0) or 0),
+            "kept": int(indeed_diag.get("kept", 0) or 0),
+            "blocked_pages": int(indeed_diag.get("blocked", 0) or 0),
+            "attempted_queries": int(indeed_diag.get("query_count", 0) or 0),
+        }
+    custom_diag = SOURCE_DIAGNOSTICS.get("CustomCareers")
+    if custom_diag:
+        custom_payload = {
+            "raw": int(custom_diag.get("raw", 0) or 0),
+            "kept": int(custom_diag.get("kept", 0) or 0),
+            "dropped": {
+                "title": int(custom_diag.get("dropped", {}).get("title", 0) or 0),
+                "location": int(custom_diag.get("dropped", {}).get("location", 0) or 0),
+                "company": int(custom_diag.get("dropped", {}).get("company", 0) or 0),
+                "window": int(custom_diag.get("dropped", {}).get("window", 0) or 0),
+                "score": int(custom_diag.get("dropped", {}).get("score", 0) or 0),
+            },
+        }
+        samples = {
+            key: list(custom_diag.get("examples", {}).get(key, []) or [])[:SOURCE_DIAGNOSTIC_SAMPLE_LIMIT]
+            for key in ("title", "location", "company", "window", "score")
+            if custom_diag.get("examples", {}).get(key)
+        }
+        if samples:
+            custom_payload["samples"] = samples
+        payload["CustomCareers"] = custom_payload
+    return payload
+
+
 def write_source_diagnostics(suffix: str = "") -> Path | None:
     merge_runtime_source_events()
     if not SOURCE_DIAGNOSTICS:
@@ -489,7 +542,9 @@ def write_source_diagnostics(suffix: str = "") -> Path | None:
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     output_path = config.DIGEST_DIR / f"source_diagnostics_{today}{suffix}.json"
     try:
-        RUN_SUMMARY["stage_timeout_hit"] = any(int(diag.get("timed_out", 0) or 0) > 0 for diag in SOURCE_DIAGNOSTICS.values())
+        RUN_SUMMARY["stage_timeout_hit"] = any(
+            int(diag.get("timed_out", 0) or 0) > 0 for diag in SOURCE_DIAGNOSTICS.values()
+        )
         payload = dict(SOURCE_DIAGNOSTICS)
         payload["__run__"] = dict(RUN_SUMMARY)
         with output_path.open("w", encoding="utf-8") as handle:
@@ -522,6 +577,28 @@ def is_custom_careers_relevant_location(location: str, summary: str, company: st
     return not location.strip() or any(
         term in combined for term in ("remote", "hybrid", "uk", "united kingdom", "england", "scotland", "wales", "london")
     )
+
+
+def is_direct_ats_relevant_location(location: str, summary: str, company: str) -> bool:
+    if is_relevant_location(location, summary):
+        return True
+    if not is_target_firm(company):
+        return False
+    normalized_location = (location or "").strip().lower()
+    combined = f"{location} {summary}".lower()
+    if not normalized_location:
+        return True
+    if re.fullmatch(r"\d+\s+locations?", normalized_location):
+        return True
+    if any(term in combined for term in ("multiple locations", "various locations", "hybrid", "remote")):
+        return True
+    return any(term in combined for term in ("uk", "united kingdom", "england", "scotland", "wales", "london"))
+
+
+def is_direct_ats_within_window(posted_display: str, posted_raw: str, posted_date: str, company: str) -> bool:
+    if parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        return True
+    return is_target_firm(company) and not posted_raw and not posted_date
 
 
 def is_linkedin_within_window(posted_display: str, posted_raw: str, posted_date: str, company: str) -> bool:
@@ -654,8 +731,9 @@ def write_digest_outputs(records: list[JobRecord], *, suffix: str = "") -> tuple
 
 
 def record_identity(record: JobRecord) -> str:
-    if record.link:
-        return f"link:{record.link}"
+    canonical_link = canonical_job_link(record.link)
+    if canonical_link:
+        return f"link:{canonical_link}"
     return f"role:{record.company.lower()}::{record.role.lower()}::{record.location.lower()}"
 
 
@@ -687,17 +765,58 @@ def build_delivery_records(new_records: list[JobRecord], qualified_records: list
 
 
 def print_source_yield(records: list[JobRecord]) -> None:
-    source_counts: dict[str, int] = {}
-    for record in records:
-        src = record.source or "Unknown"
-        source_counts[src] = source_counts.get(src, 0) + 1
-    print("\n--- Source Yield in Digest ---")
-    if source_counts:
-        for src, cnt in sorted(source_counts.items(), key=lambda item: -item[1]):
-            print(f"  {src}: {cnt}")
+    merge_runtime_source_events()
+    raw_by_source = {
+        source_name: int(diag.get("raw", 0) or 0)
+        for source_name, diag in sorted(SOURCE_DIAGNOSTICS.items())
+        if int(diag.get("raw", 0) or 0) > 0
+    }
+    kept_by_source = {
+        source_name: int(diag.get("kept", 0) or 0)
+        for source_name, diag in sorted(SOURCE_DIAGNOSTICS.items())
+        if int(diag.get("kept", 0) or 0) > 0
+    }
+    drop_reason_summary = {
+        source_name: {
+            key: int(diag.get("dropped", {}).get(key, 0) or 0)
+            for key in ("title", "location", "company", "window", "score")
+            if int(diag.get("dropped", {}).get(key, 0) or 0) > 0
+        }
+        for source_name, diag in sorted(SOURCE_DIAGNOSTICS.items())
+        if any(int(diag.get("dropped", {}).get(key, 0) or 0) > 0 for key in ("title", "location", "company", "window", "score"))
+    }
+    top_companies = Counter(record.company for record in records if record.company).most_common(10)
+    RUN_SUMMARY["raw_by_source"] = raw_by_source
+    RUN_SUMMARY["kept_by_source"] = kept_by_source
+    RUN_SUMMARY["drop_reason_summary"] = drop_reason_summary
+    RUN_SUMMARY["top_companies_kept"] = dict(top_companies)
+
+    print("\n--- Source Yield Summary ---")
+    if raw_by_source:
+        print("  raw_by_source:")
+        for src, cnt in sorted(raw_by_source.items(), key=lambda item: (-item[1], item[0].lower())):
+            print(f"    {src}: {cnt}")
+    if kept_by_source:
+        print("  kept_by_source:")
+        for src, cnt in sorted(kept_by_source.items(), key=lambda item: (-item[1], item[0].lower())):
+            print(f"    {src}: {cnt}")
+    if drop_reason_summary:
+        print("  drop_reason_summary:")
+        for src, dropped in drop_reason_summary.items():
+            parts = [f"{key}={value}" for key, value in dropped.items()]
+            print(f"    {src}: {' '.join(parts)}")
+    if top_companies:
+        print("  top_companies_kept:")
+        for company, cnt in top_companies:
+            print(f"    {company}: {cnt}")
     else:
         print("  (no roles in digest this run)")
     print("--- End Source Summary ---")
+    log_trace(f"[summary] raw_by_source={json.dumps(raw_by_source, sort_keys=True)}")
+    log_trace(f"[summary] kept_by_source={json.dumps(kept_by_source, sort_keys=True)}")
+    if drop_reason_summary:
+        log_trace(f"[summary] drop_reason_summary={json.dumps(drop_reason_summary, sort_keys=True)}")
+    log_trace(f"[summary] top_companies_kept={json.dumps(dict(top_companies), sort_keys=True)}")
 
 
 def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
@@ -842,13 +961,13 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
         location = job.get("location", "")
         if not is_relevant_title(title):
             continue
-        if not is_relevant_location(location):
+        if not is_direct_ats_relevant_location(location, "", company):
             continue
         if not should_keep_role_company(company, "ATS", "Greenhouse"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
             continue
 
         summary = job.get("summary", "")
@@ -900,13 +1019,13 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
         location = job.get("location", "")
         if not is_relevant_title(title):
             continue
-        if not is_relevant_location(location):
+        if not is_direct_ats_relevant_location(location, "", company):
             continue
         if not should_keep_role_company(company, "ATS", "Lever"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
             continue
 
         summary = job.get("summary", "")
@@ -958,13 +1077,13 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
         location = job.get("location", "")
         if not is_relevant_title(title):
             continue
-        if not is_relevant_location(location):
+        if not is_direct_ats_relevant_location(location, "", company):
             continue
         if not should_keep_role_company(company, "ATS", "SmartRecruiters"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+        if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
             continue
 
         summary = job.get("summary", "")
@@ -1016,13 +1135,13 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
         location = job.get("location", "") or "Remote"
         if not is_relevant_title(title):
             continue
-        if not is_relevant_location(location):
+        if not is_direct_ats_relevant_location(location, "", company):
             continue
         if not should_keep_role_company(company, "ATS", "Ashby"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, 30 * 24):
+        if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
             continue
 
         summary = job.get("summary", "")
@@ -1072,18 +1191,18 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
         location = job.get("location", "") or "Remote"
+        summary = job.get("summary", "")
         if not is_relevant_title(title):
             continue
-        if not is_relevant_location(location):
+        if not is_direct_ats_relevant_location(location, summary, company):
             continue
         if not should_keep_role_company(company, "ATS", "Workable"):
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not parse_posted_within_window(posted_raw or posted_display, posted_date, 30 * 24):
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
             continue
 
-        summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
         fit = assess_fit(full_text, company, "ATS", "Workable")
         score = int(fit["score"])
@@ -1103,6 +1222,68 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
                 source="Workable",
                 source_family="ATS",
                 ats_family="Workable",
+                ats_account=job.get("ats_account", ""),
+                fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+                job_status=job.get("job_status", ""),
+            )
+        )
+        diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
+    return records
+
+
+def collect_workday_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    workday_jobs = workday_search(session)
+    print(f"[Workday] {len(workday_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("Workday", len(workday_jobs))
+    for job in workday_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "")
+        summary = job.get("summary", "")
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not is_relevant_title(title):
+            diag["dropped"]["title"] += 1
+            continue
+        if not is_direct_ats_relevant_location(location, summary, company):
+            diag["dropped"]["location"] += 1
+            continue
+        if not should_keep_role_company(company, "ATS", "Workday"):
+            diag["dropped"]["company"] += 1
+            continue
+        if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
+            diag["dropped"]["window"] += 1
+            continue
+        full_text = f"{title} {company} {summary}"
+        fit = assess_fit(full_text, company, "ATS", "Workday")
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "ATS", "Workday")
+        if score < min_score:
+            diag["dropped"]["score"] += 1
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="Workday",
+                source_family="ATS",
+                ats_family="Workday",
                 ats_account=job.get("ats_account", ""),
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
@@ -1325,6 +1506,16 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
         if target_stats:
             target_stats["kept"] += 1
     if diag:
+        if source_name == "IndeedUK":
+            runtime = get_source_runtime_events().get("IndeedUK", {})
+            log_trace(
+                "[diag] "
+                f"{source_name} raw_fetched={diag['raw']} "
+                f"blocked_pages={int(runtime.get('blocked', 0) or 0)} "
+                f"page_count_attempted={int(runtime.get('page_count', 0) or 0)} "
+                f"attempted_queries={int(runtime.get('query_count', 0) or 0)} "
+                f"kept={diag['kept']}"
+            )
         log_trace(
             "[diag] "
             f"{source_name} raw={diag['raw']} kept={diag['kept']} "
@@ -1403,7 +1594,10 @@ def main(
     all_jobs.extend(run_source_stage("smartrecruiters", lambda: collect_smartrecruiters_records(session)))
     all_jobs.extend(run_source_stage("ashby", lambda: collect_ashby_records(session)))
     all_jobs.extend(run_source_stage("workable", lambda: collect_workable_records(session)))
+    all_jobs.extend(run_source_stage("workday", lambda: collect_workday_records(session)))
     for source in JOB_BOARD_SOURCES:
+        if source["name"] == "Workday":
+            continue
         if fast_email and source["name"] not in config.FAST_EMAIL_JOB_BOARD_SOURCES:
             diag = init_source_diagnostic(source["name"], 0)
             add_source_note(diag, "skipped by --fast-email")
@@ -1568,10 +1762,16 @@ def main(
     for record in records:
         if record.link:
             seen_cache[record.link] = now_utc().isoformat()
+            canonical_link = canonical_job_link(record.link)
+            if canonical_link:
+                seen_cache[canonical_link] = now_utc().isoformat()
         for alt in record.alternate_links:
             link = alt.get("link") if isinstance(alt, dict) else ""
             if link:
                 seen_cache[link] = now_utc().isoformat()
+                canonical_link = canonical_job_link(link)
+                if canonical_link:
+                    seen_cache[canonical_link] = now_utc().isoformat()
     save_seen_cache(config.SEEN_CACHE_PATH, seen_cache)
     if config.RUN_AT or config.RUN_ATS:
         state = load_run_state(config.RUN_STATE_PATH)

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 from . import config
 from .models import JobRecord
@@ -176,6 +176,49 @@ def clean_link(url: str) -> str:
         return url
 
 
+TRACKING_QUERY_KEYS = {
+    "gh_src",
+    "li_fat_id",
+    "ref",
+    "refid",
+    "source",
+    "src",
+    "trk",
+}
+
+
+def canonical_job_link(url: str) -> str:
+    """Normalize a job URL for duplicate checks without changing the displayed link."""
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(url.strip())
+    except Exception:
+        return url.strip().lower()
+
+    scheme = (parsed.scheme or "https").lower()
+    netloc = parsed.netloc.lower()
+    path = re.sub(r"/+$", "", parsed.path or "")
+
+    if "linkedin.com" in netloc and "/jobs/" in path:
+        return parsed._replace(scheme=scheme, netloc=netloc, path=path, query="", fragment="").geturl()
+
+    kept_params = []
+    for key, value in parse_qsl(parsed.query, keep_blank_values=True):
+        normalized_key = key.lower()
+        if normalized_key.startswith("utm_") or normalized_key in TRACKING_QUERY_KEYS:
+            continue
+        kept_params.append((key, value))
+
+    return parsed._replace(
+        scheme=scheme,
+        netloc=netloc,
+        path=path,
+        query=urlencode(kept_params, doseq=True),
+        fragment="",
+    ).geturl()
+
+
 def parse_applicant_count(value: str) -> Optional[int]:
     if not value:
         return None
@@ -220,9 +263,11 @@ def save_seen_cache(path: Path, seen: Dict[str, str]) -> None:
 
 
 def filter_new_records(records: List[JobRecord], seen: Dict[str, str]) -> List[JobRecord]:
+    seen_links = {canonical_job_link(link) for link in seen if canonical_job_link(link)}
     fresh: List[JobRecord] = []
     for rec in records:
-        if rec.link and rec.link in seen:
+        canonical_link = canonical_job_link(rec.link)
+        if rec.link and (rec.link in seen or canonical_link in seen_links):
             continue
         fresh.append(rec)
     return fresh
