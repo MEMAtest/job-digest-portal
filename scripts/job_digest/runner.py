@@ -1624,7 +1624,10 @@ def main(
         records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
-    delivery_records = records if ignore_seen_cache else build_delivery_records(records, pre_seen_records)
+    if ignore_seen_cache or not config.ALLOW_SEEN_TOP_UP:
+        delivery_records = records
+    else:
+        delivery_records = build_delivery_records(records, pre_seen_records)
     RUN_SUMMARY["delivery_roles"] = len(delivery_records)
     RUN_SUMMARY["new_roles"] = len(records)
     RUN_SUMMARY["delivery_top_up_roles"] = max(0, len(delivery_records) - len(records))

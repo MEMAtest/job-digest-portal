@@ -56,6 +56,7 @@ WINDOW_HOURS = int(os.getenv("JOB_DIGEST_WINDOW_HOURS", "24"))
 MIN_SCORE = int(os.getenv("JOB_DIGEST_MIN_SCORE", "70"))
 MAX_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MAX_EMAIL_ROLES", "12"))
 MIN_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MIN_EMAIL_ROLES", "10"))
+ALLOW_SEEN_TOP_UP = os.getenv("JOB_DIGEST_ALLOW_SEEN_TOP_UP", "false").strip().lower() in {"1", "true", "yes", "y"}
 LINKEDIN_TARGET_WINDOW_HOURS = int(os.getenv("JOB_DIGEST_LINKEDIN_TARGET_WINDOW_HOURS", "72"))
 LINKEDIN_INCLUDED_COMPANIES = {
     item.strip().lower()
