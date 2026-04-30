@@ -65,6 +65,11 @@ LINKEDIN_INCLUDED_COMPANIES = {
     ).split(",")
     if item.strip()
 }
+FAST_EMAIL_JOB_BOARD_SOURCES = {
+    item.strip()
+    for item in os.getenv("JOB_DIGEST_FAST_EMAIL_JOB_BOARD_SOURCES", "eFinancialCareers").split(",")
+    if item.strip()
+}
 COMPANY_SEARCH_LIMIT = int(os.getenv("JOB_DIGEST_COMPANY_SEARCH_LIMIT", "0"))
 STALE_DAYS = int(os.getenv("JOB_DIGEST_STALE_DAYS", "14"))
 AUTO_DISMISS_BELOW = int(os.getenv("JOB_DIGEST_AUTO_DISMISS_BELOW", "0"))

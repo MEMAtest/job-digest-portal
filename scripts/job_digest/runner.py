@@ -660,7 +660,7 @@ def record_identity(record: JobRecord) -> str:
 
 
 def build_delivery_records(new_records: list[JobRecord], qualified_records: list[JobRecord]) -> list[JobRecord]:
-    """Build the email/digest list: new roles first, then qualified seen roles to fill the block."""
+    """Build the email/digest list and keep the visible block score-sorted."""
     max_roles = max(config.MAX_EMAIL_ROLES, config.MIN_EMAIL_ROLES)
     target_roles = min(max_roles, max(config.MIN_EMAIL_ROLES, len(new_records)))
     selected: list[JobRecord] = []
@@ -675,7 +675,15 @@ def build_delivery_records(new_records: list[JobRecord], qualified_records: list
         if len(selected) >= target_roles:
             break
 
-    return selected
+    return sorted(
+        selected,
+        key=lambda record: (
+            int(record.fit_score or 0),
+            record.company.lower(),
+            record.role.lower(),
+        ),
+        reverse=True,
+    )
 
 
 def print_source_yield(records: list[JobRecord]) -> None:
@@ -1342,6 +1350,7 @@ def main(
     ignore_seen_cache: bool = False,
     validation_digest: bool = False,
     skip_linkedin: bool = False,
+    fast_email: bool = False,
 ) -> None:
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
@@ -1395,6 +1404,10 @@ def main(
     all_jobs.extend(run_source_stage("ashby", lambda: collect_ashby_records(session)))
     all_jobs.extend(run_source_stage("workable", lambda: collect_workable_records(session)))
     for source in JOB_BOARD_SOURCES:
+        if fast_email and source["name"] not in config.FAST_EMAIL_JOB_BOARD_SOURCES:
+            diag = init_source_diagnostic(source["name"], 0)
+            add_source_note(diag, "skipped by --fast-email")
+            continue
         all_jobs.extend(
             run_source_stage(
                 f"job_board:{source['name']}",
@@ -1644,6 +1657,11 @@ def cli() -> None:
         action="store_true",
         help="Skip LinkedIn for source-isolation and validation runs",
     )
+    parser.add_argument(
+        "--fast-email",
+        action="store_true",
+        help="Skip slow optional job boards for scheduled email delivery",
+    )
     args = parser.parse_args()
 
     if args.smoke_test:
@@ -1665,6 +1683,7 @@ def cli() -> None:
             ignore_seen_cache=args.ignore_seen_cache or args.validation_digest,
             validation_digest=args.validation_digest,
             skip_linkedin=args.skip_linkedin,
+            fast_email=args.fast_email,
         )
 
 
