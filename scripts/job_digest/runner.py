@@ -1806,10 +1806,16 @@ def main(
         html_body = html_body.replace("</h2>", "</h2>" + delivery_summary_html, 1)
     if pipeline_summary_html and "<h2" in html_body:
         html_body = html_body.replace("</h2>", "</h2>" + pipeline_summary_html, 1)
+    def compact_text(value: str, limit: int = 180) -> str:
+        text = " ".join((value or "").split())
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1].rstrip() + "..."
+
     text_lines = [
         f"Daily job digest (last {config.WINDOW_HOURS} hours).",
         f"Preferences: {config.PREFERENCES}",
-        f"Sources checked: {build_sources_summary()}",
+        f"Sources checked: {build_sources_summary(compact=True)}",
         f"New roles found: {len(records)}",
         f"Qualified roles shown: {len(top_records)}",
         "",
@@ -1821,20 +1827,10 @@ def main(
             f"Source {top_pick.source} | Fit {top_pick.fit_score}%"
         )
         text_lines.append(f"  Preference match: {top_pick.preference_match}")
-        text_lines.append(f"  Why fit: {top_pick.why_fit}")
-        text_lines.append(f"  Potential gaps: {top_pick.cv_gap}")
+        text_lines.append(f"  Why: {compact_text(top_pick.why_fit)}")
+        text_lines.append(f"  Action/watch: {compact_text(top_pick.apply_tips or top_pick.cv_gap or top_pick.tailored_summary)}")
         if top_pick.fit_verdict:
             text_lines.append(f"  Verdict: {top_pick.fit_verdict}")
-        if top_pick.role_summary:
-            text_lines.append(f"  Role detail: {top_pick.role_summary}")
-        if top_pick.key_requirements:
-            text_lines.append("  Key requirements: " + " | ".join(top_pick.key_requirements[:5]))
-        if top_pick.tailored_summary:
-            text_lines.append(f"  Candidate angle: {top_pick.tailored_summary}")
-        if top_pick.key_talking_points:
-            text_lines.append("  Talking points: " + " | ".join(top_pick.key_talking_points[:5]))
-        if top_pick.apply_tips:
-            text_lines.append(f"  Apply tip: {top_pick.apply_tips}")
         text_lines.append(f"  Link: {top_pick.link}")
         text_lines.append("")
     for rec in top_records:
@@ -1843,20 +1839,10 @@ def main(
             f"Source {rec.source} | Fit {rec.fit_score}%"
         )
         text_lines.append(f"  Preference match: {rec.preference_match}")
-        text_lines.append(f"  Why fit: {rec.why_fit}")
-        text_lines.append(f"  Potential gaps: {rec.cv_gap}")
+        text_lines.append(f"  Why: {compact_text(rec.why_fit)}")
+        text_lines.append(f"  Action/watch: {compact_text(rec.apply_tips or rec.cv_gap or rec.tailored_summary)}")
         if rec.fit_verdict:
             text_lines.append(f"  Verdict: {rec.fit_verdict}")
-        if rec.role_summary:
-            text_lines.append(f"  Role detail: {rec.role_summary}")
-        elif rec.notes:
-            text_lines.append(f"  Role detail: {rec.notes[:700]}")
-        if rec.key_requirements:
-            text_lines.append("  Key requirements: " + " | ".join(rec.key_requirements[:4]))
-        if rec.tailored_summary:
-            text_lines.append(f"  Candidate angle: {rec.tailored_summary}")
-        if rec.key_talking_points:
-            text_lines.append("  Talking points: " + " | ".join(rec.key_talking_points[:4]))
         text_lines.append(f"  Link: {rec.link}")
         text_lines.append("")
     text_body = "\n".join(text_lines)

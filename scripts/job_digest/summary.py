@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
@@ -11,7 +12,10 @@ from .models import JobRecord
 from .utils import select_top_pick
 
 
-def build_sources_summary() -> str:
+def build_sources_summary(*, compact: bool = False) -> str:
+    if compact:
+        return "LinkedIn, eFinancialCareers, Workday, ATS feeds, and selected job boards"
+
     if config.SOURCES_SUMMARY_OVERRIDE:
         return config.SOURCES_SUMMARY_OVERRIDE
 
@@ -65,7 +69,7 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
             "<div style='font-family:Arial, sans-serif; max-width:900px; margin:0 auto;'>"
             f"<h2 style='color:#0B4F8A;'>{header}</h2>"
             f"<p style='color:#333;'>Preferences: {config.PREFERENCES}</p>"
-            f"<p style='color:#333;'>Sources checked: {build_sources_summary()}</p>"
+            f"<p style='color:#333;'>Sources checked: {build_sources_summary(compact=True)}</p>"
             "<div style='background:#F7F9FC; padding:16px; border-radius:8px;'>"
             "<p style='margin:0;'>No roles matched in this window. I will keep scanning and send the next update tomorrow.</p>"
             "</div>"
@@ -74,39 +78,24 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
 
     top_pick = select_top_pick(records)
 
-    def compact_text(value: str, limit: int = 700) -> str:
+    def compact_text(value: str, limit: int = 150) -> str:
         text = " ".join((value or "").split())
         if len(text) <= limit:
             return text
         return text[: limit - 1].rstrip() + "…"
 
-    def compact_list(values: list[str], limit: int = 4) -> str:
-        items = [str(value).strip() for value in values or [] if str(value).strip()]
-        return " · ".join(items[:limit])
-
-    def detail_block(rec: JobRecord, *, top_pick_detail: bool = False) -> str:
-        sections: list[str] = []
-        if rec.fit_verdict:
-            sections.append(f"<strong>Verdict:</strong> {escape(rec.fit_verdict)}")
-        if rec.role_summary:
-            sections.append(f"<strong>Role detail:</strong> {escape(compact_text(rec.role_summary, 900 if top_pick_detail else 450))}")
-        elif rec.notes:
-            sections.append(f"<strong>Role detail:</strong> {escape(compact_text(rec.notes, 450))}")
-        if rec.key_requirements:
-            sections.append(f"<strong>Key requirements:</strong> {escape(compact_list(rec.key_requirements))}")
-        if rec.tailored_summary:
-            sections.append(f"<strong>Candidate angle:</strong> {escape(compact_text(rec.tailored_summary, 550 if top_pick_detail else 350))}")
-        if rec.key_talking_points:
-            sections.append(f"<strong>Talking points:</strong> {escape(compact_list(rec.key_talking_points, 3))}")
-        if rec.apply_tips:
-            sections.append(f"<strong>Apply tip:</strong> {escape(compact_text(rec.apply_tips, 350))}")
-        if not sections:
+    def display_posted(value: str) -> str:
+        text = (value or "").strip()
+        if not text:
             return ""
-        return (
-            "<div style='margin-top:8px; color:#333; font-size:13px; line-height:1.45;'>"
-            + "<br>".join(sections)
-            + "</div>"
-        )
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            return parsed.strftime("%d %b")
+        except ValueError:
+            return compact_text(text, 24)
+
+    def action_line(rec: JobRecord) -> str:
+        return compact_text(rec.apply_tips or rec.cv_gap or rec.tailored_summary, 150)
 
     top_pick_section = ""
     if top_pick:
@@ -118,15 +107,12 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
             f"<a href='{top_pick.link}' style='color:#0B4F8A; text-decoration:none;'>"
             f"{top_pick.role}</a></div>"
             f"<div style='color:#555; margin-top:4px;'>{top_pick.company} · {top_pick.location}</div>"
-            f"<div style='margin-top:8px; color:#333;'><strong>Released:</strong> {top_pick.posted} "
+            f"<div style='margin-top:8px; color:#333;'><strong>Released:</strong> {display_posted(top_pick.posted)} "
             f"· <strong>Source:</strong> {top_pick.source} · <strong>Fit:</strong> {top_pick.fit_score}%</div>"
-            f"<div style='margin-top:8px; color:#333;'><strong>Preference match:</strong> "
-            f"{top_pick.preference_match}</div>"
             f"<div style='margin-top:8px; color:#333;'><strong>Why you fit:</strong> "
-            f"{top_pick.why_fit}</div>"
-            f"<div style='margin-top:8px; color:#333;'><strong>Potential gaps:</strong> "
-            f"{top_pick.cv_gap}</div>"
-            + detail_block(top_pick, top_pick_detail=True) +
+            f"{escape(compact_text(top_pick.why_fit, 190))}</div>"
+            f"<div style='margin-top:8px; color:#333;'><strong>Action:</strong> "
+            f"{escape(action_line(top_pick))}</div>"
             "</div>"
         )
 
@@ -154,14 +140,11 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
             f"<tr style='background:{row_bg};'>"
             f"<td style='padding:10px;'><a href='{rec.link}' style='color:#0B4F8A; text-decoration:none;'><strong>{rec.role}</strong></a>{badge}"
             f"<div style='color:#666; font-size:12px; margin-top:4px;'>{rec.company} · {rec.location}</div>"
-            f"{detail_block(rec)}</td>"
-            f"<td style='padding:10px; white-space:nowrap;'>{rec.posted}</td>"
-            f"<td style='padding:10px; color:#333;'>{rec.source}</td>"
+            f"<div style='color:#777; font-size:12px; margin-top:4px;'>{rec.source} · {display_posted(rec.posted)}</div></td>"
             f"<td style='padding:10px;'><span style='display:inline-block; padding:4px 8px; border-radius:12px; "
             f"background:{fit_color}; color:#fff; font-weight:bold;'>{rec.fit_score}%</span></td>"
-            f"<td style='padding:10px; color:#333;'>{rec.preference_match}</td>"
-            f"<td style='padding:10px; color:#333;'>{rec.why_fit}</td>"
-            f"<td style='padding:10px; color:#333;'>{rec.cv_gap}</td>"
+            f"<td style='padding:10px; color:#333;'>{escape(compact_text(rec.why_fit, 160))}</td>"
+            f"<td style='padding:10px; color:#333;'>{escape(action_line(rec))}</td>"
             "</tr>"
         )
 
@@ -171,12 +154,9 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
         "<thead style='background:#F0F4F8;'>"
         "<tr>"
         "<th style='text-align:left; padding:10px;'>Role</th>"
-        "<th style='text-align:left; padding:10px;'>Released</th>"
-        "<th style='text-align:left; padding:10px;'>Source</th>"
         "<th style='text-align:left; padding:10px;'>Fit</th>"
-        "<th style='text-align:left; padding:10px;'>Preference Match</th>"
-        "<th style='text-align:left; padding:10px;'>Why You Fit</th>"
-        "<th style='text-align:left; padding:10px;'>Potential Gaps</th>"
+        "<th style='text-align:left; padding:10px;'>Why</th>"
+        "<th style='text-align:left; padding:10px;'>Action / Watch</th>"
         "</tr>"
         "</thead><tbody>"
         + "".join(rows)
@@ -187,7 +167,7 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
         "<div style='font-family:Arial, sans-serif; max-width:1000px; margin:0 auto;'>"
         f"<h2 style='color:#0B4F8A; margin-bottom:4px;'>{header}</h2>"
         f"<p style='color:#555; margin-top:0;'>Preferences: {config.PREFERENCES}</p>"
-        f"<p style='color:#555; margin-top:0;'>Sources checked: {build_sources_summary()}</p>"
+        f"<p style='color:#555; margin-top:0;'>Sources checked: {build_sources_summary(compact=True)}</p>"
         f"<p style='color:#333; font-weight:bold;'>Matches found: {len(records)}</p>"
         + top_pick_section
         + table
