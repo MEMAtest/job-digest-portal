@@ -305,9 +305,9 @@ def _parse_run_time(value: str) -> Optional[Tuple[int, int]]:
         return None
 
 
-def should_run_now(force: bool = False) -> bool:
+def due_run_slot(force: bool = False) -> Optional[str]:
     if force or config.FORCE_RUN:
-        return True
+        return "manual"
 
     run_times = []
     if config.RUN_AT:
@@ -315,9 +315,9 @@ def should_run_now(force: bool = False) -> bool:
     if config.RUN_ATS:
         run_times.extend(config.RUN_ATS)
     if not run_times:
-        return True
+        return "unscheduled"
     if ZoneInfo is None:
-        return True
+        return "unscheduled"
 
     tz = ZoneInfo(config.TZ_NAME)
     now_local = datetime.now(tz)
@@ -326,6 +326,7 @@ def should_run_now(force: bool = False) -> bool:
     if not isinstance(last_slots, list):
         last_slots = []
 
+    catch_up_candidates: List[Tuple[float, str]] = []
     for run_time in run_times:
         parsed = _parse_run_time(run_time)
         if not parsed:
@@ -337,15 +338,23 @@ def should_run_now(force: bool = False) -> bool:
             second=0,
             microsecond=0,
         )
-        delta_minutes = abs((now_local - target).total_seconds()) / 60.0
-        if delta_minutes > config.RUN_WINDOW_MINUTES:
-            continue
+        signed_delta_minutes = (now_local - target).total_seconds() / 60.0
         slot_key = f"{now_local.strftime('%Y-%m-%d')}-{target_hour:02d}:{target_minute:02d}"
         if slot_key in last_slots:
             continue
-        return True
+        if abs(signed_delta_minutes) <= config.RUN_WINDOW_MINUTES:
+            return slot_key
+        if 0 <= signed_delta_minutes <= config.RUN_CATCH_UP_MINUTES:
+            catch_up_candidates.append((signed_delta_minutes, slot_key))
 
-    return False
+    if catch_up_candidates:
+        return sorted(catch_up_candidates, key=lambda item: item[0])[0][1]
+
+    return None
+
+
+def should_run_now(force: bool = False) -> bool:
+    return due_run_slot(force=force) is not None
 
 
 def parse_posted_within_window(posted_text: str, posted_date: str, window_hours: int) -> bool:

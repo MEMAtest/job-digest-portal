@@ -83,6 +83,7 @@ from .utils import (
     canonicalize_company_name,
     canonicalize_posted_fields,
     canonical_job_link,
+    due_run_slot,
     filter_new_records,
     is_target_firm,
     load_run_state,
@@ -94,8 +95,6 @@ from .utils import (
     save_seen_cache,
     select_top_pick,
     should_keep_role_company,
-    should_run_now,
-    _parse_run_time,
 )
 
 
@@ -762,6 +761,77 @@ def build_delivery_records(new_records: list[JobRecord], qualified_records: list
         ),
         reverse=True,
     )
+
+
+def ensure_record_richness(records: list[JobRecord]) -> list[JobRecord]:
+    """Guarantee every digest row has useful role/candidate detail even if LLM enrichment is partial."""
+    for record in records:
+        combined = f"{record.role} {record.company} {record.notes}".lower()
+        requirements = []
+        if any(term in combined for term in ("kyc", "aml", "screening", "fraud", "financial crime", "compliance", "risk")):
+            requirements.extend([
+                "Financial crime, compliance, risk, or controls product knowledge",
+                "Ability to balance regulatory outcomes with customer and operational experience",
+            ])
+        if any(term in combined for term in ("payment", "card", "treasury", "ledger", "transaction", "banking")):
+            requirements.extend([
+                "Payments, banking, or transaction-platform product experience",
+                "Strong control design and cross-functional delivery discipline",
+            ])
+        if any(term in combined for term in ("ai", "model", "automation", "data", "analytics")):
+            requirements.extend([
+                "Data-led product judgement and comfort with AI, automation, or analytics workflows",
+            ])
+        if any(term in combined for term in ("product manager", "product owner", "product lead", "head of product")):
+            requirements.extend([
+                "Product discovery, roadmap ownership, stakeholder alignment, and agile delivery",
+            ])
+        if not requirements:
+            requirements.extend([
+                "Relevant product ownership experience in regulated financial services",
+                "Stakeholder management across business, technology, operations, and control teams",
+            ])
+
+        if not record.key_requirements:
+            record.key_requirements = requirements[:5]
+
+        if not record.role_summary:
+            if record.notes:
+                record.role_summary = record.notes[:900]
+            else:
+                record.role_summary = (
+                    "Likely role focus: own product outcomes, prioritise roadmap decisions, manage delivery across "
+                    "technology and business stakeholders, and translate regulatory/customer needs into scalable "
+                    "platform improvements."
+                )
+
+        if not record.tailored_summary:
+            record.tailored_summary = (
+                "Ade's strongest angle is regulated fintech product delivery: KYC/onboarding, screening, fraud/risk "
+                "controls, API/platform change, stakeholder leadership, and measurable operational improvement across "
+                "multi-jurisdiction environments."
+            )
+
+        if not record.match_notes:
+            record.match_notes = (
+                "Match should be positioned around financial-crime product depth, platform delivery, regulatory change, "
+                "and measurable outcomes from Vistra, Ebury, N26, Elucidate, and Fenergo work."
+            )
+
+        if not record.key_talking_points:
+            record.key_talking_points = [
+                "Standardised KYC/onboarding and screening controls across complex regulated environments",
+                "Improved operational quality using automation, workflow redesign, and data-led prioritisation",
+                "Led product/platform change across compliance, operations, engineering, and senior stakeholders",
+            ]
+
+        if not record.apply_tips:
+            record.apply_tips = (
+                "Lead the application with KYC/AML, onboarding, screening, fraud/risk, and platform delivery metrics; "
+                "de-emphasise unrelated domain gaps unless the advert explicitly requires them."
+            )
+
+    return records
 
 
 def print_source_yield(records: list[JobRecord]) -> None:
@@ -1542,6 +1612,7 @@ def main(
     validation_digest: bool = False,
     skip_linkedin: bool = False,
     fast_email: bool = False,
+    run_slot_key: str = "",
 ) -> None:
     session = requests.Session()
     session.headers.update({"User-Agent": config.USER_AGENT})
@@ -1622,12 +1693,15 @@ def main(
 
     if not skip_enrichment:
         records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
+        records = [record for record in records if int(record.fit_score or 0) >= 65]
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
+    records = ensure_record_richness(records)
 
     if ignore_seen_cache or not config.ALLOW_SEEN_TOP_UP:
         delivery_records = records
     else:
         delivery_records = build_delivery_records(records, pre_seen_records)
+    delivery_records = ensure_record_richness(delivery_records)
     RUN_SUMMARY["delivery_roles"] = len(delivery_records)
     RUN_SUMMARY["new_roles"] = len(records)
     RUN_SUMMARY["delivery_top_up_roles"] = max(0, len(delivery_records) - len(records))
@@ -1637,6 +1711,11 @@ def main(
         digest_suffix = "_validation"
     elif ignore_seen_cache:
         digest_suffix += "_ignore_seen"
+    if not digest_suffix and config.WRITE_SLOT_DIGESTS:
+        if run_slot_key and run_slot_key not in {"manual", "unscheduled"}:
+            digest_suffix = "_" + run_slot_key.rsplit("-", 1)[-1].replace(":", "")
+        else:
+            digest_suffix = "_" + datetime.now().strftime("%H%M%S")
     out_xlsx, out_csv = run_step(
         "write_digest_outputs",
         lambda: write_digest_outputs(delivery_records, suffix=digest_suffix),
@@ -1744,6 +1823,18 @@ def main(
         text_lines.append(f"  Preference match: {top_pick.preference_match}")
         text_lines.append(f"  Why fit: {top_pick.why_fit}")
         text_lines.append(f"  Potential gaps: {top_pick.cv_gap}")
+        if top_pick.fit_verdict:
+            text_lines.append(f"  Verdict: {top_pick.fit_verdict}")
+        if top_pick.role_summary:
+            text_lines.append(f"  Role detail: {top_pick.role_summary}")
+        if top_pick.key_requirements:
+            text_lines.append("  Key requirements: " + " | ".join(top_pick.key_requirements[:5]))
+        if top_pick.tailored_summary:
+            text_lines.append(f"  Candidate angle: {top_pick.tailored_summary}")
+        if top_pick.key_talking_points:
+            text_lines.append("  Talking points: " + " | ".join(top_pick.key_talking_points[:5]))
+        if top_pick.apply_tips:
+            text_lines.append(f"  Apply tip: {top_pick.apply_tips}")
         text_lines.append(f"  Link: {top_pick.link}")
         text_lines.append("")
     for rec in top_records:
@@ -1754,6 +1845,18 @@ def main(
         text_lines.append(f"  Preference match: {rec.preference_match}")
         text_lines.append(f"  Why fit: {rec.why_fit}")
         text_lines.append(f"  Potential gaps: {rec.cv_gap}")
+        if rec.fit_verdict:
+            text_lines.append(f"  Verdict: {rec.fit_verdict}")
+        if rec.role_summary:
+            text_lines.append(f"  Role detail: {rec.role_summary}")
+        elif rec.notes:
+            text_lines.append(f"  Role detail: {rec.notes[:700]}")
+        if rec.key_requirements:
+            text_lines.append("  Key requirements: " + " | ".join(rec.key_requirements[:4]))
+        if rec.tailored_summary:
+            text_lines.append(f"  Candidate angle: {rec.tailored_summary}")
+        if rec.key_talking_points:
+            text_lines.append("  Talking points: " + " | ".join(rec.key_talking_points[:4]))
         text_lines.append(f"  Link: {rec.link}")
         text_lines.append("")
     text_body = "\n".join(text_lines)
@@ -1776,22 +1879,13 @@ def main(
                 if canonical_link:
                     seen_cache[canonical_link] = now_utc().isoformat()
     save_seen_cache(config.SEEN_CACHE_PATH, seen_cache)
-    if config.RUN_AT or config.RUN_ATS:
+    if run_slot_key and run_slot_key not in {"manual", "unscheduled"} and not (scrape_only or validation_digest):
         state = load_run_state(config.RUN_STATE_PATH)
-        now_local = datetime.now(ZoneInfo(config.TZ_NAME)) if ZoneInfo else datetime.now()
-        run_times = [t for t in config.RUN_ATS if _parse_run_time(t)] or ([config.RUN_AT] if config.RUN_AT else [])
         last_slots = state.get("last_run_slots", [])
         if not isinstance(last_slots, list):
             last_slots = []
-        for run_time in run_times or ["manual"]:
-            parsed = _parse_run_time(run_time) if run_time != "manual" else None
-            if parsed:
-                hour, minute = parsed
-                slot_key = f"{now_local.strftime('%Y-%m-%d')}-{hour:02d}:{minute:02d}"
-            else:
-                slot_key = f"{now_local.strftime('%Y-%m-%d')}-manual"
-            if slot_key not in last_slots:
-                last_slots.append(slot_key)
+        if run_slot_key not in last_slots:
+            last_slots.append(run_slot_key)
         state["last_run_slots"] = last_slots[-50:]
         save_run_state(config.RUN_STATE_PATH, state)
 
@@ -1876,7 +1970,8 @@ def cli() -> None:
     elif args.backfill_role_summary:
         backfill_role_summaries(limit=args.backfill_limit or None)
     else:
-        if not should_run_now(force=args.force):
+        run_slot_key = due_run_slot(force=args.force)
+        if not run_slot_key:
             print("Skipping run: outside scheduled run window or already sent for this slot.")
             raise SystemExit(0)
         main(
@@ -1887,6 +1982,7 @@ def cli() -> None:
             validation_digest=args.validation_digest,
             skip_linkedin=args.skip_linkedin,
             fast_email=args.fast_email,
+            run_slot_key="" if args.force else run_slot_key,
         )
 
 

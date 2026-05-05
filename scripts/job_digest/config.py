@@ -57,6 +57,7 @@ MIN_SCORE = int(os.getenv("JOB_DIGEST_MIN_SCORE", "70"))
 MAX_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MAX_EMAIL_ROLES", "12"))
 MIN_EMAIL_ROLES = int(os.getenv("JOB_DIGEST_MIN_EMAIL_ROLES", "10"))
 ALLOW_SEEN_TOP_UP = os.getenv("JOB_DIGEST_ALLOW_SEEN_TOP_UP", "false").strip().lower() in {"1", "true", "yes", "y"}
+WRITE_SLOT_DIGESTS = os.getenv("JOB_DIGEST_WRITE_SLOT_DIGESTS", "true").strip().lower() in {"1", "true", "yes", "y"}
 LINKEDIN_TARGET_WINDOW_HOURS = int(os.getenv("JOB_DIGEST_LINKEDIN_TARGET_WINDOW_HOURS", "72"))
 LINKEDIN_INCLUDED_COMPANIES = {
     item.strip().lower()
@@ -90,6 +91,7 @@ SEEN_CACHE_DAYS = int(os.getenv("JOB_DIGEST_SEEN_CACHE_DAYS", "14"))
 RUN_AT = os.getenv("JOB_DIGEST_RUN_AT", "")
 RUN_ATS = [t.strip() for t in os.getenv("JOB_DIGEST_RUN_ATS", "").split(",") if t.strip()]
 RUN_WINDOW_MINUTES = int(os.getenv("JOB_DIGEST_RUN_WINDOW_MINUTES", "20"))
+RUN_CATCH_UP_MINUTES = int(os.getenv("JOB_DIGEST_RUN_CATCH_UP_MINUTES", "240"))
 RUN_STATE_PATH = Path(
     os.getenv("JOB_DIGEST_RUN_STATE", str(DIGEST_DIR / "run_state.json"))
 )

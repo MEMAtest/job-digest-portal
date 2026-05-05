@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from html import escape
 from typing import List
 
 from . import boards
@@ -73,6 +74,40 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
 
     top_pick = select_top_pick(records)
 
+    def compact_text(value: str, limit: int = 700) -> str:
+        text = " ".join((value or "").split())
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1].rstrip() + "…"
+
+    def compact_list(values: list[str], limit: int = 4) -> str:
+        items = [str(value).strip() for value in values or [] if str(value).strip()]
+        return " · ".join(items[:limit])
+
+    def detail_block(rec: JobRecord, *, top_pick_detail: bool = False) -> str:
+        sections: list[str] = []
+        if rec.fit_verdict:
+            sections.append(f"<strong>Verdict:</strong> {escape(rec.fit_verdict)}")
+        if rec.role_summary:
+            sections.append(f"<strong>Role detail:</strong> {escape(compact_text(rec.role_summary, 900 if top_pick_detail else 450))}")
+        elif rec.notes:
+            sections.append(f"<strong>Role detail:</strong> {escape(compact_text(rec.notes, 450))}")
+        if rec.key_requirements:
+            sections.append(f"<strong>Key requirements:</strong> {escape(compact_list(rec.key_requirements))}")
+        if rec.tailored_summary:
+            sections.append(f"<strong>Candidate angle:</strong> {escape(compact_text(rec.tailored_summary, 550 if top_pick_detail else 350))}")
+        if rec.key_talking_points:
+            sections.append(f"<strong>Talking points:</strong> {escape(compact_list(rec.key_talking_points, 3))}")
+        if rec.apply_tips:
+            sections.append(f"<strong>Apply tip:</strong> {escape(compact_text(rec.apply_tips, 350))}")
+        if not sections:
+            return ""
+        return (
+            "<div style='margin-top:8px; color:#333; font-size:13px; line-height:1.45;'>"
+            + "<br>".join(sections)
+            + "</div>"
+        )
+
     top_pick_section = ""
     if top_pick:
         top_pick_section = (
@@ -91,6 +126,7 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
             f"{top_pick.why_fit}</div>"
             f"<div style='margin-top:8px; color:#333;'><strong>Potential gaps:</strong> "
             f"{top_pick.cv_gap}</div>"
+            + detail_block(top_pick, top_pick_detail=True) +
             "</div>"
         )
 
@@ -117,7 +153,8 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
         rows.append(
             f"<tr style='background:{row_bg};'>"
             f"<td style='padding:10px;'><a href='{rec.link}' style='color:#0B4F8A; text-decoration:none;'><strong>{rec.role}</strong></a>{badge}"
-            f"<div style='color:#666; font-size:12px; margin-top:4px;'>{rec.company} · {rec.location}</div></td>"
+            f"<div style='color:#666; font-size:12px; margin-top:4px;'>{rec.company} · {rec.location}</div>"
+            f"{detail_block(rec)}</td>"
             f"<td style='padding:10px; white-space:nowrap;'>{rec.posted}</td>"
             f"<td style='padding:10px; color:#333;'>{rec.source}</td>"
             f"<td style='padding:10px;'><span style='display:inline-block; padding:4px 8px; border-radius:12px; "
