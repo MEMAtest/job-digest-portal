@@ -1715,11 +1715,30 @@ def main(
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
     records = ensure_record_richness(records)
     main_records = [record for record in records if int(record.fit_score or 0) > config.EMAIL_BORDERLINE_MAX_SCORE]
-    borderline_records = [
+    borderline_candidates = [
         record
         for record in records
         if config.EMAIL_BORDERLINE_MIN_SCORE <= int(record.fit_score or 0) <= config.EMAIL_BORDERLINE_MAX_SCORE
-    ][: config.MAX_BORDERLINE_EMAIL_ROLES]
+    ]
+    borderline_records = borderline_candidates[: config.MAX_BORDERLINE_EMAIL_ROLES]
+    if config.MIN_LINKEDIN_BORDERLINE_ROLES > 0:
+        selected_links = {record.link for record in borderline_records if record.link}
+        selected_linkedin_count = sum(1 for record in borderline_records if record.source == "LinkedIn")
+        needed_linkedin_count = max(0, config.MIN_LINKEDIN_BORDERLINE_ROLES - selected_linkedin_count)
+        linkedin_candidates = [
+            record
+            for record in borderline_candidates
+            if record.source == "LinkedIn" and record.link not in selected_links
+        ][:needed_linkedin_count]
+        for linkedin_record in linkedin_candidates:
+            if len(borderline_records) < config.MAX_BORDERLINE_EMAIL_ROLES:
+                borderline_records.append(linkedin_record)
+                continue
+            for index in range(len(borderline_records) - 1, -1, -1):
+                if borderline_records[index].source != "LinkedIn":
+                    borderline_records[index] = linkedin_record
+                    break
+        borderline_records = sorted(borderline_records, key=lambda record: record.fit_score, reverse=True)
     for record in main_records:
         record.email_bucket = "main"
     for record in borderline_records:
