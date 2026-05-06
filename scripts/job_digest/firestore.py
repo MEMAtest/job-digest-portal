@@ -109,6 +109,7 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "source_family": source_family,
             "ats_family": ats_family,
             "ats_account": record.ats_account,
+            "email_bucket": record.email_bucket,
             "fit_score": record.fit_score,
             "preference_match": record.preference_match,
             "why_fit": record.why_fit,

@@ -76,7 +76,8 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
             "</div>"
         )
 
-    top_pick = select_top_pick(records)
+    main_records_for_top_pick = [rec for rec in records if rec.email_bucket != "borderline"]
+    top_pick = select_top_pick(main_records_for_top_pick)
 
     def compact_text(value: str, limit: int = 150) -> str:
         text = " ".join((value or "").split())
@@ -117,7 +118,10 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
         )
 
     rows = []
-    for idx, rec in enumerate(records):
+    main_records = [rec for rec in records if rec.email_bucket != "borderline"]
+    borderline_records = [rec for rec in records if rec.email_bucket == "borderline"]
+    ordered_records = main_records + borderline_records
+    for idx, rec in enumerate(ordered_records):
         if rec.fit_score >= 85:
             fit_color = "#1B7F5D"
         elif rec.fit_score >= 75:
@@ -125,7 +129,7 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
         else:
             fit_color = "#8A5A0B"
 
-        row_bg = "#FFFFFF" if idx % 2 == 0 else "#F9FBFD"
+        row_bg = "#FFF7ED" if rec.email_bucket == "borderline" else ("#FFFFFF" if idx % 2 == 0 else "#F9FBFD")
         if top_pick and rec.link == top_pick.link:
             row_bg = "#FFF3D6"
         badge = ""
@@ -134,6 +138,12 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
                 "<span style='display:inline-block; margin-left:8px; padding:2px 6px; "
                 "border-radius:10px; background:#F5A623; color:#fff; font-size:11px; "
                 "font-weight:bold;'>Top Pick</span>"
+            )
+        elif rec.email_bucket == "borderline":
+            badge = (
+                "<span style='display:inline-block; margin-left:8px; padding:2px 6px; "
+                "border-radius:10px; background:#D97706; color:#fff; font-size:11px; "
+                "font-weight:bold;'>Maybe</span>"
             )
 
         rows.append(

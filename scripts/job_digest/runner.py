@@ -448,6 +448,14 @@ def min_score_for_fit(fit: dict, source_family: str, source: str) -> int:
     return min_score
 
 
+def keep_score_threshold(source_family: str, source: str) -> int:
+    if source == "CustomCareers":
+        return min(CUSTOM_CAREERS_MIN_SCORE, config.EMAIL_BORDERLINE_MIN_SCORE)
+    if source_family in {"ATS", "JobBoard", "Aggregator"}:
+        return config.EMAIL_BORDERLINE_MIN_SCORE
+    return min(config.MIN_SCORE, config.EMAIL_BORDERLINE_MIN_SCORE)
+
+
 def build_recent_digest_forecast() -> dict:
     digest_files = sorted(
         p for p in config.DIGEST_DIR.glob("digest_*.csv") if "scrape_only" not in p.name
@@ -699,6 +707,7 @@ def write_digest_outputs(records: list[JobRecord], *, suffix: str = "") -> tuple
             "Link": r.link,
             "Posted": r.posted,
             "Source": r.source,
+            "Email_Bucket": r.email_bucket,
             "Fit_Score_%": r.fit_score,
             "Fit_Verdict": r.fit_verdict,
             "Preference_Match": r.preference_match,
@@ -975,7 +984,8 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
         min_score = min_score_for_fit(fit, "Aggregator", "LinkedIn")
         if is_target_firm(company) or is_linkedin_included_company(company):
             min_score = min(min_score, 65)
-        if score < min_score:
+        keep_threshold = min(min_score, keep_score_threshold("Aggregator", "LinkedIn"))
+        if score < keep_threshold:
             drop(
                 "score",
                 {
@@ -1000,6 +1010,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
                 posted_date=posted_date,
                 source="LinkedIn",
                 source_family="Aggregator",
+                email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
@@ -1045,7 +1056,7 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
         fit = assess_fit(full_text, company, "ATS", "Greenhouse")
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Greenhouse")
-        if score < min_score:
+        if score < keep_score_threshold("ATS", "Greenhouse"):
             continue
 
         records.append(
@@ -1061,6 +1072,7 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
                 source_family="ATS",
                 ats_family="Greenhouse",
                 ats_account=job.get("ats_account", ""),
+                email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
@@ -1103,7 +1115,7 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
         fit = assess_fit(full_text, company, "ATS", "Lever")
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Lever")
-        if score < min_score:
+        if score < keep_score_threshold("ATS", "Lever"):
             continue
 
         records.append(
@@ -1119,6 +1131,7 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
                 source_family="ATS",
                 ats_family="Lever",
                 ats_account=job.get("ats_account", ""),
+                email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
@@ -1161,7 +1174,7 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
         fit = assess_fit(full_text, company, "ATS", "SmartRecruiters")
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "SmartRecruiters")
-        if score < min_score:
+        if score < keep_score_threshold("ATS", "SmartRecruiters"):
             continue
 
         records.append(
@@ -1177,6 +1190,7 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
                 source_family="ATS",
                 ats_family="SmartRecruiters",
                 ats_account=job.get("ats_account", ""),
+                email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
@@ -1219,7 +1233,7 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
         fit = assess_fit(full_text, company, "ATS", "Ashby")
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Ashby")
-        if score < min_score:
+        if score < keep_score_threshold("ATS", "Ashby"):
             continue
 
         records.append(
@@ -1235,6 +1249,7 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
                 source_family="ATS",
                 ats_family="Ashby",
                 ats_account=job.get("ats_account", ""),
+                email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
@@ -1277,7 +1292,7 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
         fit = assess_fit(full_text, company, "ATS", "Workable")
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Workable")
-        if score < min_score:
+        if score < keep_score_threshold("ATS", "Workable"):
             continue
 
         records.append(
@@ -1293,6 +1308,7 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
                 source_family="ATS",
                 ats_family="Workable",
                 ats_account=job.get("ats_account", ""),
+                email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
@@ -1338,7 +1354,7 @@ def collect_workday_records(session: requests.Session) -> list[JobRecord]:
         fit = assess_fit(full_text, company, "ATS", "Workday")
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Workday")
-        if score < min_score:
+        if score < keep_score_threshold("ATS", "Workday"):
             diag["dropped"]["score"] += 1
             continue
 
@@ -1355,6 +1371,7 @@ def collect_workday_records(session: requests.Session) -> list[JobRecord]:
                 source_family="ATS",
                 ats_family="Workday",
                 ats_account=job.get("ats_account", ""),
+                email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
@@ -1517,7 +1534,7 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
         fit = assess_fit(full_text, company, "JobBoard", effective_source_name)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "JobBoard", effective_source_name)
-        if score < min_score:
+        if score < min(min_score, keep_score_threshold("JobBoard", effective_source_name)):
             if diag:
                 diag["dropped"]["score"] += 1
                 add_source_diagnostic_example(
@@ -1547,6 +1564,7 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
                 posted_date=posted_date,
                 source=effective_source_name,
                 source_family="JobBoard",
+                email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
                 preference_match=build_preference_match(full_text, company, location),
@@ -1693,18 +1711,30 @@ def main(
 
     if not skip_enrichment:
         records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
-        records = [record for record in records if int(record.fit_score or 0) >= 65]
+        records = [record for record in records if int(record.fit_score or 0) >= config.EMAIL_BORDERLINE_MIN_SCORE]
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
     records = ensure_record_richness(records)
+    main_records = [record for record in records if int(record.fit_score or 0) > config.EMAIL_BORDERLINE_MAX_SCORE]
+    borderline_records = [
+        record
+        for record in records
+        if config.EMAIL_BORDERLINE_MIN_SCORE <= int(record.fit_score or 0) <= config.EMAIL_BORDERLINE_MAX_SCORE
+    ][: config.MAX_BORDERLINE_EMAIL_ROLES]
+    for record in main_records:
+        record.email_bucket = "main"
+    for record in borderline_records:
+        record.email_bucket = "borderline"
 
     if ignore_seen_cache or not config.ALLOW_SEEN_TOP_UP:
-        delivery_records = records
+        delivery_records = main_records
     else:
-        delivery_records = build_delivery_records(records, pre_seen_records)
+        delivery_records = build_delivery_records(main_records, pre_seen_records)
     delivery_records = ensure_record_richness(delivery_records)
+    email_records = delivery_records + borderline_records
     RUN_SUMMARY["delivery_roles"] = len(delivery_records)
     RUN_SUMMARY["new_roles"] = len(records)
-    RUN_SUMMARY["delivery_top_up_roles"] = max(0, len(delivery_records) - len(records))
+    RUN_SUMMARY["delivery_top_up_roles"] = max(0, len(delivery_records) - len(main_records))
+    RUN_SUMMARY["borderline_roles"] = len(borderline_records)
 
     digest_suffix = "_scrape_only" if scrape_only else ""
     if validation_digest:
@@ -1718,7 +1748,7 @@ def main(
             digest_suffix = "_" + datetime.now().strftime("%H%M%S")
     out_xlsx, out_csv = run_step(
         "write_digest_outputs",
-        lambda: write_digest_outputs(delivery_records, suffix=digest_suffix),
+        lambda: write_digest_outputs(email_records, suffix=digest_suffix),
     )
     RUN_SUMMARY["completed"] = True
     RUN_SUMMARY["validation_digest_written"] = bool(validation_digest or ignore_seen_cache)
@@ -1728,9 +1758,9 @@ def main(
     diagnostics_path = write_source_diagnostics(suffix=digest_suffix)
 
     if not scrape_only:
-        run_step("write_records_to_firestore", lambda: write_records_to_firestore(records))
-        run_step("write_notifications", lambda: write_notifications(records))
-        run_step("write_source_stats", lambda: write_source_stats(records))
+        run_step("write_records_to_firestore", lambda: write_records_to_firestore(email_records))
+        run_step("write_notifications", lambda: write_notifications(main_records))
+        run_step("write_source_stats", lambda: write_source_stats(email_records))
 
     if not scrape_only and not skip_post_hooks:
         run_step("write_role_suggestions", write_role_suggestions)
@@ -1739,13 +1769,15 @@ def main(
 
     if scrape_only:
         print(f"Digest generated: {out_xlsx}")
-        print(f"Roles found: {len(delivery_records)}")
-        if len(delivery_records) != len(records):
-            print(f"New roles found: {len(records)}")
-            print(f"Qualified top-up roles: {len(delivery_records) - len(records)}")
+        print(f"Roles found: {len(email_records)}")
+        if borderline_records:
+            print(f"Borderline roles included: {len(borderline_records)}")
+        if len(delivery_records) != len(main_records):
+            print(f"New main roles found: {len(main_records)}")
+            print(f"Qualified top-up roles: {len(delivery_records) - len(main_records)}")
         if not records and int(RUN_SUMMARY.get("pre_seen_kept", 0) or 0) > 0 and not (validation_digest or ignore_seen_cache):
             print("Production digest empty because all kept roles were already seen.")
-        print_source_yield(delivery_records)
+        print_source_yield(email_records)
         print_source_health_summary()
         print_seen_cache_summary(validation_digest_path=str(out_csv) if (validation_digest or ignore_seen_cache) else "")
         print_recent_digest_forecast()
@@ -1794,13 +1826,14 @@ def main(
     if top_pick and top_pick not in top_records:
         top_records = [top_pick] + top_records
         top_records = top_records[: max(config.MAX_EMAIL_ROLES, config.MIN_EMAIL_ROLES)]
-    html_body = build_email_html(top_records, config.WINDOW_HOURS)
+    html_body = build_email_html(top_records + borderline_records, config.WINDOW_HOURS)
     delivery_summary_html = (
         "<div style='background:#ECFDF5; border:1px solid #BBF7D0; padding:10px; "
         "border-radius:8px; margin-bottom:14px; font-size:14px; color:#064E3B;'>"
         f"<strong>New roles:</strong> {len(records)} &nbsp; "
         f"<strong>Qualified roles shown:</strong> {len(top_records)}"
-        "</div>"
+        + (f" &nbsp; <strong>Borderline shown:</strong> {len(borderline_records)}" if borderline_records else "")
+        + "</div>"
     )
     if "<h2" in html_body:
         html_body = html_body.replace("</h2>", "</h2>" + delivery_summary_html, 1)
@@ -1818,6 +1851,7 @@ def main(
         f"Sources checked: {build_sources_summary(compact=True)}",
         f"New roles found: {len(records)}",
         f"Qualified roles shown: {len(top_records)}",
+        f"Borderline roles shown: {len(borderline_records)}",
         "",
     ]
     if top_pick:
@@ -1833,7 +1867,7 @@ def main(
             text_lines.append(f"  Verdict: {top_pick.fit_verdict}")
         text_lines.append(f"  Link: {top_pick.link}")
         text_lines.append("")
-    for rec in top_records:
+    for rec in top_records + borderline_records:
         text_lines.append(
             f"- {rec.role} | {rec.company} | {rec.posted} | "
             f"Source {rec.source} | Fit {rec.fit_score}%"
@@ -1851,7 +1885,7 @@ def main(
     subject = f"Daily Job Digest - {today}"
     email_sent = send_email(subject, html_body, text_body)
 
-    for record in records:
+    for record in email_records:
         if record.link:
             seen_cache[record.link] = now_utc().isoformat()
             canonical_link = canonical_job_link(record.link)
@@ -1876,11 +1910,13 @@ def main(
         save_run_state(config.RUN_STATE_PATH, state)
 
     print(f"Digest generated: {out_xlsx}")
-    print(f"Roles found: {len(delivery_records)}")
-    if len(delivery_records) != len(records):
-        print(f"New roles found: {len(records)}")
-        print(f"Qualified top-up roles: {len(delivery_records) - len(records)}")
-    print_source_yield(delivery_records)
+    print(f"Roles found: {len(email_records)}")
+    if borderline_records:
+        print(f"Borderline roles included: {len(borderline_records)}")
+    if len(delivery_records) != len(main_records):
+        print(f"New main roles found: {len(main_records)}")
+        print(f"Qualified top-up roles: {len(delivery_records) - len(main_records)}")
+    print_source_yield(email_records)
     print_source_health_summary()
     print_recent_digest_forecast()
 

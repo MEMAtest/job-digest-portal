@@ -43,4 +43,5 @@ class JobRecord:
     ats_family: str = ""
     ats_account: str = ""
     source_family: str = ""
+    email_bucket: str = "main"
     alternate_links: List[Dict[str, str]] = field(default_factory=list)
