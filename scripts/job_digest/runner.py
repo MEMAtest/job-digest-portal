@@ -2016,7 +2016,7 @@ def cli() -> None:
             print("Skipping run: outside scheduled run window or already sent for this slot.")
             raise SystemExit(0)
         main(
-            skip_enrichment=args.skip_enrichment or args.scrape_only or args.validation_digest,
+            skip_enrichment=args.skip_enrichment or args.fast_email or args.scrape_only or args.validation_digest,
             skip_post_hooks=args.skip_post_hooks or args.scrape_only or args.validation_digest,
             scrape_only=args.scrape_only or args.validation_digest,
             ignore_seen_cache=args.ignore_seen_cache or args.validation_digest,
