@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from email.utils import make_msgid
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from html import escape
@@ -199,6 +200,7 @@ def send_email(subject: str, html_body: str, text_body: str) -> bool:
     msg["Subject"] = subject
     msg["From"] = config.FROM_EMAIL
     msg["To"] = config.TO_EMAIL
+    msg["Message-ID"] = make_msgid(domain="job-digest.local")
 
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
@@ -210,8 +212,42 @@ def send_email(subject: str, html_body: str, text_body: str) -> bool:
             server.starttls()
             server.login(config.SMTP_USER, config.SMTP_PASS)
             server.send_message(msg)
+        ensure_self_sent_digest_reaches_inbox(msg["Message-ID"])
         print("Email sent successfully")
         return True
     except Exception as exc:  # noqa: BLE001
         print(f"Email send failed: {exc}")
         return False
+
+
+def ensure_self_sent_digest_reaches_inbox(message_id: str) -> None:
+    """Gmail does not reliably show self-sent messages in Inbox.
+
+    The digest currently sends from and to the same Gmail account. SMTP accepts
+    the message, but Gmail can place it only in Sent/All Mail. Add the Inbox
+    label after send so the user receives a visible inbox alert.
+    """
+    if not message_id:
+        return
+    if config.SMTP_USER.lower() != config.TO_EMAIL.lower():
+        return
+    if "gmail.com" not in config.SMTP_HOST.lower():
+        return
+
+    try:
+        import imaplib
+
+        with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
+            imap.login(config.SMTP_USER, config.SMTP_PASS)
+            status, _ = imap.select('"[Gmail]/All Mail"')
+            if status != "OK":
+                return
+            status, data = imap.search(None, "HEADER", "Message-ID", message_id)
+            if status != "OK" or not data or not data[0]:
+                return
+            for msg_id in data[0].split()[-3:]:
+                imap.store(msg_id, "+X-GM-LABELS", r"(\Inbox)")
+                imap.store(msg_id, "-FLAGS", r"(\Seen)")
+            imap.logout()
+    except Exception as exc:  # noqa: BLE001
+        print(f"Email inbox labeling skipped: {exc}")
