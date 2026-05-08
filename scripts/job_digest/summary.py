@@ -239,14 +239,34 @@ def ensure_self_sent_digest_reaches_inbox(message_id: str, raw_bytes: bytes) -> 
 
     try:
         import imaplib
+        import re
 
         with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
             imap.login(config.SMTP_USER, config.SMTP_PASS)
             status, response = imap.append("INBOX", None, None, raw_bytes)
-            if status == "OK":
-                print(f"Email appended to Inbox via IMAP: {response}")
-            else:
+            if status != "OK":
                 print(f"Inbox APPEND non-OK status: {status} {response}")
+                imap.logout()
+                return
+
+            appended_uid = None
+            for chunk in response or []:
+                if not chunk:
+                    continue
+                match = re.search(rb"APPENDUID \d+ (\d+)", chunk)
+                if match:
+                    appended_uid = match.group(1)
+                    break
+
+            if appended_uid:
+                imap.select("INBOX")
+                imap.uid("STORE", appended_uid, "-FLAGS", "(\\Seen)")
+                print(
+                    f"Email appended to Inbox via IMAP and marked unread: "
+                    f"UID {appended_uid.decode()} response={response}"
+                )
+            else:
+                print(f"Email appended to Inbox via IMAP (UID not parsed): {response}")
             imap.logout()
     except Exception as exc:  # noqa: BLE001
         print(f"Inbox APPEND failed: {type(exc).__name__}: {exc}")
