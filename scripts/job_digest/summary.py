@@ -212,7 +212,7 @@ def send_email(subject: str, html_body: str, text_body: str) -> bool:
             server.starttls()
             server.login(config.SMTP_USER, config.SMTP_PASS)
             server.send_message(msg)
-        ensure_self_sent_digest_reaches_inbox(msg["Message-ID"])
+        ensure_self_sent_digest_reaches_inbox(msg["Message-ID"], msg.as_bytes())
         print("Email sent successfully")
         return True
     except Exception as exc:  # noqa: BLE001
@@ -220,18 +220,21 @@ def send_email(subject: str, html_body: str, text_body: str) -> bool:
         return False
 
 
-def ensure_self_sent_digest_reaches_inbox(message_id: str) -> None:
-    """Gmail does not reliably show self-sent messages in Inbox.
+def ensure_self_sent_digest_reaches_inbox(message_id: str, raw_bytes: bytes) -> None:
+    """Gmail places self-sent SMTP messages in Sent/All Mail, not Inbox.
 
-    The digest currently sends from and to the same Gmail account. SMTP accepts
-    the message, but Gmail can place it only in Sent/All Mail. Add the Inbox
-    label after send so the user receives a visible inbox alert.
+    Append the raw message directly to INBOX via IMAP after SMTP send. APPEND is
+    synchronous and avoids the race window where a search-then-label approach
+    runs before Gmail has indexed the just-sent message.
     """
-    if not message_id:
+    if not message_id or not raw_bytes:
+        print("Inbox APPEND skipped: missing message_id or raw_bytes")
         return
     if config.SMTP_USER.lower() != config.TO_EMAIL.lower():
+        print("Inbox APPEND skipped: SMTP_USER and TO_EMAIL differ (not self-send)")
         return
     if "gmail.com" not in config.SMTP_HOST.lower():
+        print("Inbox APPEND skipped: SMTP host is not Gmail")
         return
 
     try:
@@ -239,15 +242,11 @@ def ensure_self_sent_digest_reaches_inbox(message_id: str) -> None:
 
         with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
             imap.login(config.SMTP_USER, config.SMTP_PASS)
-            status, _ = imap.select('"[Gmail]/All Mail"')
-            if status != "OK":
-                return
-            status, data = imap.search(None, "HEADER", "Message-ID", message_id)
-            if status != "OK" or not data or not data[0]:
-                return
-            for msg_id in data[0].split()[-3:]:
-                imap.store(msg_id, "+X-GM-LABELS", r"(\Inbox)")
-                imap.store(msg_id, "-FLAGS", r"(\Seen)")
+            status, response = imap.append("INBOX", None, None, raw_bytes)
+            if status == "OK":
+                print(f"Email appended to Inbox via IMAP: {response}")
+            else:
+                print(f"Inbox APPEND non-OK status: {status} {response}")
             imap.logout()
     except Exception as exc:  # noqa: BLE001
-        print(f"Email inbox labeling skipped: {exc}")
+        print(f"Inbox APPEND failed: {type(exc).__name__}: {exc}")
