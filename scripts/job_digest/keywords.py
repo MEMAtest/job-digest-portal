@@ -444,6 +444,7 @@ ROLE_TITLE_REQUIREMENTS = {
     "operations",
     "management",
     "vp",
+    "officer",
 }
 
 VENDOR_COMPANIES = {
@@ -644,7 +645,16 @@ DOMAIN_TERMS = [
     "screening",
     "financial crime",
     "fincrime",
+    "money laundering",
     "transaction monitoring",
+    "perpetual kyc",
+    "transformation",
+    "remediation",
+    "risk",
+    "operational risk",
+    "model risk",
+    "regulatory change",
+    "controls",
     "sanctions",
     "identity",
     "fraud",
