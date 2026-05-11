@@ -205,6 +205,16 @@ def send_email(subject: str, html_body: str, text_body: str) -> bool:
     msg.attach(MIMEText(text_body, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
+    is_self_send_gmail = (
+        config.SMTP_USER.lower() == config.TO_EMAIL.lower()
+        and "gmail.com" in config.SMTP_HOST.lower()
+    )
+
+    if is_self_send_gmail:
+        if append_to_gmail_inbox(msg.as_bytes()):
+            return True
+        print("APPEND failed; falling back to SMTP delivery so the email is not lost")
+
     import smtplib
 
     try:
@@ -212,30 +222,24 @@ def send_email(subject: str, html_body: str, text_body: str) -> bool:
             server.starttls()
             server.login(config.SMTP_USER, config.SMTP_PASS)
             server.send_message(msg)
-        ensure_self_sent_digest_reaches_inbox(msg["Message-ID"], msg.as_bytes())
-        print("Email sent successfully")
+        print("Email sent successfully via SMTP")
         return True
     except Exception as exc:  # noqa: BLE001
         print(f"Email send failed: {exc}")
         return False
 
 
-def ensure_self_sent_digest_reaches_inbox(message_id: str, raw_bytes: bytes) -> None:
-    """Gmail places self-sent SMTP messages in Sent/All Mail, not Inbox.
+def append_to_gmail_inbox(raw_bytes: bytes) -> bool:
+    """Deliver a self-sent digest directly to Gmail INBOX via IMAP APPEND.
 
-    Append the raw message directly to INBOX via IMAP after SMTP send. APPEND is
-    synchronous and avoids the race window where a search-then-label approach
-    runs before Gmail has indexed the just-sent message.
+    For self-sends (FROM == TO on Gmail), SMTP delivery produces a Sent copy
+    that Gmail sometimes also mirrors into INBOX, resulting in two separate
+    messages per send. Using IMAP APPEND only puts a single copy in INBOX and
+    leaves Sent empty for these self-sends, which is the desired behaviour.
     """
-    if not message_id or not raw_bytes:
-        print("Inbox APPEND skipped: missing message_id or raw_bytes")
-        return
-    if config.SMTP_USER.lower() != config.TO_EMAIL.lower():
-        print("Inbox APPEND skipped: SMTP_USER and TO_EMAIL differ (not self-send)")
-        return
-    if "gmail.com" not in config.SMTP_HOST.lower():
-        print("Inbox APPEND skipped: SMTP host is not Gmail")
-        return
+    if not raw_bytes:
+        print("Inbox APPEND skipped: empty raw_bytes")
+        return False
 
     try:
         import imaplib
@@ -247,7 +251,7 @@ def ensure_self_sent_digest_reaches_inbox(message_id: str, raw_bytes: bytes) -> 
             if status != "OK":
                 print(f"Inbox APPEND non-OK status: {status} {response}")
                 imap.logout()
-                return
+                return False
 
             appended_uid = None
             for chunk in response or []:
@@ -262,11 +266,13 @@ def ensure_self_sent_digest_reaches_inbox(message_id: str, raw_bytes: bytes) -> 
                 imap.select("INBOX")
                 imap.uid("STORE", appended_uid, "-FLAGS", "(\\Seen)")
                 print(
-                    f"Email appended to Inbox via IMAP and marked unread: "
+                    f"Email delivered to Inbox via IMAP APPEND (unread): "
                     f"UID {appended_uid.decode()} response={response}"
                 )
             else:
-                print(f"Email appended to Inbox via IMAP (UID not parsed): {response}")
+                print(f"Email delivered to Inbox via IMAP APPEND (UID not parsed): {response}")
             imap.logout()
+        return True
     except Exception as exc:  # noqa: BLE001
         print(f"Inbox APPEND failed: {type(exc).__name__}: {exc}")
+        return False
