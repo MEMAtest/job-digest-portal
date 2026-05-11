@@ -643,6 +643,7 @@ DOMAIN_TERMS = [
     "onboarding",
     "screening",
     "financial crime",
+    "fincrime",
     "transaction monitoring",
     "sanctions",
     "identity",

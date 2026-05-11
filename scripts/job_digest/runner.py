@@ -1902,7 +1902,15 @@ def main(
 
     today = datetime.now().strftime("%Y-%m-%d")
     subject = f"Daily Job Digest - {today}"
-    email_sent = send_email(subject, html_body, text_body)
+    if not top_records and not borderline_records:
+        print(
+            "Skipping email: no qualified or borderline roles to report this run "
+            f"(pre_seen_kept={RUN_SUMMARY.get('pre_seen_kept', 0)}, "
+            f"seen_filtered={RUN_SUMMARY.get('seen_filtered', 0)})."
+        )
+        email_sent = False
+    else:
+        email_sent = send_email(subject, html_body, text_body)
 
     for record in email_records:
         if record.link:
