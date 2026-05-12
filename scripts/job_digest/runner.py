@@ -1854,8 +1854,12 @@ def main(
         + (f" &nbsp; <strong>Borderline shown:</strong> {len(borderline_records)}" if borderline_records else "")
         + "</div>"
     )
+    from .daily_focus import build_focus_html, build_focus_text
+    focus_html = build_focus_html()
     if "<h2" in html_body:
         html_body = html_body.replace("</h2>", "</h2>" + delivery_summary_html, 1)
+    if focus_html and "<h2" in html_body:
+        html_body = html_body.replace("</h2>", "</h2>" + focus_html, 1)
     if pipeline_summary_html and "<h2" in html_body:
         html_body = html_body.replace("</h2>", "</h2>" + pipeline_summary_html, 1)
     def compact_text(value: str, limit: int = 180) -> str:
@@ -1871,6 +1875,8 @@ def main(
         f"New roles found: {len(records)}",
         f"Qualified roles shown: {len(top_records)}",
         f"Borderline roles shown: {len(borderline_records)}",
+        "",
+        build_focus_text(),
         "",
     ]
     if top_pick:
