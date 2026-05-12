@@ -6,7 +6,9 @@ google-generativeai==0.8.6
 groq==1.0.0
 openai==2.9.0
 pandas==2.3.3
+openpyxl==3.1.5
 pdfplumber==0.11.9
+python-dotenv==1.0.1
 pypdf==6.5.0
 python-jobspy>=1.1,<2
 requests==2.32.5
