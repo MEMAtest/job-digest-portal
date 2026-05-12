@@ -1,0 +1,138 @@
+name: Daily Job Digest
+
+on:
+  schedule:
+    # BST = UTC+1 (summer). 8/12/16/20 BST = 7/11/15/19 UTC.
+    # Adjust by +1 hour to all entries when UK clocks revert to GMT in autumn.
+    - cron: '0 7,11,15,19 * * *'
+  workflow_dispatch:
+    inputs:
+      ignore_seen_cache:
+        description: 'Bypass seen-cache (validation mode, may send duplicates)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: digest-cron
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install python-dotenv
+
+      - name: Restore digest state cache
+        uses: actions/cache@v4
+        with:
+          path: digest-data
+          key: digest-state-${{ github.run_id }}
+          restore-keys: |
+            digest-state-
+
+      - name: Write Firebase service account JSON
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          mkdir -p secrets
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > secrets/firebase.json
+          # Sanity check: it should parse as JSON
+          python -c "import json; json.load(open('secrets/firebase.json'))"
+
+      - name: Run digest
+        env:
+          # SMTP / inbox delivery
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          TO_EMAIL: ${{ secrets.TO_EMAIL }}
+          # Firebase
+          FIREBASE_SERVICE_ACCOUNT_PATH: secrets/firebase.json
+          FIREBASE_COLLECTION: ${{ secrets.FIREBASE_COLLECTION }}
+          # LLMs
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          JOB_DIGEST_OPENROUTER_MODEL: ${{ secrets.JOB_DIGEST_OPENROUTER_MODEL }}
+          JOB_DIGEST_GROQ_MODEL: ${{ secrets.JOB_DIGEST_GROQ_MODEL }}
+          JOB_DIGEST_GROQ_MAX_JOBS: ${{ secrets.JOB_DIGEST_GROQ_MAX_JOBS }}
+          # Output / cache location (cloud-friendly)
+          JOB_DIGEST_BASE_DIR: ${{ github.workspace }}/digest-data
+          JOB_DIGEST_TZ: ${{ secrets.JOB_DIGEST_TZ }}
+          # Pipeline knobs
+          JOB_DIGEST_WINDOW_HOURS: ${{ secrets.JOB_DIGEST_WINDOW_HOURS }}
+          JOB_DIGEST_MIN_SCORE: ${{ secrets.JOB_DIGEST_MIN_SCORE }}
+          JOB_DIGEST_MAX_EMAIL_ROLES: ${{ secrets.JOB_DIGEST_MAX_EMAIL_ROLES }}
+          JOB_DIGEST_MIN_EMAIL_ROLES: ${{ secrets.JOB_DIGEST_MIN_EMAIL_ROLES }}
+          JOB_DIGEST_MAX_BORDERLINE_EMAIL_ROLES: ${{ secrets.JOB_DIGEST_MAX_BORDERLINE_EMAIL_ROLES }}
+          JOB_DIGEST_MIN_LINKEDIN_BORDERLINE_ROLES: ${{ secrets.JOB_DIGEST_MIN_LINKEDIN_BORDERLINE_ROLES }}
+          JOB_DIGEST_EMAIL_BORDERLINE_MIN_SCORE: ${{ secrets.JOB_DIGEST_EMAIL_BORDERLINE_MIN_SCORE }}
+          JOB_DIGEST_EMAIL_BORDERLINE_MAX_SCORE: ${{ secrets.JOB_DIGEST_EMAIL_BORDERLINE_MAX_SCORE }}
+          JOB_DIGEST_PREFERENCES: ${{ secrets.JOB_DIGEST_PREFERENCES }}
+          JOB_DIGEST_SEEN_CACHE_DAYS: ${{ secrets.JOB_DIGEST_SEEN_CACHE_DAYS }}
+          JOB_DIGEST_EMAIL_ENABLED: ${{ secrets.JOB_DIGEST_EMAIL_ENABLED }}
+          JOB_DIGEST_ALLOW_SEEN_TOP_UP: ${{ secrets.JOB_DIGEST_ALLOW_SEEN_TOP_UP }}
+          JOB_DIGEST_WRITE_SLOT_DIGESTS: ${{ secrets.JOB_DIGEST_WRITE_SLOT_DIGESTS }}
+          # LinkedIn timing
+          JOB_DIGEST_LINKEDIN_DEADLINE_SECONDS: ${{ secrets.JOB_DIGEST_LINKEDIN_DEADLINE_SECONDS }}
+          JOB_DIGEST_LINKEDIN_DETAILS_DEADLINE_SECONDS: ${{ secrets.JOB_DIGEST_LINKEDIN_DETAILS_DEADLINE_SECONDS }}
+          JOB_DIGEST_LINKEDIN_DETAIL_TIMEOUT_SECONDS: ${{ secrets.JOB_DIGEST_LINKEDIN_DETAIL_TIMEOUT_SECONDS }}
+          JOB_DIGEST_LINKEDIN_MAX_DETAIL_JOBS: ${{ secrets.JOB_DIGEST_LINKEDIN_MAX_DETAIL_JOBS }}
+          JOB_DIGEST_LINKEDIN_TARGET_WINDOW_HOURS: ${{ secrets.JOB_DIGEST_LINKEDIN_TARGET_WINDOW_HOURS }}
+          JOB_DIGEST_SOURCE_STAGE_TIMEOUT: ${{ secrets.JOB_DIGEST_SOURCE_STAGE_TIMEOUT }}
+          # Diagnostics
+          JOB_DIGEST_CUSTOM_DIAGNOSTICS: ${{ secrets.JOB_DIGEST_CUSTOM_DIAGNOSTICS }}
+          JOB_DIGEST_CUSTOM_DIAGNOSTICS_LIMIT: ${{ secrets.JOB_DIGEST_CUSTOM_DIAGNOSTICS_LIMIT }}
+          # Scheduling within runner (used by --force we override anyway)
+          JOB_DIGEST_RUN_ATS: ${{ secrets.JOB_DIGEST_RUN_ATS }}
+          JOB_DIGEST_RUN_WINDOW_MINUTES: ${{ secrets.JOB_DIGEST_RUN_WINDOW_MINUTES }}
+          JOB_DIGEST_RUN_CATCH_UP_MINUTES: ${{ secrets.JOB_DIGEST_RUN_CATCH_UP_MINUTES }}
+          # Site + auto-apply
+          SITE_URL: ${{ secrets.SITE_URL }}
+          AUTO_APPLY_HMAC_SECRET: ${{ secrets.AUTO_APPLY_HMAC_SECRET }}
+          # Watchdog
+          JOB_DIGEST_RUN_DEADLINE_SECONDS: '1200'
+        run: |
+          mkdir -p digest-data/digests
+          EXTRA_FLAGS=""
+          if [ "${{ github.event.inputs.ignore_seen_cache }}" = "true" ]; then
+            EXTRA_FLAGS="--ignore-seen-cache"
+          fi
+          python scripts/daily_job_search.py --force --skip-post-hooks --fast-email --skip-enrichment $EXTRA_FLAGS
+
+      - name: Save digest state cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: digest-data
+          key: digest-state-${{ github.run_id }}
+
+      - name: Upload digest outputs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-outputs-${{ github.run_id }}
+          path: |
+            digest-data/digests/*.csv
+            digest-data/digests/*.xlsx
+            digest-data/digests/runner_trace.log
+            digest-data/digests/source_diagnostics_*.json
+          retention-days: 14
+          if-no-files-found: ignore
