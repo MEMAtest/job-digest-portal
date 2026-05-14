@@ -119,8 +119,15 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
         )
 
     rows = []
-    main_records = [rec for rec in records if rec.email_bucket != "borderline"]
-    borderline_records = [rec for rec in records if rec.email_bucket == "borderline"]
+    top_pick_link = top_pick.link if top_pick else None
+    main_records = [
+        rec for rec in records
+        if rec.email_bucket != "borderline" and rec.link != top_pick_link
+    ]
+    borderline_records = [
+        rec for rec in records
+        if rec.email_bucket == "borderline" and rec.link != top_pick_link
+    ]
     ordered_records = main_records + borderline_records
     for idx, rec in enumerate(ordered_records):
         if rec.fit_score >= 85:
@@ -131,16 +138,8 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
             fit_color = "#8A5A0B"
 
         row_bg = "#FFF7ED" if rec.email_bucket == "borderline" else ("#FFFFFF" if idx % 2 == 0 else "#F9FBFD")
-        if top_pick and rec.link == top_pick.link:
-            row_bg = "#FFF3D6"
         badge = ""
-        if top_pick and rec.link == top_pick.link:
-            badge = (
-                "<span style='display:inline-block; margin-left:8px; padding:2px 6px; "
-                "border-radius:10px; background:#F5A623; color:#fff; font-size:11px; "
-                "font-weight:bold;'>Top Pick</span>"
-            )
-        elif rec.email_bucket == "borderline":
+        if rec.email_bucket == "borderline":
             badge = (
                 "<span style='display:inline-block; margin-left:8px; padding:2px 6px; "
                 "border-radius:10px; background:#D97706; color:#fff; font-size:11px; "

@@ -1892,7 +1892,10 @@ def main(
             text_lines.append(f"  Verdict: {top_pick.fit_verdict}")
         text_lines.append(f"  Link: {top_pick.link}")
         text_lines.append("")
+    top_pick_link = top_pick.link if top_pick else None
     for rec in top_records + borderline_records:
+        if top_pick_link and rec.link == top_pick_link:
+            continue
         text_lines.append(
             f"- {rec.role} | {rec.company} | {rec.posted} | "
             f"Source {rec.source} | Fit {rec.fit_score}%"
