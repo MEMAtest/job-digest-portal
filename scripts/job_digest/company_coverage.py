@@ -165,11 +165,16 @@ BANK_FIRMS = {
 }
 
 REGTECH_FIRMS = {
-    "Actimize", "Alloy", "BioCatch", "Chainalysis", "ComplyAdvantage", "ComplyCube", "Elliptic", "Encompass",
-    "Entrust", "Fenergo", "Feedzai", "Featurespace", "FinScan", "Fourthline", "Hawk", "Hawk AI", "IMTF",
-    "Incode", "Jumio", "KYC360", "KYC Portal", "Kyckr", "LexisNexis Risk", "Lucinity", "Napier", "NICE Actimize",
-    "Norbloc", "Onfido", "Persona", "Quantexa", "Refinitiv", "Resistant AI", "Ripjar", "Salv", "Saphyre",
-    "Sigma360", "smartKYC", "Socure", "Strise", "Sumsub", "SymphonyAI", "Trulioo", "Unit21", "Veriff",
+    "Actimize", "Alloy", "Arachnys", "Arkose Labs", "BehavioSec", "BioCatch", "Cable", "Callsign",
+    "Chainalysis", "ComplyAdvantage", "ComplyCube", "Credas", "Elliptic", "Encompass", "Entrust",
+    "Feedzai", "Fenergo", "Featurespace", "FinScan", "Fourthline", "Frankie One", "FrankieOne",
+    "Global Screening Services", "Hawk", "Hawk AI", "Hummingbird RegTech", "IDnow", "IMTF", "Incode",
+    "Jumio", "KYC360", "KYC Portal", "Kyckr", "LexisNexis Risk", "Lucinity", "Mesh", "Mitek",
+    "Napier", "NICE Actimize", "Norbloc", "Ondato", "Onfido", "Oscilar", "PassFort", "Persona",
+    "Quantexa", "Refinitiv", "Resistant AI", "Ripjar", "Riskified", "Salv", "Sanction Scanner",
+    "Saphyre", "Sardine", "SEON", "Shufti Pro", "Sift", "Sigma360", "Silent Eight", "smartKYC",
+    "Socure", "Solidus Labs", "Strise", "Sumsub", "SymphonyAI", "Taktile", "Theta Lake", "Tookitaki",
+    "TRM Labs", "Trulioo", "Unit21", "Veriff",
 }
 
 TIER1_FIRMS = {

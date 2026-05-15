@@ -1,6 +1,8 @@
+10x Banking
 Allica Bank
 Atom Bank
 Bank of America
+Banked
 Banking Circle
 Barclays
 BNP Paribas
@@ -36,6 +38,7 @@ Santander UK
 Secure Trust Bank
 Société Générale
 Societe Generale
+Sopra Banking Software
 Standard Chartered
 StandardChartered
 Starling Bank
@@ -106,7 +109,10 @@ TrueLayer
 Truelayer
 Wise
 Wise Australia Investments
+11:FS Foundry
+ACI Worldwide
 Adclear
+Akurateco
 alloy
 Amazon
 ANNA Money
@@ -119,9 +125,13 @@ AuditComply
 Avaloq
 azimo
 Azimo
+Backbase
 Blackdot Solutions
 Block
 Square
+Boku
+Bottomline Technologies
+BR-DGE
 Brex
 brex
 C365Cloud
@@ -130,11 +140,14 @@ Cashplus
 CheckedSafe
 Chip
 chip
+Clear Junction
 clearscore
 Clearscore
 CleverChain
 Credit Benchmark
+Credit Kudos
 Creditspring
+Crezco
 CUBE
 Currencycloud
 Curve
@@ -144,35 +157,47 @@ Datactics
 Davies
 Derivitec
 Detected
+DNA Payments
+Dock Financial
 Dow Jones
 DowJones
 Dowjones
 E-Sign
 Engine by Starling
 entrust
+Episode Six
+Equals Money
 Fable Data
+Fime
+Finastra
 Finch
 finch
 FinCrime Dynamics
 FIS
+FIS Global
 Flagstone
 Flow Global
 FNA
 Forensic Analytics
+Form3
 Forter
+Freetrade
 FundApps
 Funding Circle
 Fundingcircle
 fundingcircle
+GBG
 Gen H
-Global Screening Services
+Global Processing Services
 Google
 Griffin
 Hozah
 Infinian
 iProov
+Judopay
 Juni
 Kaizen
+Kani Payments
 klarna
 Klarna
 Konfir
@@ -185,6 +210,7 @@ lexisnexis
 Love Finance
 Mambu
 mambu
+Mangopay
 Marqeta
 marqeta
 Mastercard
@@ -199,24 +225,34 @@ Monese
 Moneybox
 Moody
 Moody's
+nCino
 Neotas
 NICE
 Nium
 NorthRow
 Novatus
 Nuggets
+Nuvei
 OneDome
 OneID
+OpenPayd
 Oracle
+Ordo
 Paddle
+Pay.UK
+Payabl
+Paydock
 Payhawk
 PayPal
 Pega
 Penfold
+PensionBee
+Pismo
 Plaid
 plaid
 Pleo
 Plum
+PPRO
 Primer
 Profylr
 ProofID
@@ -243,7 +279,6 @@ Salesforce
 Santander
 SAP
 saphyre
-Sardine
 Smartpension
 smartpension
 SmartStream
@@ -256,16 +291,23 @@ Soldo
 Spendesk
 stripe
 SumUp
+Swan
 Symphonyai
 symphonyai
 TAINA Technology
+Tell Money
+tell.money
 Temenos
 Thirdfort
 Thought Machine
 Thoughtmachine
+Thredd
+Thunes
 Tink
 tink
 Token.io
+Toqio
+Treezor
 Trust Payments
 Trustly
 Tuum
@@ -273,12 +315,15 @@ Verto
 Visa
 Volt
 Voxsmart
+Vyne
+Weavr
 Wordwatch
 Worldline
 Worldpay
 Worldremit
 worldremit
 Yapily
+Yuno
 Zilch
 zopa
 Chainalysis
@@ -306,16 +351,26 @@ trulioo
 Veriff
 veriff
 Alloy
+Arachnys
+Arkose Labs
+BehavioSec
 BioCatch
+Cable
+Callsign
 ComplyCube
+Credas
 Encompass
 encompass
 Entrust
 Feedzai
 FinScan
 Fourthline
+Frankie One
+FrankieOne
+Global Screening Services
 Hawk AI
-Hawk
+Hummingbird RegTech
+IDnow
 IMTF
 Incode
 Jumio
@@ -325,14 +380,31 @@ Kyc360
 Kyckr
 LexisNexis Risk
 Lucinity
+Mesh
+Mitek
 Norbloc
+Ondato
+Oscilar
+PassFort
 Persona
 Resistant AI
+Riskified
 Salv
+Sanction Scanner
 Saphyre
+Sardine
+SEON
+Shufti Pro
+Sift
 Sigma360
+Silent Eight
 smartKYC
 Socure
+Solidus Labs
 Strise
 SymphonyAI
+Taktile
+Theta Lake
+Tookitaki
+TRM Labs
 Unit21
