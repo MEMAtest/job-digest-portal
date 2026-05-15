@@ -3,10 +3,11 @@ name: Daily Job Digest
 on:
   schedule:
     # GitHub Actions schedules drift 15-60 min at top-of-hour due to queue load.
-    # Fire 30 min off-peak so the typical drift lands emails near 08/12/16/20 BST.
-    # BST = UTC+1 (summer): 6:30/10:30/14:30/18:30 UTC + ~30 min drift ≈ 08/12/16/20 BST.
+    # Fire 30 min off-peak so the typical drift lands emails near 04/08/12/16/20/24 BST.
+    # BST = UTC+1 (summer): 3:30/6:30/10:30/14:30/18:30/22:30 UTC + ~30 min drift
+    # ≈ 04:30 / 07:30 / 11:30 / 15:30 / 19:30 / 23:30 BST.
     # Shift all entries by +1 hour when UK clocks revert to GMT in autumn.
-    - cron: '30 6,10,14,18 * * *'
+    - cron: '30 3,6,10,14,18,22 * * *'
   workflow_dispatch:
     inputs:
       ignore_seen_cache:
