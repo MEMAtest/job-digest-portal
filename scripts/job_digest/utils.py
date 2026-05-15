@@ -96,6 +96,10 @@ def looks_like_recruiter(name: str) -> bool:
 
 def should_keep_role_company(company: str, source_family: str, source: str) -> bool:
     canonical = canonicalize_company_name(company)
+    canonical_lc = (canonical or "").lower()
+    raw_lc = (company or "").strip().lower()
+    if canonical_lc in config.EXCLUDE_COMPANIES or raw_lc in config.EXCLUDE_COMPANIES:
+        return False
     if source_family in {"ATS", "Manual"}:
         return bool(canonical or normalize_text(company))
     if not canonical:

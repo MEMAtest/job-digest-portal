@@ -428,7 +428,18 @@ EXCLUDE_LOCATION_TERMS = {
 }
 
 EXCLUDE_TITLE_TERMS = {"growth"}
-EXCLUDE_COMPANIES = {"ebury"}
+EXCLUDE_COMPANIES = {
+    "ebury",
+    "wise",
+    "wise payments",
+    "wise plc",
+    "wise inc",
+    "wise ltd",
+    "wise business",
+    "wise platform",
+    "transferwise",
+    "transferwise ltd",
+}
 
 ROLE_TITLE_REQUIREMENTS = {
     "manager",
