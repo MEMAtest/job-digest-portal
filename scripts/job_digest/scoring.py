@@ -248,6 +248,29 @@ def is_relevant_title(title: str) -> bool:
     return False
 
 
+def is_relevant_title_direct(title: str) -> bool:
+    """Relaxed title filter for direct ATS sources.
+
+    Direct ATS feeds (Greenhouse, Lever, Ashby, SmartRecruiters, Workable,
+    Workday) only return roles from target firms, so the company gate is
+    implicit. The full LinkedIn-tuned is_relevant_title is too aggressive
+    here — it requires title to contain product/platform/a domain term in
+    addition to a role term, which drops legitimate target-firm roles like
+    'Senior Manager, Compliance Strategy' that don't carry a product noun.
+
+    Keep if: passes the EXCLUDE check AND contains any role-level term.
+    Drop if: exclude term present (e.g. 'growth' for the growth-PM blocklist)
+    or no role-level term at all (e.g. 'Junior Onboarding Analyst' — too
+    junior).
+    """
+    title_l = title.lower()
+    if any(term in title_l for term in config.EXCLUDE_TITLE_TERMS):
+        return False
+    if not any(req in title_l for req in config.ROLE_TITLE_REQUIREMENTS):
+        return False
+    return True
+
+
 def is_relevant_location(location: str, text: str = "") -> bool:
     combined = f"{location} {text}".lower()
     if "northern ireland" in combined:

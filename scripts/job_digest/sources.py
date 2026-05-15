@@ -738,7 +738,11 @@ def smartrecruiters_search(session: requests.Session) -> List[Dict[str, str]]:
         limit = 100
         while True:
             url = f"https://api.smartrecruiters.com/v1/companies/{company}/postings"
-            params = {"limit": limit, "offset": offset, "q": "product"}
+            # No server-side q filter: pull all roles per company and let the
+            # downstream title filter (is_relevant_title_direct) decide. The old
+            # q="product" hardcode hid every Compliance/Risk/Officer-titled role
+            # from target firms like HSBC and Barclays.
+            params = {"limit": limit, "offset": offset}
             try:
                 resp = session.get(url, params=params, timeout=20)
             except requests.RequestException:
@@ -1749,7 +1753,7 @@ def iter_job_like_nodes(data: object) -> Iterable[Dict[str, object]]:
 def efinancialcareers_api_search(session: requests.Session) -> List[Dict[str, str]]:
     jobs: List[Dict[str, str]] = []
     api_url = "https://job-search-ui.efinancialcareers.com/v1/efc/jobs/search"
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms():
         payload = {
             "keyword": keyword,
             "location": "London",
@@ -1816,7 +1820,7 @@ def efinancialcareers_html_search(session: requests.Session) -> List[Dict[str, s
         return jobs
 
     job_map: Dict[str, Dict[str, str]] = {}
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms():
         slug = slugify(keyword)
         search_url = f"{base_url}/jobs/{slug}"
         try:
@@ -2489,6 +2493,37 @@ def builtin_london_search(session: requests.Session) -> List[Dict[str, str]]:
     return jobs
 
 
+def financial_services_board_search_terms() -> List[str]:
+    """High-signal terms for finance job boards where broad searches create noise."""
+    terms = [
+        "financial crime product manager",
+        "financial crime product owner",
+        "senior product manager kyc",
+        "senior product manager kyb",
+        "kyc product manager",
+        "kyb product manager",
+        "aml kyc product manager",
+        "client lifecycle product manager",
+        "client lifecycle regulatory solutions",
+        "clm product manager",
+        "fenergo product manager",
+        "fenergo product owner",
+        "transaction monitoring product manager",
+        "sanctions screening product manager",
+        "customer screening product manager",
+        "financial crime transformation",
+        "kyc transformation manager",
+        "clm transformation manager",
+        "aml transformation manager",
+        "financial crime business analyst",
+        "financial crime project manager",
+    ]
+    for keyword in BOARD_KEYWORDS:
+        if keyword not in terms:
+            terms.append(keyword)
+    return terms[:20]
+
+
 def jobserve_search(session: requests.Session) -> List[Dict[str, str]]:
     jobs: List[Dict[str, str]] = []
     url = JOB_BOARD_URLS.get("JobServe")
@@ -2517,7 +2552,7 @@ def jobserve_search(session: requests.Session) -> List[Dict[str, str]]:
     post_url = urljoin(url, action)
 
     job_map: Dict[str, Dict[str, str]] = {}
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms():
         payload = dict(base_payload)
         payload["ctl00$main$srch$ctl_qs$txtKey"] = keyword
         payload["ctl00$main$srch$ctl_qs$txtTitle"] = ""

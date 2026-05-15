@@ -43,8 +43,10 @@ from .scoring import (
     build_reasons,
     is_relevant_location,
     is_relevant_title,
+    is_relevant_title_direct,
     score_fit,
 )
+from .custom_careers import custom_careers_search as direct_custom_careers_search
 from .sources import (
     adzuna_search,
     ashby_search,
@@ -448,9 +450,17 @@ def min_score_for_fit(fit: dict, source_family: str, source: str) -> int:
     return min_score
 
 
+DIRECT_ATS_SOURCES = {"Greenhouse", "Lever", "Ashby", "SmartRecruiters", "Workable", "Workday", "DirectCareers"}
+
+
 def keep_score_threshold(source_family: str, source: str) -> int:
     if source == "CustomCareers":
         return min(CUSTOM_CAREERS_MIN_SCORE, config.EMAIL_BORDERLINE_MIN_SCORE)
+    if source_family == "ATS" and source in DIRECT_ATS_SOURCES:
+        # Direct ATS only returns roles from registered target firms, so the
+        # company gate is implicit. The LinkedIn-tuned EMAIL_BORDERLINE_MIN_SCORE
+        # is too aggressive here. Drop the floor by 10 points (minimum 40).
+        return max(40, config.EMAIL_BORDERLINE_MIN_SCORE - 10)
     if source_family in {"ATS", "JobBoard", "Aggregator"}:
         return config.EMAIL_BORDERLINE_MIN_SCORE
     return min(config.MIN_SCORE, config.EMAIL_BORDERLINE_MIN_SCORE)
@@ -1040,15 +1050,22 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
         location = job.get("location", "")
-        if not is_relevant_title(title):
+        if not is_relevant_title_direct(title):
+            diag["dropped"]["title"] += 1
+            add_source_diagnostic_example(diag, "title", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not is_direct_ats_relevant_location(location, "", company):
+            diag["dropped"]["location"] += 1
+            add_source_diagnostic_example(diag, "location", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not should_keep_role_company(company, "ATS", "Greenhouse"):
+            diag["dropped"]["company"] += 1
+            add_source_diagnostic_example(diag, "company", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
         if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
+            diag["dropped"]["window"] += 1
             continue
 
         summary = job.get("summary", "")
@@ -1057,6 +1074,8 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Greenhouse")
         if score < keep_score_threshold("ATS", "Greenhouse"):
+            diag["dropped"]["score"] += 1
+            add_source_diagnostic_example(diag, "score", {"company": company, "title": title, "score": score, "link": job.get("link", "")})
             continue
 
         records.append(
@@ -1099,15 +1118,22 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
         location = job.get("location", "")
-        if not is_relevant_title(title):
+        if not is_relevant_title_direct(title):
+            diag["dropped"]["title"] += 1
+            add_source_diagnostic_example(diag, "title", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not is_direct_ats_relevant_location(location, "", company):
+            diag["dropped"]["location"] += 1
+            add_source_diagnostic_example(diag, "location", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not should_keep_role_company(company, "ATS", "Lever"):
+            diag["dropped"]["company"] += 1
+            add_source_diagnostic_example(diag, "company", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
         if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
+            diag["dropped"]["window"] += 1
             continue
 
         summary = job.get("summary", "")
@@ -1116,6 +1142,8 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Lever")
         if score < keep_score_threshold("ATS", "Lever"):
+            diag["dropped"]["score"] += 1
+            add_source_diagnostic_example(diag, "score", {"company": company, "title": title, "score": score, "link": job.get("link", "")})
             continue
 
         records.append(
@@ -1158,15 +1186,22 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
         location = job.get("location", "")
-        if not is_relevant_title(title):
+        if not is_relevant_title_direct(title):
+            diag["dropped"]["title"] += 1
+            add_source_diagnostic_example(diag, "title", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not is_direct_ats_relevant_location(location, "", company):
+            diag["dropped"]["location"] += 1
+            add_source_diagnostic_example(diag, "location", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not should_keep_role_company(company, "ATS", "SmartRecruiters"):
+            diag["dropped"]["company"] += 1
+            add_source_diagnostic_example(diag, "company", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
         if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
+            diag["dropped"]["window"] += 1
             continue
 
         summary = job.get("summary", "")
@@ -1175,6 +1210,8 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "SmartRecruiters")
         if score < keep_score_threshold("ATS", "SmartRecruiters"):
+            diag["dropped"]["score"] += 1
+            add_source_diagnostic_example(diag, "score", {"company": company, "title": title, "score": score, "link": job.get("link", "")})
             continue
 
         records.append(
@@ -1217,15 +1254,22 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
         title = job.get("title", "")
         company = canonical_company(job.get("company", ""))
         location = job.get("location", "") or "Remote"
-        if not is_relevant_title(title):
+        if not is_relevant_title_direct(title):
+            diag["dropped"]["title"] += 1
+            add_source_diagnostic_example(diag, "title", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not is_direct_ats_relevant_location(location, "", company):
+            diag["dropped"]["location"] += 1
+            add_source_diagnostic_example(diag, "location", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not should_keep_role_company(company, "ATS", "Ashby"):
+            diag["dropped"]["company"] += 1
+            add_source_diagnostic_example(diag, "company", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
         if not is_direct_ats_within_window(posted_display, posted_raw, posted_date, company):
+            diag["dropped"]["window"] += 1
             continue
 
         summary = job.get("summary", "")
@@ -1234,6 +1278,8 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Ashby")
         if score < keep_score_threshold("ATS", "Ashby"):
+            diag["dropped"]["score"] += 1
+            add_source_diagnostic_example(diag, "score", {"company": company, "title": title, "score": score, "link": job.get("link", "")})
             continue
 
         records.append(
@@ -1277,15 +1323,22 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
         company = canonical_company(job.get("company", ""))
         location = job.get("location", "") or "Remote"
         summary = job.get("summary", "")
-        if not is_relevant_title(title):
+        if not is_relevant_title_direct(title):
+            diag["dropped"]["title"] += 1
+            add_source_diagnostic_example(diag, "title", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not is_direct_ats_relevant_location(location, summary, company):
+            diag["dropped"]["location"] += 1
+            add_source_diagnostic_example(diag, "location", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
         if not should_keep_role_company(company, "ATS", "Workable"):
+            diag["dropped"]["company"] += 1
+            add_source_diagnostic_example(diag, "company", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
             continue
 
         posted_display, posted_raw, posted_date = normalize_posted(job)
         if not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            diag["dropped"]["window"] += 1
             continue
 
         full_text = f"{title} {company} {summary}"
@@ -1293,6 +1346,8 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Workable")
         if score < keep_score_threshold("ATS", "Workable"):
+            diag["dropped"]["score"] += 1
+            add_source_diagnostic_example(diag, "score", {"company": company, "title": title, "score": score, "link": job.get("link", "")})
             continue
 
         records.append(
@@ -1338,7 +1393,7 @@ def collect_workday_records(session: requests.Session) -> list[JobRecord]:
         location = job.get("location", "")
         summary = job.get("summary", "")
         posted_display, posted_raw, posted_date = normalize_posted(job)
-        if not is_relevant_title(title):
+        if not is_relevant_title_direct(title):
             diag["dropped"]["title"] += 1
             continue
         if not is_direct_ats_relevant_location(location, summary, company):
@@ -1437,6 +1492,75 @@ def collect_job_board_source(session: requests.Session, source: dict) -> list[di
         elif source["name"] == "WorkInStartups":
             jobs.extend(workinstartups_search(session))
     return jobs
+
+
+def collect_custom_careers_records(session: requests.Session) -> list[JobRecord]:
+    """Scrape the 196 bespoke careers pages (uk_firm_feeds.csv platform=Custom)
+    in parallel via JSON-LD or generic href patterns."""
+    records: list[JobRecord] = []
+    raw_jobs = direct_custom_careers_search(session)
+    diag = init_source_diagnostic("DirectCareers", len(raw_jobs))
+    for job in raw_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "") or "Remote"
+        if not is_relevant_title_direct(title):
+            diag["dropped"]["title"] += 1
+            add_source_diagnostic_example(diag, "title", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
+            continue
+        if not is_direct_ats_relevant_location(location, job.get("summary", ""), company):
+            diag["dropped"]["location"] += 1
+            add_source_diagnostic_example(diag, "location", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
+            continue
+        if not should_keep_role_company(company, "ATS", "DirectCareers"):
+            diag["dropped"]["company"] += 1
+            add_source_diagnostic_example(diag, "company", {"company": company, "title": title, "location": location, "link": job.get("link", "")})
+            continue
+
+        # Posted date is often missing in custom careers JSON-LD; treat as fresh.
+        posted_raw = job.get("posted_date", "")
+        posted_display = posted_raw or "Recent"
+        posted_date = posted_raw
+
+        summary = job.get("summary", "")
+        full_text = f"{title} {company} {summary}"
+        fit = assess_fit(full_text, company, "ATS", "DirectCareers")
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "ATS", "DirectCareers")
+        if score < keep_score_threshold("ATS", "DirectCareers"):
+            diag["dropped"]["score"] += 1
+            add_source_diagnostic_example(diag, "score", {"company": company, "title": title, "score": score, "link": job.get("link", "")})
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="DirectCareers",
+                source_family="ATS",
+                ats_family="DirectCareers",
+                ats_account=job.get("source_firm", ""),
+                email_bucket="main" if score >= min_score else "borderline",
+                fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+            )
+        )
+        diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
+    return records
 
 
 def collect_job_board_records(session: requests.Session, source: dict) -> list[JobRecord]:
@@ -1684,6 +1808,7 @@ def main(
     all_jobs.extend(run_source_stage("ashby", lambda: collect_ashby_records(session)))
     all_jobs.extend(run_source_stage("workable", lambda: collect_workable_records(session)))
     all_jobs.extend(run_source_stage("workday", lambda: collect_workday_records(session)))
+    all_jobs.extend(run_source_stage("custom_careers", lambda: collect_custom_careers_records(session)))
     for source in JOB_BOARD_SOURCES:
         if source["name"] == "Workday":
             continue
