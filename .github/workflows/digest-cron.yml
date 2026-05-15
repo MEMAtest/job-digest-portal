@@ -14,6 +14,16 @@ on:
         description: 'Bypass seen-cache (validation mode, may send duplicates)'
         type: boolean
         default: false
+      force_focus:
+        description: 'Force Daily Focus category (overrides hour-based pick)'
+        type: choice
+        default: ''
+        options:
+          - ''
+          - Quote
+          - Term
+          - Reflection
+          - Industry
 
 concurrency:
   group: digest-cron
@@ -112,6 +122,8 @@ jobs:
           AUTO_APPLY_HMAC_SECRET: ${{ secrets.AUTO_APPLY_HMAC_SECRET }}
           # Watchdog
           JOB_DIGEST_RUN_DEADLINE_SECONDS: '1200'
+          # Manual override for Daily Focus category (empty = normal hour-based pick)
+          JOB_DIGEST_FORCE_FOCUS: ${{ github.event.inputs.force_focus }}
         run: |
           mkdir -p digest-data/digests
           EXTRA_FLAGS=""

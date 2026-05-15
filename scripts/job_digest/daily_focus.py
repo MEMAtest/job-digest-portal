@@ -20,6 +20,7 @@ Industry Watch:
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
@@ -152,7 +153,11 @@ _PROCESS_PICK: Optional[FocusItem] = None
 
 
 def _category_for_hour(hour_utc: int) -> str:
-    """Map UTC hour to category. 8/12/16/20 BST = 7/11/15/19 UTC."""
+    """Map UTC hour to category. 8/12/16/20 BST = 7/11/15/19 UTC.
+    Honour JOB_DIGEST_FORCE_FOCUS env override (used for manual verification)."""
+    forced = (os.getenv("JOB_DIGEST_FORCE_FOCUS") or "").strip().capitalize()
+    if forced in {"Quote", "Term", "Reflection", "Industry"}:
+        return forced
     if hour_utc in (7, 8):
         return "Quote"
     if hour_utc in (11, 12):
