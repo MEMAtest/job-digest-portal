@@ -1929,42 +1929,6 @@ def main(
             print(f"Source diagnostics: {diagnostics_path}")
         return
 
-    pipeline_summary_html = ""
-    try:
-        fs_client = init_firestore_client()
-        if fs_client:
-            all_docs = fs_client.collection(config.FIREBASE_COLLECTION).stream()
-            pipeline_counts = {"saved": 0, "applied": 0, "interview": 0, "offer": 0, "rejected": 0}
-            follow_ups_due = []
-            today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            for d in all_docs:
-                data = d.to_dict()
-                status = (data.get("application_status") or "saved").lower()
-                if status in pipeline_counts:
-                    pipeline_counts[status] += 1
-                fu = data.get("follow_up_date", "")
-                if fu and fu[:10] <= today_str and status not in ("rejected", "offer"):
-                    follow_ups_due.append(f"{data.get('role', '?')} at {data.get('company', '?')}")
-            pipeline_cells = " | ".join(
-                f"<strong>{k.title()}</strong>: {v}" for k, v in pipeline_counts.items()
-            )
-            pipeline_summary_html = (
-                "<div style='background:#EEF2FF; border:1px solid #C7D2FE; padding:12px; "
-                "border-radius:8px; margin-bottom:14px; font-size:14px; color:#1E1B4B;'>"
-                f"<div style='font-weight:bold; margin-bottom:6px;'>Pipeline Summary</div>"
-                f"<div>{pipeline_cells}</div>"
-            )
-            if follow_ups_due:
-                fu_list = ", ".join(follow_ups_due[:5])
-                more = f" (+{len(follow_ups_due) - 5} more)" if len(follow_ups_due) > 5 else ""
-                pipeline_summary_html += (
-                    f"<div style='margin-top:8px; color:#DC2626;'>"
-                    f"<strong>Follow-ups due:</strong> {fu_list}{more}</div>"
-                )
-            pipeline_summary_html += "</div>"
-    except Exception:
-        pass
-
     top_pick = select_top_pick(delivery_records)
     top_records = delivery_records[: max(config.MAX_EMAIL_ROLES, config.MIN_EMAIL_ROLES)]
     if top_pick and top_pick not in top_records:
@@ -1985,8 +1949,6 @@ def main(
         html_body = html_body.replace("</h2>", "</h2>" + delivery_summary_html, 1)
     if focus_html and "<h2" in html_body:
         html_body = html_body.replace("</h2>", "</h2>" + focus_html, 1)
-    if pipeline_summary_html and "<h2" in html_body:
-        html_body = html_body.replace("</h2>", "</h2>" + pipeline_summary_html, 1)
     def compact_text(value: str, limit: int = 180) -> str:
         text = " ".join((value or "").split())
         if len(text) <= limit:

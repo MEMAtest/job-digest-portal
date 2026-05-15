@@ -28,8 +28,9 @@ from typing import List, Optional, Tuple
 from . import config
 
 
-# (category, headline, body, optional URL)
-FocusItem = Tuple[str, str, str, Optional[str]]
+# (category, headline, body, optional URL, optional CV-grounded model answer)
+# The 5th element is used only by Reflection entries — None elsewhere.
+FocusItem = Tuple[str, str, str, Optional[str], Optional[str]]
 
 
 QUOTES: List[FocusItem] = [
@@ -94,21 +95,37 @@ TERMS: List[FocusItem] = [
 
 REFLECTIONS: List[FocusItem] = [
     ("Reflection", "Hardest call you made",
-     "Think of one time you held an unpopular view in a senior stakeholder meeting. What was the call? Did you change your mind? Why or why not? Most senior interviews probe this exactly once.", None),
+     "Think of one time you held an unpopular view in a senior stakeholder meeting. What was the call? Did you change your mind? Why or why not? Most senior interviews probe this exactly once.",
+     None,
+     "At N26, recommended pausing new feature work for a quarter so the squad could remediate BaFin's transaction monitoring, screening and EDD findings end-to-end. Unpopular with growth leadership at the time, but the right call — 470 PEP backlog cleared, 70% of reviews automated, regulator unblocked. The call held because I framed it as cheapest-to-fix-now versus enforcement risk later."),
     ("Reflection", "Your strongest metric story",
-     "Pick one outcome you delivered that you can defend with numbers (baseline, scope, method, result). Practise saying it in 60 seconds with the metric in the first sentence.", None),
+     "Pick one outcome you delivered that you can defend with numbers (baseline, scope, method, result). Practise saying it in 60 seconds with the metric in the first sentence.",
+     None,
+     "At Vistra, cut onboarding cycle time roughly in half (~45 to ~20 days) across 20+ jurisdictions. Baseline came from production tickets; scope was a process bottleneck audit covering KYC, QC and servicing handoffs; method was redesigned QC sampling plus SLA reporting per country, monthly. The metric I'd defend is SLA adherence, because cycle-time alone hides rework."),
     ("Reflection", "The thing you'd do differently",
-     "Pick a project that didn't go to plan. What would you change with hindsight? Strong candidates separate decision quality from outcome quality — bad outcome doesn't mean bad call.", None),
+     "Pick a project that didn't go to plan. What would you change with hindsight? Strong candidates separate decision quality from outcome quality — bad outcome doesn't mean bad call.",
+     None,
+     "At Elucidate, the Tier-1 bank PoC closed at £120k ARR — but I let the UX layer go too wide before we had paid-adoption signal. Outcome was fine; sequencing decision wasn't. Today I'd have shipped a thinner front end and spent the saved cycles on usage analytics so the next conversion conversation had data, not anecdotes."),
     ("Reflection", "Your operating principles",
-     "Without thinking too hard: how do you actually work week-to-week? Weekly deep-dives? Single-threaded ownership? Async-first? Knowing your own rhythm makes 'culture fit' answers honest, not performed.", None),
+     "Without thinking too hard: how do you actually work week-to-week? Weekly deep-dives? Single-threaded ownership? Async-first? Knowing your own rhythm makes 'culture fit' answers honest, not performed.",
+     None,
+     "Weekly deep-dive sessions with ops/control leads; SteerCo-ready packs with named owners, dates and dependency tracking; single-threaded ownership for any control change. Bias to writing the thing down before talking it through. Async-first for status, synchronous for decisions and disagreement."),
     ("Reflection", "What you cannot delegate",
-     "Identify two or three things you currently do that nobody else in your org can. Then ask: is that a strength or a single point of failure? Senior interviews care about the answer.", None),
+     "Identify two or three things you currently do that nobody else in your org can. Then ask: is that a strength or a single point of failure? Senior interviews care about the answer.",
+     None,
+     "Two things: regulator-facing framing (how a finding is described, what evidence supports it, what the firm's response is) and the vendor relationships in Fenergo, Napier and Enate. Both compound on years of judgement and history. Honest answer is that the regulator framing is becoming a single point of failure — I should be building a second person up to do it inside 6 months."),
     ("Reflection", "Your regulator-facing instinct",
-     "If a regulator asked you tomorrow to walk through a control you own, could you? In what order would you present the evidence? Most people freeze on this; preparation flips it into a quiet advantage.", None),
+     "If a regulator asked you tomorrow to walk through a control you own, could you? In what order would you present the evidence? Most people freeze on this; preparation flips it into a quiet advantage.",
+     None,
+     "Yes. Order would be: control objective; the specific rule it ties to (MLR 2017 Reg 18 or 19, the relevant JMLSG paragraph, or the FCA expectation in the Handbook); evidence design — what fires, what's recorded, who reviews, who escalates; last 12 months of exceptions with root cause and remediation. That ordering comes from FCA Authorisations associate experience and the N26 BaFin remediation; muscle memory rather than rehearsed."),
     ("Reflection", "The data point you trust least",
-     "What metric in your current org do you mistrust most, and why? Strong product candidates can name one and explain the bias or measurement gap behind it.", None),
+     "What metric in your current org do you mistrust most, and why? Strong product candidates can name one and explain the bias or measurement gap behind it.",
+     None,
+     "Alert-to-SAR ratio in isolation. It only measures the alerts we did generate, never what slipped past — so a 'good' ratio can hide a recall problem. I pair it with sample-based testing on closed alerts, retrospective findings from internal audit, and any typology coverage gaps surfaced in horizon scanning. One number is never enough."),
     ("Reflection", "Your bar for shipping",
-     "Where exactly do you draw the line between 'safe to launch' and 'needs more time'? Articulating this — with one example each way — is one of the cleanest ways to show senior judgement.", None),
+     "Where exactly do you draw the line between 'safe to launch' and 'needs more time'? Articulating this — with one example each way — is one of the cleanest ways to show senior judgement.",
+     None,
+     "Two questions before any go-live: can I defend this to a regulator on day one, and can the first-line operator run it without me. If both yes, ship. The Elucidate Tier-1 PoC met that bar at narrow scope — we held back the broader workflow features deliberately. Conversely at N26 we delayed an EDD release a fortnight because the recordkeeping evidence didn't yet survive a walk-through; the right call."),
 ]
 
 
@@ -178,7 +195,7 @@ def _pick_unseen(pool: List[FocusItem], recent_keys: List[str]) -> FocusItem:
 
 
 def _key(item: FocusItem) -> str:
-    cat, head, _, _ = item
+    cat, head = item[0], item[1]
     return f"{cat}::{head}"
 
 
@@ -246,13 +263,28 @@ def pick_focus(now: Optional[datetime] = None) -> FocusItem:
 
 
 def build_focus_html(now: Optional[datetime] = None) -> str:
-    category, headline, body, url = pick_focus(now)
+    item = pick_focus(now)
+    category, headline, body, url = item[:4]
+    model_answer = item[4] if len(item) >= 5 else None
     link_html = ""
     if url:
         link_html = (
             f"<div style='margin-top:8px;'>"
             f"<a href='{escape(url)}' style='color:#92400E; text-decoration:underline; font-weight:bold;'>"
             f"Read more &rarr;</a></div>"
+        )
+    model_html = ""
+    if model_answer:
+        model_html = (
+            "<div style='margin-top:10px; padding:10px 12px; background:#FFF7ED; "
+            "border-left:3px solid #92400E; border-radius:4px; color:#451A03; "
+            "line-height:1.5; font-size:13px;'>"
+            "<div style='text-transform:uppercase; letter-spacing:0.06em; "
+            "font-size:10px; font-weight:bold; color:#92400E; margin-bottom:4px;'>"
+            "Your CV-grounded answer"
+            "</div>"
+            f"<div>{escape(model_answer)}</div>"
+            "</div>"
         )
     return (
         "<div style='background:#FFFBEB; border:1px solid #FDE68A; padding:12px; "
@@ -261,14 +293,19 @@ def build_focus_html(now: Optional[datetime] = None) -> str:
         f"font-weight:bold; color:#92400E; margin-bottom:4px;'>{escape(category)}</div>"
         f"<div style='font-weight:bold; color:#451A03; margin-bottom:6px;'>{escape(headline)}</div>"
         f"<div style='color:#78350F; line-height:1.5;'>{escape(body)}</div>"
+        f"{model_html}"
         f"{link_html}"
         "</div>"
     )
 
 
 def build_focus_text(now: Optional[datetime] = None) -> str:
-    category, headline, body, url = pick_focus(now)
+    item = pick_focus(now)
+    category, headline, body, url = item[:4]
+    model_answer = item[4] if len(item) >= 5 else None
     text = f"[{category}] {headline} — {body}"
+    if model_answer:
+        text += f"\n  Your CV-grounded answer: {model_answer}"
     if url:
         text += f"\n  Link: {url}"
     return text
