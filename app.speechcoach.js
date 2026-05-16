@@ -1092,7 +1092,7 @@ const renderResult = () => {
           <span>${session.wpm} wpm</span>
           <span>Top: ${escapeHtml(top)}</span>
           ${session.rescored ? `<span>Whisper rescored</span>` : ""}
-          ${aiCombined ? `<span>AI combined</span><span>Base ${Math.round(Number(session.baseScore ?? session.score || 0))}</span>` : ""}
+          ${aiCombined ? `<span>AI combined</span><span>Base ${Math.round(Number((session.baseScore ?? session.score) || 0))}</span>` : ""}
         </div>
         ${coach.audioUrl ? `<audio class="speech-audio" controls src="${coach.audioUrl}"></audio>` : ""}
         ${session.queuedOffline ? `<div class="speech-small-warning">Queued offline. It will sync automatically.</div>` : ""}
