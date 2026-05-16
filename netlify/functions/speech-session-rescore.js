@@ -118,6 +118,37 @@ const getTopFiller = (counts = {}) => {
   }
   return top;
 };
+const sanitizeReview = (review = null) => {
+  if (!review || typeof review !== "object") return null;
+  const cleanList = (items, maxItems = 6) =>
+    Array.isArray(items) ? items.slice(0, maxItems).map((item) => stringValue(item, 500)).filter(Boolean) : [];
+  const metrics = review.metrics && typeof review.metrics === "object" ? review.metrics : {};
+  return {
+    version: numberValue(review.version, 1),
+    score: Math.max(0, Math.min(100, Math.round(numberValue(review.score, 0)))),
+    verdict: stringValue(review.verdict, 80),
+    createdAt: stringValue(review.createdAt || new Date().toISOString(), 80),
+    metrics: {
+      words: numberValue(metrics.words, 0),
+      sentences: numberValue(metrics.sentences, 0),
+      fpm: numberValue(metrics.fpm, 0),
+      wpm: numberValue(metrics.wpm, 0),
+      totalFillers: numberValue(metrics.totalFillers, 0),
+      modelKeywordCoverage: metrics.modelKeywordCoverage === null ? null : numberValue(metrics.modelKeywordCoverage, 0),
+      matchedKeywords: cleanList(metrics.matchedKeywords, 20),
+      missingKeywords: cleanList(metrics.missingKeywords, 20),
+      hasMetric: Boolean(metrics.hasMetric),
+      hasEvidence: Boolean(metrics.hasEvidence),
+      hasStructure: Boolean(metrics.hasStructure),
+      hasOpeningJudgement: Boolean(metrics.hasOpeningJudgement),
+      hasClose: Boolean(metrics.hasClose),
+    },
+    strengths: cleanList(review.strengths),
+    fixes: cleanList(review.fixes),
+    betterAnswer: stringValue(review.betterAnswer, 2500),
+    drill: stringValue(review.drill, 500),
+  };
+};
 const serializeSession = (id, data = {}) => ({
   id,
   sessionId: data.sessionId || id,
@@ -139,6 +170,7 @@ const serializeSession = (id, data = {}) => ({
   wpm: numberValue(data.wpm, 0),
   score: numberValue(data.score, 0),
   topFiller: data.topFiller || null,
+  speechReview: data.speechReview || null,
   audioRef: data.audioRef || null,
   createdAtIso: data.createdAtIso || toIso(data.createdAt),
   createdAt: data.createdAtIso || toIso(data.createdAt),
@@ -223,6 +255,7 @@ exports.handler = async (event) => {
     const scoreData = calculateScore({ duration: existing.duration, totalFillers: detected.total, transcript });
     const top = getTopFiller(detected.counts);
     const rescoredAt = new Date().toISOString();
+    const speechReview = sanitizeReview(payload.speechReview);
     const update = {
       transcript,
       whisperTranscript: transcript,
@@ -236,6 +269,7 @@ exports.handler = async (event) => {
       wpm: scoreData.wpm,
       score: scoreData.score,
       topFiller: top?.filler || null,
+      ...(speechReview ? { speechReview } : {}),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     await ref.set(update, { merge: true });

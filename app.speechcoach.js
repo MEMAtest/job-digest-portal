@@ -287,6 +287,7 @@ const saveRescoredSessionDocument = async (session, whisperTranscript) => {
       sessionId: session.id,
       transcript: whisperTranscript,
       model: WHISPER_MODEL,
+      speechReview: session.speechReview || null,
     }),
   });
   return data;
@@ -1024,6 +1025,50 @@ const renderResult = () => {
         ${session.queuedOffline ? `<div class="speech-small-warning">Queued offline. It will sync automatically.</div>` : ""}
       </div>
     </div>
+    ${renderSpeechReview(session.speechReview)}
+  `;
+};
+
+const renderSpeechReview = (review) => {
+  if (!review) return "";
+  const verdict = String(review.verdict || "review").toUpperCase();
+  const metrics = review.metrics || {};
+  const list = (items = []) => items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+  return `
+    <div class="speech-review-card">
+      <div class="speech-review-head">
+        <div>
+          <h3>Answer Review</h3>
+          <p>${escapeHtml(verdict)} · ${Number(review.score || 0)}/100</p>
+        </div>
+        <div class="speech-review-score">${Number(review.score || 0)}</div>
+      </div>
+      <div class="speech-review-metrics">
+        <span>${Number(metrics.words || 0)} words</span>
+        <span>${Number(metrics.fpm || 0).toFixed(1)} fpm</span>
+        <span>${metrics.hasMetric ? "metric used" : "no metric"}</span>
+        <span>${metrics.hasEvidence ? "evidence named" : "no named evidence"}</span>
+      </div>
+      <div class="speech-review-grid">
+        <div>
+          <strong>What worked</strong>
+          <ul>${list(review.strengths || [])}</ul>
+        </div>
+        <div>
+          <strong>Fix next</strong>
+          <ul>${list(review.fixes || [])}</ul>
+        </div>
+      </div>
+      ${
+        review.betterAnswer
+          ? `<details class="speech-better-answer">
+              <summary>Better version</summary>
+              <div>${escapeHtml(review.betterAnswer)}</div>
+            </details>`
+          : ""
+      }
+      ${review.drill ? `<div class="speech-review-drill"><strong>Next drill:</strong> ${escapeHtml(review.drill)}</div>` : ""}
+    </div>
   `;
 };
 
@@ -1071,6 +1116,7 @@ const renderHistoryRow = (session) => {
         <div class="speech-history-detail">
           <div class="speech-history-meta">${escapeHtml(job ? getJobLabel(job) : "General drill")} · ${escapeHtml(session.source || "Speech Coach")}</div>
           <div class="speech-stored-transcript">${renderStoredTranscript(session)}</div>
+          ${renderSpeechReview(session.speechReview)}
           ${session.audioRef ? `<button class="btn btn-tertiary speech-load-audio" data-audio-session="${escapeHtml(session.id)}" data-audio-ref="${escapeHtml(session.audioRef)}">Load audio</button>` : ""}
           ${audioSrc ? `<audio class="speech-audio" controls src="${escapeHtml(audioSrc)}"></audio>` : ""}
         </div>

@@ -21,6 +21,38 @@ const countWords = (text) => {
   return matches ? matches.length : 0;
 };
 
+const sentenceCount = (text) => {
+  const matches = String(text || "").split(/[.!?]+/).map((item) => item.trim()).filter(Boolean);
+  return matches.length;
+};
+
+const firstSentence = (text) => String(text || "").split(/[.!?]+/).map((item) => item.trim()).filter(Boolean)[0] || "";
+
+const normaliseTokens = (text) => {
+  const stopwords = new Set([
+    "the", "and", "for", "that", "this", "with", "from", "into", "then", "than", "your", "you", "are", "was",
+    "were", "have", "has", "had", "but", "not", "can", "would", "should", "could", "about", "answer", "question",
+    "using", "use", "role", "work", "worked", "working", "product", "point", "show", "shows", "clear",
+  ]);
+  const tokens = String(text || "").toLowerCase().match(/[a-z0-9]+(?:['’][a-z0-9]+)?/g) || [];
+  return tokens
+    .map((token) => token.replace(/['’]s$/, ""))
+    .filter((token) => token.length > 2 && !stopwords.has(token));
+};
+
+const topKeywords = (text, limit = 12) => {
+  const counts = new Map();
+  normaliseTokens(text).forEach((token) => counts.set(token, (counts.get(token) || 0) + 1));
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, limit).map(([token]) => token);
+};
+
+const keywordHits = (transcript, keywords) => {
+  const tokens = new Set(normaliseTokens(transcript));
+  return keywords.filter((keyword) => tokens.has(keyword));
+};
+
+const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, value));
+
 const pushMatch = (matches, filler, start, end, text) => {
   if (start < 0 || end <= start) return;
   matches.push({ filler, start, end, text: text.slice(start, end) });
@@ -179,12 +211,22 @@ export const buildSessionPayload = ({
   const scoreData = calculateSpeechScore({ duration, totalFillers, transcript });
   const top = getTopFiller(fillerCounts);
   const now = new Date().toISOString();
+  const speechReview = reviewSpeechAnswer({
+    transcript,
+    modelAnswer: question?.modelAnswer || "",
+    duration: scoreData.duration,
+    fillerCounts,
+    fpm: scoreData.fpm,
+    wpm: scoreData.wpm,
+    category: question?.category || "",
+  });
   return {
     id: sessionId,
     sessionId,
     jobId: jobId || null,
     questionId: question?.id || "",
     questionText: question?.text || "",
+    questionModelAnswer: question?.modelAnswer || "",
     category: question?.category || "",
     transcript: transcript || "",
     webSpeechTranscript: webSpeechTranscript || transcript || "",
@@ -195,6 +237,7 @@ export const buildSessionPayload = ({
     wpm: scoreData.wpm,
     score: scoreData.score,
     topFiller: top?.filler || null,
+    speechReview,
     audioRef: audioRef || null,
     createdAtIso: now,
     device,
@@ -214,6 +257,15 @@ export const rescoreSessionWithTranscript = (session = {}, transcript = "", opti
     transcript: canonicalTranscript,
   });
   const top = getTopFiller(detected.counts);
+  const speechReview = reviewSpeechAnswer({
+    transcript: canonicalTranscript,
+    modelAnswer: options.modelAnswer || session.questionModelAnswer || "",
+    duration: scoreData.duration,
+    fillerCounts: detected.counts,
+    fpm: scoreData.fpm,
+    wpm: scoreData.wpm,
+    category: session.category || "",
+  });
 
   return {
     ...session,
@@ -229,5 +281,121 @@ export const rescoreSessionWithTranscript = (session = {}, transcript = "", opti
     wpm: scoreData.wpm,
     score: scoreData.score,
     topFiller: top?.filler || null,
+    speechReview,
   };
+};
+
+export const reviewSpeechAnswer = ({
+  transcript = "",
+  modelAnswer = "",
+  duration = 0,
+  fillerCounts = {},
+  fpm = 0,
+  wpm = 0,
+  category = "",
+} = {}) => {
+  const text = String(transcript || "").trim();
+  const words = countWords(text);
+  const sentences = sentenceCount(text);
+  const opening = firstSentence(text);
+  const lower = text.toLowerCase();
+  const modelKeywords = topKeywords(modelAnswer, 12);
+  const hits = keywordHits(text, modelKeywords);
+  const missingKeywords = modelKeywords.filter((keyword) => !hits.includes(keyword)).slice(0, 6);
+  const totalFillers = Object.values(fillerCounts || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+  const metrics = text.match(/\b\d+%|\b\d+\s*(days?|weeks?|months?|records?|jurisdictions?|markets?|k|m|million|thousand|arr|gbp|£)/gi) || [];
+  const hasMetric = metrics.length > 0;
+  const hasEvidence = /\b(vistra|ebury|n26|elucidate|fenergo|napier|enate|lexisnexis|salesforce|30\+|50,?000|38%|55%|70%|120k|400k)\b/i.test(text);
+  const hasStructure =
+    /\b(situation|task|action|result|first|second|third|firstly|secondly|finally|so the result|the result|i would start|i would then|i would close)\b/i.test(text) ||
+    sentences >= 3;
+  const hasOpeningJudgement =
+    opening.length > 20 &&
+    !/^(um|uh|so|yeah|i guess|i think|maybe|probably|kind of|sort of)\b/i.test(opening) &&
+    /\b(i would|i'd|my view|the key|the problem|the priority|i would start|i would frame)\b/i.test(opening);
+  const hasClose = /\b(close|closing|result|therefore|so i would|that is why|the key point|what this shows|in short)\b/i.test(
+    lower.slice(Math.max(0, lower.length - 260))
+  );
+  const lengthScore = words >= 90 && words <= 220 ? 100 : words >= 60 && words <= 260 ? 75 : words >= 35 ? 55 : 25;
+  const fillerScore = clamp(100 - Math.max(0, Number(fpm || 0) - 2) * 18);
+  const metricScore = hasMetric ? 100 : 35;
+  const evidenceScore = hasEvidence ? 100 : 45;
+  const structureScore = hasStructure ? 90 : sentences >= 2 ? 60 : 30;
+  const openingScore = hasOpeningJudgement ? 90 : opening.length > 20 ? 60 : 30;
+  const relevanceScore = modelKeywords.length ? Math.round((hits.length / modelKeywords.length) * 100) : 65;
+  const closeScore = hasClose ? 85 : 45;
+  const score = Math.round(
+    lengthScore * 0.12 +
+      fillerScore * 0.18 +
+      metricScore * 0.14 +
+      evidenceScore * 0.16 +
+      structureScore * 0.16 +
+      openingScore * 0.1 +
+      relevanceScore * 0.1 +
+      closeScore * 0.04
+  );
+  const verdict = score >= 80 ? "strong" : score >= 65 ? "good" : score >= 50 ? "needs work" : "weak";
+  const strengths = [];
+  if (hasMetric) strengths.push("Used a concrete metric.");
+  if (hasEvidence) strengths.push("Anchored the answer in named experience.");
+  if (hasStructure) strengths.push("Had enough structure to follow the answer.");
+  if (Number(fpm || 0) <= 4) strengths.push("Filler rate stayed within the target zone.");
+  if (hits.length >= Math.max(2, Math.ceil(modelKeywords.length * 0.35))) strengths.push("Covered several model-answer keywords.");
+  if (!strengths.length) strengths.push("Captured a usable first draft to improve.");
+
+  const fixes = [];
+  if (!hasOpeningJudgement) fixes.push("Open with a direct judgement before explaining context.");
+  if (!hasMetric) fixes.push("Add one quantified result or baseline.");
+  if (!hasEvidence) fixes.push("Name the relevant experience: Vistra, Ebury, N26, Elucidate, Fenergo, Napier or Enate.");
+  if (!hasStructure) fixes.push("Use a simple spine: situation, action, result, relevance.");
+  if (Number(fpm || 0) > 4) fixes.push(`Reduce fillers from ${Number(fpm || 0).toFixed(1)} per minute to under 4.0.`);
+  if (words < 60) fixes.push("Develop the answer beyond a short fragment.");
+  if (words > 260) fixes.push("Cut the answer to a tighter 60-90 second version.");
+  if (!hasClose) fixes.push("End with why the example matters for the role.");
+  if (missingKeywords.length) fixes.push(`Work in missing ideas: ${missingKeywords.slice(0, 4).join(", ")}.`);
+
+  const betterAnswer = buildBetterAnswer({ transcript: text, modelAnswer, category, missingKeywords, hasMetric, hasEvidence });
+  const drill = fixes[0] || "Repeat the answer once, keeping the same structure and cutting one filler.";
+
+  return {
+    version: 1,
+    score,
+    verdict,
+    createdAt: new Date().toISOString(),
+    metrics: {
+      words,
+      sentences,
+      fpm: Number(Number(fpm || 0).toFixed(2)),
+      wpm: Number(wpm || 0),
+      totalFillers,
+      modelKeywordCoverage: modelKeywords.length ? Number((hits.length / modelKeywords.length).toFixed(2)) : null,
+      matchedKeywords: hits,
+      missingKeywords,
+      hasMetric,
+      hasEvidence,
+      hasStructure,
+      hasOpeningJudgement,
+      hasClose,
+    },
+    strengths: strengths.slice(0, 4),
+    fixes: fixes.slice(0, 5),
+    betterAnswer,
+    drill,
+  };
+};
+
+const buildBetterAnswer = ({ transcript, modelAnswer, category, missingKeywords = [], hasMetric, hasEvidence }) => {
+  const model = String(modelAnswer || "").trim();
+  if (model) {
+    const sentences = model.split(/(?<=[.!?])\s+/).map((item) => item.trim()).filter(Boolean);
+    if (sentences.length >= 3) return sentences.slice(0, 4).join(" ");
+    return model;
+  }
+  const evidencePrompt = hasEvidence ? "the relevant delivery example" : "a named example such as Vistra, Ebury, N26 or Elucidate";
+  const metricPrompt = hasMetric ? "the metric already mentioned" : "one concrete metric";
+  const missing = missingKeywords.length ? ` I would explicitly include ${missingKeywords.slice(0, 3).join(", ")}.` : "";
+  if (category === "behavioural") {
+    return `I would frame this as a STAR answer. The situation was a regulated workflow where speed, control quality and stakeholder alignment were all under pressure. My action was to map the constraint, align Compliance, Operations and Engineering, and make the smallest safe process or platform change. The result should land with ${metricPrompt}, then close by explaining why ${evidencePrompt} is relevant to this role.${missing}`;
+  }
+  return `I would start with the judgement, then give the evidence. The key issue is the trade-off between customer or operational flow and control quality. I would use ${evidencePrompt}, explain the product decision, quantify the impact with ${metricPrompt}, and close with how the same judgement applies to this role.${missing}`;
 };

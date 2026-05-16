@@ -5,6 +5,7 @@ import {
   calculateTrend,
   detectFillers,
   rescoreSessionWithTranscript,
+  reviewSpeechAnswer,
   selectQuestion,
 } from "../app.speechcoach.logic.js";
 
@@ -141,6 +142,7 @@ describe("buildSessionPayload", () => {
       totalFillers: 1,
       audioRef: "speech-audio/abc.webm",
     });
+    expect(parsed.speechReview.score).toBeGreaterThan(0);
     expect(typeof parsed.createdAtIso).toBe("string");
   });
 });
@@ -167,5 +169,39 @@ describe("rescoreSessionWithTranscript", () => {
     });
     expect(rescored.fillerCounts["I think"]).toBe(1);
     expect(rescored.fillerCounts.probably).toBe(1);
+    expect(rescored.speechReview.verdict).toBeTruthy();
+  });
+});
+
+describe("reviewSpeechAnswer", () => {
+  it("rewards metric-led structured answers with evidence", () => {
+    const review = reviewSpeechAnswer({
+      transcript:
+        "I would frame this through the Ebury screening example. The problem was unnecessary manual reviews from blunt thresholds. I mapped alert quality, worked with Compliance and changed the LexisNexis API handling. The result was 38% fewer unnecessary reviews while keeping control comfort, which is relevant because the role needs risk and customer experience balanced.",
+      modelAnswer:
+        "Use Ebury. Baseline alert volumes, alert quality, true positives and false positives. Tune thresholds with Compliance sign-off. Result: 38% reduction in unnecessary manual reviews while preserving control comfort.",
+      duration: 75,
+      fillerCounts: detectFillers("").counts,
+      fpm: 0,
+      wpm: 145,
+      category: "domain",
+    });
+    expect(review.score).toBeGreaterThanOrEqual(75);
+    expect(review.strengths.length).toBeGreaterThan(0);
+    expect(review.betterAnswer).toContain("Ebury");
+  });
+
+  it("flags short unstructured answers", () => {
+    const review = reviewSpeechAnswer({
+      transcript: "I think it was good and probably relevant.",
+      modelAnswer: "Use Vistra, workflow redesign, cycle-time reduction and stakeholder alignment.",
+      duration: 8,
+      fillerCounts: detectFillers("I think it was probably good").counts,
+      fpm: 15,
+      wpm: 80,
+      category: "behavioural",
+    });
+    expect(review.score).toBeLessThan(65);
+    expect(review.fixes.join(" ")).toMatch(/metric|Open|Develop|fillers/i);
   });
 });

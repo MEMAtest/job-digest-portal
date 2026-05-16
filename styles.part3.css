@@ -3357,6 +3357,54 @@
 }
 .speech-audio { display: block; width: 100%; margin-top: 10px; }
 .speech-small-warning { margin-top: 8px; color: #9a3412; font-size: 12px; font-weight: 700; }
+.speech-review-card {
+  border: 1px solid #c7d2fe;
+  border-radius: 14px;
+  background: #eef2ff;
+  padding: 14px;
+}
+.speech-review-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.speech-review-head h3 { margin: 0; color: #0f172a; }
+.speech-review-head p { margin: 4px 0 0; color: #475569; font-size: 13px; font-weight: 800; }
+.speech-review-score {
+  min-width: 58px;
+  min-height: 58px;
+  border-radius: 999px;
+  background: #4f46e5;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  font-weight: 900;
+}
+.speech-review-metrics { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.speech-review-metrics span {
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #fff;
+  color: #3730a3;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.speech-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.speech-review-grid > div {
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: #fff;
+  padding: 11px;
+}
+.speech-review-grid strong { color: #0f172a; }
+.speech-review-grid ul { margin: 8px 0 0; padding-left: 18px; color: #334155; font-size: 13px; line-height: 1.45; }
+.speech-better-answer {
+  margin-top: 12px;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: #fff;
+}
+.speech-better-answer summary { cursor: pointer; padding: 10px 12px; font-size: 13px; font-weight: 900; color: #3730a3; }
+.speech-better-answer div { border-top: 1px solid #c7d2fe; padding: 12px; color: #334155; font-size: 13px; line-height: 1.55; }
+.speech-review-drill { margin-top: 10px; color: #1e293b; font-size: 13px; }
 .speech-history-panel { padding: 16px; }
 .speech-history-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
 .speech-history-filters { margin-top: 0; }
@@ -3408,6 +3456,7 @@
   .speech-live-grid,
   .speech-filler-grid,
   .speech-job-practice-stats { grid-template-columns: 1fr 1fr; }
+  .speech-review-grid { grid-template-columns: 1fr; }
   .speech-history-head { flex-direction: column; }
   .speech-history-main { grid-template-columns: 1fr 58px; }
   .speech-history-main span:nth-child(1),
