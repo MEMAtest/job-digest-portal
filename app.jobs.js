@@ -48,6 +48,7 @@ import {
 import { buildPrepQa, openPrepMode } from "./app.prep.js";
 import { quickApply, autoTailorCv } from "./app.applyhub.js";
 import { getTailoredCvPlainText, buildTailoredCvHtml, renderPdfFromElement } from "./app.cv.js";
+import { openSpeechCoachForJob, renderJobPracticeStats } from "./app.speechcoach.js";
 import {
   isApplyAssistantSupported,
   launchApplyAssistant,
@@ -668,6 +669,7 @@ const renderJobDetail = (job, detailEl) => {
         }</button>
         <button class="btn btn-secondary btn-dismiss">Dismiss</button>
         <button class="btn btn-prep" data-job-id="${escapeHtml(job.id)}">Prep</button>
+        <button class="btn btn-secondary btn-practice" data-job-id="${escapeHtml(job.id)}">Practice</button>
         <a class="btn btn-tertiary" href="${escapeHtml(safeHref(job.link))}" target="_blank" rel="noreferrer">View link</a>
       </div>
       <div class="job-detail-tabs">
@@ -742,6 +744,11 @@ const renderJobDetail = (job, detailEl) => {
         <div class="detail-box">
           <div class="section-title">Quick pitch</div>
           <div>${formatInlineText(job.quick_pitch || "Not available yet.")}</div>
+        </div>
+        <div class="detail-box">
+          <div class="section-title">Speech Coach</div>
+          ${renderJobPracticeStats(job)}
+          <button class="btn btn-secondary btn-practice" data-job-id="${escapeHtml(job.id)}">Practice this role</button>
         </div>
         <div class="detail-box">
           <div class="section-title">Key talking points</div>
@@ -956,6 +963,10 @@ const renderJobDetail = (job, detailEl) => {
   if (prepBtn) {
     prepBtn.addEventListener("click", () => openPrepMode(prepBtn.dataset.jobId));
   }
+
+  detailEl.querySelectorAll(".btn-practice").forEach((button) => {
+    button.addEventListener("click", () => openSpeechCoachForJob(button.dataset.jobId));
+  });
 
   detailEl.querySelectorAll(".copy-btn").forEach((btn) => {
     btn.addEventListener("click", () => {

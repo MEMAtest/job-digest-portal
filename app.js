@@ -4,6 +4,7 @@ import "./app.prep.js";
 import "./app.triage.js";
 import "./app.applyhub.js";
 import "./app.cvhub.js";
+import "./app.speechcoach.js";
 import "./app.jobs.js";
 import "./app.dashboard.js";
 import "./app.notifications.js";

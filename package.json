@@ -7,15 +7,17 @@
     "validate:cv-builder": "node scripts/validate-cv-builder.mjs",
     "test:smoke": "node scripts/smoke-e2e.mjs",
     "test:smoke:prod": "node scripts/smoke-e2e.mjs --url=https://adejob.netlify.app/",
-    "test:smoke:install": "playwright install chromium"
+    "test:smoke:install": "playwright install chromium",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "firebase-admin": "^12.1.0",
+    "nodemailer": "^6.9.0",
     "openai": "^4.0.0",
-    "web-push": "^3.6.0",
-    "nodemailer": "^6.9.0"
+    "web-push": "^3.6.0"
   },
   "devDependencies": {
-    "playwright": "^1.52.0"
+    "playwright": "^1.52.0",
+    "vitest": "^4.1.6"
   }
 }

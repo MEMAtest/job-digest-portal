@@ -4,7 +4,7 @@ const withCors = (body, statusCode = 200) => ({
   headers: {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, X-Session-Id",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   },
   body: JSON.stringify(body),

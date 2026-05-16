@@ -1,0 +1,1136 @@
+[
+  {
+    "id": "beh-01",
+    "text": "Tell me about a time you improved a weak process under pressure.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-02",
+    "text": "Tell me about a time you challenged a stakeholder's proposed solution.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-03",
+    "text": "Describe a time you had to influence without formal authority.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-04",
+    "text": "Tell me about a product decision where you had incomplete data.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-05",
+    "text": "Describe a difficult trade-off between speed and control quality.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-06",
+    "text": "Tell me about a time you recovered a project that was drifting.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-07",
+    "text": "Describe a time you changed your mind after evidence emerged.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-08",
+    "text": "Tell me about a time you handled conflict between compliance and operations.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-09",
+    "text": "Give an example of a time you simplified a complex regulatory process.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-10",
+    "text": "Tell me about your strongest product delivery failure and what changed afterwards.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-11",
+    "text": "Describe a time you had to brief senior leadership on risk.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-12",
+    "text": "Tell me about a time you raised standards on documentation or governance.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-13",
+    "text": "Describe a time you had to say no to a popular request.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "beh-14",
+    "text": "Tell me about a time you coached a team through ambiguity.",
+    "category": "behavioural",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-01",
+    "text": "How would you explain KYC onboarding controls to a product engineering team?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-02",
+    "text": "What are the key failure modes in business onboarding?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-03",
+    "text": "How would you reduce false positives without weakening financial crime controls?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-04",
+    "text": "How would you evaluate whether a sanctions screening change is safe?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-05",
+    "text": "What matters most when migrating a CLM platform such as Fenergo?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-06",
+    "text": "How do you balance customer experience and AML obligations?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-07",
+    "text": "What metrics would you track for CDD and EDD workflow health?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-08",
+    "text": "How would you design an audit trail for onboarding decisions?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-09",
+    "text": "What does good control testing look like for screening rules?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-10",
+    "text": "How would you approach jurisdictional differences across 30 plus markets?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-11",
+    "text": "How do PEP, sanctions, adverse media and transaction monitoring differ operationally?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-12",
+    "text": "Where can automation help in enhanced due diligence, and where should humans stay in control?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-13",
+    "text": "How would you define a risk-based approach for onboarding queues?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "dom-14",
+    "text": "What data quality checks matter most before a screening or CLM migration?",
+    "category": "domain",
+    "roleTag": [
+      "PM",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-01",
+    "text": "Walk me through how you would define the roadmap for a compliance platform.",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-02",
+    "text": "How do you prioritise product work when every stakeholder says their issue is urgent?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-03",
+    "text": "What would your first 30 days look like in a financial crime product role?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-04",
+    "text": "How do you turn regulatory requirements into product requirements?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-05",
+    "text": "How would you measure whether an onboarding product is succeeding?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-06",
+    "text": "Describe how you would write a PRD for screening threshold optimisation.",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-07",
+    "text": "How do you decide between workflow redesign and vendor configuration?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-08",
+    "text": "How would you run discovery for a payments risk product?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-09",
+    "text": "How do you keep engineers aligned when the domain is regulatory and ambiguous?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-10",
+    "text": "What product metrics would you put on a compliance leadership dashboard?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-11",
+    "text": "How do you manage technical debt in a regulated product platform?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-12",
+    "text": "How would you approach build versus buy for a RegTech capability?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-13",
+    "text": "How do you validate that a control change improves user experience?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "pro-14",
+    "text": "How would you structure a business case for a 400k compliance platform investment?",
+    "category": "product",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-01",
+    "text": "A screening queue doubles overnight. What do you do first?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-02",
+    "text": "A regulator questions your onboarding control design. How do you respond?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-03",
+    "text": "Engineering says a key compliance requirement will delay launch by six weeks. What now?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-04",
+    "text": "Operations wants lower thresholds but compliance is worried about missed risk. How do you decide?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-05",
+    "text": "A migration has 50,000 records and poor source data quality. What is your plan?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-06",
+    "text": "A senior stakeholder asks for a dashboard by tomorrow, but the data is not reliable. What do you do?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-07",
+    "text": "A new market launch requires different KYC rules from the core flow. How do you design it?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-08",
+    "text": "A vendor API is failing intermittently during onboarding. How do you triage impact?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-09",
+    "text": "You inherit a product with no clear owner and weak documentation. What is week one?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-10",
+    "text": "A live control change causes customer friction to spike. How do you diagnose it?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-11",
+    "text": "A policy team provides unclear requirements. How do you move forward without guessing?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-12",
+    "text": "A model-driven risk tool is producing unexplained decisions. How do you govern it?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-13",
+    "text": "You need to cut onboarding time from 45 days to 20 days. Where do you start?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "sce-14",
+    "text": "An audit finding lands during a roadmap planning cycle. How do you rebalance priorities?",
+    "category": "scenario",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-01",
+    "text": "Why this company?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-02",
+    "text": "Why this role now?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-03",
+    "text": "Why product rather than pure compliance or operations?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-04",
+    "text": "What kind of product culture helps you do your best work?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-05",
+    "text": "What problem space do you want to own over the next two years?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-06",
+    "text": "Why are you credible in financial crime product work?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-07",
+    "text": "What attracts you to platform product roles?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-08",
+    "text": "How does this role connect to your Vistra, Ebury, N26 and Elucidate experience?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-09",
+    "text": "What would make this move a strong fit for you?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-10",
+    "text": "What do you want the hiring manager to remember about you?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-11",
+    "text": "Why are you interested in regulated fintech and payments?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-12",
+    "text": "How do you want to grow as a product leader?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-13",
+    "text": "What makes you different from a generic product manager?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "mot-14",
+    "text": "Why should a team trust you with high-risk regulated delivery?",
+    "category": "motivation",
+    "roleTag": [
+      "PM",
+      "Director",
+      "Compliance"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-01",
+    "text": "What would your critics say you over-index on?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-02",
+    "text": "What would you do if the interviewer disagreed with your whole approach?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-03",
+    "text": "Explain your product philosophy in one minute.",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-04",
+    "text": "Teach me sanctions screening as if I am new to financial crime.",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-05",
+    "text": "What is the most overrated metric in onboarding?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-06",
+    "text": "What assumption in this role description might be wrong?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-07",
+    "text": "If you could remove one step from KYC, what would it be and why?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-08",
+    "text": "What is the fastest way to lose trust with compliance stakeholders?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-09",
+    "text": "How would you answer if a CEO asked why onboarding still takes too long?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-10",
+    "text": "What would you automate last, not first?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-11",
+    "text": "What question should we have asked you but did not?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-12",
+    "text": "If you joined and found the roadmap was wrong, how would you prove it?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-13",
+    "text": "What is one financial crime control that often creates false comfort?",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  },
+  {
+    "id": "cur-14",
+    "text": "Give me a 30-second closing statement for this interview.",
+    "category": "curveball",
+    "roleTag": [
+      "PM",
+      "Director"
+    ],
+    "companyTag": [],
+    "timesAsked": 0,
+    "avgScore": 0,
+    "lastAskedAt": null
+  }
+]

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v25';
+const CACHE_VERSION = 'v26';
 const CACHE_NAME = `job-digest-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -14,6 +14,8 @@ const APP_SHELL = [
   '/app.applyassistant.js',
   '/app.applyhub.js',
   '/app.cvhub.js',
+  '/app.speechcoach.js',
+  '/app.speechcoach.logic.js',
   '/app.bootstrap.js',
   '/app.jobs.js',
   '/app.dashboard.js',
@@ -27,6 +29,7 @@ const APP_SHELL = [
   '/app.settings.js',
   '/app.ilog.js',
   '/config.js',
+  '/speech-questions.json',
   '/favicon.svg',
   '/manifest.webmanifest',
 ];
@@ -66,6 +69,12 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return;
+
+  // Netlify functions include live writes, signed URLs, and server-side data.
+  // Never serve them from the service-worker cache.
+  if (url.origin === location.origin && url.pathname.startsWith('/.netlify/functions/')) {
+    return;
+  }
 
   // Network-only for Firebase / Firestore / Google APIs (let SDK handle caching)
   if (
