@@ -237,6 +237,19 @@ try {
   const prepCards = await page.locator("#prep-card-list > *").count();
   record("Preparation content present", prepCards > 0, `cards=${prepCards}`);
 
+  await page.getByRole("button", { name: "Speech Coach" }).click();
+  await page.waitForTimeout(2500);
+  const speechVisible = await page.locator('.tab-section[data-tab="speechcoach"]:not(.hidden)').count();
+  record("Speech Coach tab opens", speechVisible > 0, `visible=${speechVisible}`);
+  const speechQuestion = ((await page.locator(".speech-question-text").first().textContent()) || "").trim();
+  record("Speech Coach question loaded", assertText(speechQuestion) && !/load or select/i.test(speechQuestion), speechQuestion.slice(0, 100));
+  const modelAnswerCount = await page.locator(".speech-model-answer").count();
+  record("Speech Coach model answer present", modelAnswerCount > 0, `modelAnswers=${modelAnswerCount}`);
+  const whisperToggle = await page.locator("#speech-whisper-toggle").count();
+  record("Speech Coach Whisper toggle present", whisperToggle === 1, `toggles=${whisperToggle}`);
+  const aiReviewToggle = await page.locator("#speech-ai-review-toggle").count();
+  record("Speech Coach AI review toggle present", aiReviewToggle === 1, `toggles=${aiReviewToggle}`);
+
   const filteredConsoleErrors = consoleErrors.filter((text) => !/favicon.ico/i.test(text));
   record("No page exceptions", pageErrors.length === 0, pageErrors.slice(0, 3).join(" || "));
   record("No console errors", filteredConsoleErrors.length === 0, filteredConsoleErrors.slice(0, 5).join(" || "));

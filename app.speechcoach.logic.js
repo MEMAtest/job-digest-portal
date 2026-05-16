@@ -235,9 +235,13 @@ export const buildSessionPayload = ({
     totalFillers,
     fpm: scoreData.fpm,
     wpm: scoreData.wpm,
+    baseScore: scoreData.score,
     score: scoreData.score,
+    phase3Score: null,
+    scoreType: "filler_score",
     topFiller: top?.filler || null,
     speechReview,
+    aiReview: null,
     audioRef: audioRef || null,
     createdAtIso: now,
     device,
@@ -279,9 +283,13 @@ export const rescoreSessionWithTranscript = (session = {}, transcript = "", opti
     totalFillers: detected.total,
     fpm: scoreData.fpm,
     wpm: scoreData.wpm,
+    baseScore: scoreData.score,
     score: scoreData.score,
+    phase3Score: null,
+    scoreType: "filler_score",
     topFiller: top?.filler || null,
     speechReview,
+    aiReview: null,
   };
 };
 

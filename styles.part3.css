@@ -3269,6 +3269,19 @@
 .speech-whisper-status span { color: #475569; }
 .speech-whisper-bar { height: 7px; background: #dbeafe; border-radius: 999px; overflow: hidden; margin-top: 8px; }
 .speech-whisper-bar span { display: block; height: 100%; background: #2563eb; transition: width 0.2s ease; }
+.speech-ai-status {
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: #eef2ff;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.speech-ai-status strong { font-weight: 900; color: #312e81; }
+.speech-ai-status span { color: #475569; }
 .speech-alert {
   border: 1px solid #fed7aa;
   background: #fff7ed;
@@ -3363,6 +3376,12 @@
   background: #eef2ff;
   padding: 14px;
 }
+.speech-ai-review-card {
+  border: 1px solid #bae6fd;
+  border-radius: 14px;
+  background: #f0f9ff;
+  padding: 14px;
+}
 .speech-review-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .speech-review-head h3 { margin: 0; color: #0f172a; }
 .speech-review-head p { margin: 4px 0 0; color: #475569; font-size: 13px; font-weight: 800; }
@@ -3405,6 +3424,16 @@
 .speech-better-answer summary { cursor: pointer; padding: 10px 12px; font-size: 13px; font-weight: 900; color: #3730a3; }
 .speech-better-answer div { border-top: 1px solid #c7d2fe; padding: 12px; color: #334155; font-size: 13px; line-height: 1.55; }
 .speech-review-drill { margin-top: 10px; color: #1e293b; font-size: 13px; }
+.speech-ai-diagnosis {
+  border-left: 3px solid #0284c7;
+  border-radius: 10px;
+  background: #e0f2fe;
+  color: #0f172a;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 10px 0;
+}
 .speech-history-panel { padding: 16px; }
 .speech-history-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
 .speech-history-filters { margin-top: 0; }

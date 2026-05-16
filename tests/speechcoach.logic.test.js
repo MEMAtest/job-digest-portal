@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createRequire } from "module";
 import {
   buildSessionPayload,
   calculateSpeechScore,
@@ -8,6 +9,13 @@ import {
   reviewSpeechAnswer,
   selectQuestion,
 } from "../app.speechcoach.logic.js";
+
+const require = createRequire(import.meta.url);
+const {
+  calculateCombinedScore,
+  normalizeAiReview,
+  safeJsonParse,
+} = require("../netlify/functions/_speech_ai_review.js");
 
 describe("detectFillers", () => {
   it("counts multi-word and single-word fillers", () => {
@@ -203,5 +211,57 @@ describe("reviewSpeechAnswer", () => {
     });
     expect(review.score).toBeLessThan(65);
     expect(review.fixes.join(" ")).toMatch(/metric|Open|Develop|fillers/i);
+  });
+});
+
+describe("Phase 3 AI review helpers", () => {
+  it("calculates the blended score from filler, clarity, structure and duration", () => {
+    const result = calculateCombinedScore({
+      clarityScore: 80,
+      structureScore: 70,
+      fpm: 3,
+      duration: 75,
+    });
+    expect(result).toMatchObject({
+      fillerScore: 88,
+      durationScore: 100,
+      combinedScore: 85,
+    });
+  });
+
+  it("normalizes model output into the stored AI review shape", () => {
+    const review = normalizeAiReview({
+      rawReview: {
+        clarityScore: 82,
+        structureScore: 75,
+        confidenceScore: 70,
+        hedgingCount: 2,
+        metricPlacement: "later",
+        structure: { opening: true, body: true, close: false },
+        jargonFlags: ["unclear platform phrasing"],
+        lengthVerdict: "tight",
+        diagnosis: "Specific but the metric arrives too late.",
+        strengths: ["Relevant Ebury evidence"],
+        fixes: ["Lead with the 38% result"],
+        betterAnswer: "I would lead with the Ebury threshold example.",
+        nextDrill: "Repeat with metric in sentence one.",
+      },
+      session: { duration: 80, fpm: 2.5, wpm: 130, totalFillers: 3, transcript: "word ".repeat(130) },
+      provider: { name: "test", model: "test-model" },
+    });
+    expect(review).toMatchObject({
+      status: "complete",
+      provider: "test",
+      model: "test-model",
+      metricPlacement: "later",
+      lengthVerdict: "tight",
+      hedgingCount: 2,
+    });
+    expect(review.combinedScore).toBeGreaterThan(80);
+    expect(review.components.clarityScore).toBe(82);
+  });
+
+  it("parses fenced JSON AI responses", () => {
+    expect(safeJsonParse("```json\n{\"clarityScore\":88}\n```")).toEqual({ clarityScore: 88 });
   });
 });

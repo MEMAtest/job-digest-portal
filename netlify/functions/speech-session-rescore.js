@@ -155,6 +155,7 @@ const serializeSession = (id, data = {}) => ({
   jobId: data.jobId || null,
   questionId: data.questionId || "",
   questionText: data.questionText || "",
+  questionModelAnswer: data.questionModelAnswer || "",
   category: data.category || "",
   transcript: data.transcript || "",
   webSpeechTranscript: data.webSpeechTranscript || "",
@@ -168,9 +169,13 @@ const serializeSession = (id, data = {}) => ({
   totalFillers: numberValue(data.totalFillers, 0),
   fpm: numberValue(data.fpm, 0),
   wpm: numberValue(data.wpm, 0),
+  baseScore: numberValue(data.baseScore ?? data.score, 0),
   score: numberValue(data.score, 0),
+  phase3Score: data.phase3Score == null ? null : numberValue(data.phase3Score, 0),
+  scoreType: data.scoreType || "filler_score",
   topFiller: data.topFiller || null,
   speechReview: data.speechReview || null,
+  aiReview: data.aiReview || null,
   audioRef: data.audioRef || null,
   createdAtIso: data.createdAtIso || toIso(data.createdAt),
   createdAt: data.createdAtIso || toIso(data.createdAt),
@@ -267,13 +272,18 @@ exports.handler = async (event) => {
       totalFillers: detected.total,
       fpm: scoreData.fpm,
       wpm: scoreData.wpm,
+      baseScore: scoreData.score,
       score: scoreData.score,
+      phase3Score: null,
+      scoreType: "filler_score",
       topFiller: top?.filler || null,
       ...(speechReview ? { speechReview } : {}),
+      aiReview: admin.firestore.FieldValue.delete(),
+      aiReviewedAt: admin.firestore.FieldValue.delete(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
     await ref.set(update, { merge: true });
-    const updated = { ...existing, ...update };
+    const updated = { ...existing, ...update, aiReview: null, aiReviewedAt: "" };
     const practiceStats = await recomputePracticeStats(db, existing.jobId || null);
     return withCors({ ok: true, session: serializeSession(sessionId, updated), practiceStats });
   } catch (error) {

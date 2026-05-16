@@ -68,6 +68,54 @@ const sanitizeReview = (review = null) => {
   };
 };
 
+const sanitizeAiReview = (review = null) => {
+  if (!review || typeof review !== "object") return null;
+  const cleanList = (items, maxItems = 6, maxChars = 500) =>
+    Array.isArray(items) ? items.slice(0, maxItems).map((item) => stringValue(item, maxChars)).filter(Boolean) : [];
+  const components = review.components && typeof review.components === "object" ? review.components : {};
+  const metrics = review.metrics && typeof review.metrics === "object" ? review.metrics : {};
+  const structure = review.structure && typeof review.structure === "object" ? review.structure : {};
+  return {
+    version: numberValue(review.version, 1),
+    status: stringValue(review.status || "complete", 40),
+    provider: stringValue(review.provider, 80),
+    model: stringValue(review.model, 160),
+    createdAt: stringValue(review.createdAt || new Date().toISOString(), 80),
+    transcriptHash: stringValue(review.transcriptHash, 120),
+    score: Math.max(0, Math.min(100, Math.round(numberValue(review.score, 0)))),
+    combinedScore: Math.max(0, Math.min(100, Math.round(numberValue(review.combinedScore ?? review.score, 0)))),
+    verdict: stringValue(review.verdict, 80),
+    components: {
+      fillerScore: numberValue(components.fillerScore, 0),
+      clarityScore: numberValue(components.clarityScore, 0),
+      structureScore: numberValue(components.structureScore, 0),
+      durationScore: numberValue(components.durationScore, 0),
+      confidenceScore: numberValue(components.confidenceScore, 0),
+    },
+    metrics: {
+      duration: numberValue(metrics.duration, 0),
+      fpm: numberValue(metrics.fpm, 0),
+      wpm: numberValue(metrics.wpm, 0),
+      totalFillers: numberValue(metrics.totalFillers, 0),
+      transcriptChars: numberValue(metrics.transcriptChars, 0),
+    },
+    hedgingCount: numberValue(review.hedgingCount, 0),
+    metricPlacement: stringValue(review.metricPlacement, 40),
+    structure: {
+      opening: Boolean(structure.opening),
+      body: Boolean(structure.body),
+      close: Boolean(structure.close),
+    },
+    jargonFlags: cleanList(review.jargonFlags, 5, 140),
+    lengthVerdict: stringValue(review.lengthVerdict, 40),
+    diagnosis: stringValue(review.diagnosis, 300),
+    strengths: cleanList(review.strengths, 4, 240),
+    fixes: cleanList(review.fixes, 5, 260),
+    betterAnswer: stringValue(review.betterAnswer, 2500),
+    nextDrill: stringValue(review.nextDrill, 500),
+  };
+};
+
 const sanitizeSession = (raw = {}) => {
   const sessionId = cleanId(raw.sessionId || raw.id);
   if (!sessionId) throw new Error("Missing session id");
@@ -94,9 +142,13 @@ const sanitizeSession = (raw = {}) => {
     totalFillers,
     fpm: numberValue(raw.fpm, 0),
     wpm: numberValue(raw.wpm, 0),
+    baseScore: Math.max(0, Math.min(100, Math.round(numberValue(raw.baseScore ?? raw.score, 0)))),
     score: Math.max(0, Math.min(100, Math.round(numberValue(raw.score, 0)))),
+    phase3Score: raw.phase3Score == null ? null : Math.max(0, Math.min(100, Math.round(numberValue(raw.phase3Score, 0)))),
+    scoreType: raw.scoreType ? stringValue(raw.scoreType, 80) : "filler_score",
     topFiller: raw.topFiller ? stringValue(raw.topFiller, 80) : null,
     speechReview: sanitizeReview(raw.speechReview),
+    aiReview: sanitizeAiReview(raw.aiReview),
     audioRef: raw.audioRef ? stringValue(raw.audioRef, 500) : null,
     createdAt: admin.firestore.Timestamp.fromDate(createdAtDate),
     createdAtIso: createdAtDate.toISOString(),
@@ -129,9 +181,13 @@ const serializeSession = (id, data = {}) => ({
   totalFillers: numberValue(data.totalFillers, 0),
   fpm: numberValue(data.fpm, 0),
   wpm: numberValue(data.wpm, 0),
+  baseScore: numberValue(data.baseScore ?? data.score, 0),
   score: numberValue(data.score, 0),
+  phase3Score: data.phase3Score == null ? null : numberValue(data.phase3Score, 0),
+  scoreType: data.scoreType || "filler_score",
   topFiller: data.topFiller || null,
   speechReview: data.speechReview || null,
+  aiReview: data.aiReview || null,
   audioRef: data.audioRef || null,
   createdAtIso: data.createdAtIso || toIso(data.createdAt),
   createdAt: data.createdAtIso || toIso(data.createdAt),

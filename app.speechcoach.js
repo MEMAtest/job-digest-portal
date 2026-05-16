@@ -83,6 +83,9 @@ const coach = {
   whisperProgress: 0,
   whisperPipelinePromise: null,
   whisperDevice: "wasm",
+  aiReviewEnabled: safeLocalStorageGet("speechCoach.aiReviewEnabled") !== "false",
+  aiReviewBusy: false,
+  aiReviewStatus: "",
   installPrompt: null,
 };
 
@@ -293,6 +296,18 @@ const saveRescoredSessionDocument = async (session, whisperTranscript) => {
   return data;
 };
 
+const requestAiReviewDocument = async (session, options = {}) => {
+  const data = await fetchJson("/.netlify/functions/speech-session-review", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: session.id,
+      force: Boolean(options.force),
+    }),
+  });
+  return data;
+};
+
 const mergeSavedSession = (session, practiceStats = null) => {
   coach.sessions = [session, ...coach.sessions.filter((item) => item.id !== session.id)].slice(0, 50);
   if (session.jobId && practiceStats) {
@@ -305,6 +320,11 @@ const mergeSavedSession = (session, practiceStats = null) => {
 const setWhisperStatus = (status, progress = coach.whisperProgress) => {
   coach.whisperStatus = status;
   coach.whisperProgress = Number(progress || 0);
+  renderSpeechCoach();
+};
+
+const setAiReviewStatus = (status) => {
+  coach.aiReviewStatus = status;
   renderSpeechCoach();
 };
 
@@ -396,11 +416,46 @@ const runWhisperRescore = async (session, audioBlob) => {
     mergeSavedSession(saved, data.practiceStats || null);
     coach.whisperStatus = `Whisper rescored with ${coach.whisperDevice || "local"} model.`;
     showToast("Whisper transcript saved.");
+    runAiReviewForSession(saved);
   } catch (error) {
     console.warn("Whisper rescore failed", error);
     coach.whisperStatus = "Whisper unavailable. Kept the live Web Speech transcript.";
+    runAiReviewForSession(coach.lastSession || session);
   } finally {
     coach.whisperBusy = false;
+    renderSpeechCoach();
+  }
+};
+
+const runAiReviewForSession = async (session, options = {}) => {
+  if (!coach.aiReviewEnabled || !session?.id || session.queuedOffline) return;
+  if (!String(session.transcript || "").trim()) return;
+  coach.aiReviewBusy = true;
+  setAiReviewStatus("AI coach review running in the background…");
+
+  try {
+    const data = await requestAiReviewDocument(session, options);
+    if (data.status === "complete" || data.status === "cached") {
+      const saved = data.session || { ...session, aiReview: data.aiReview || session.aiReview };
+      coach.lastSession = saved;
+      mergeSavedSession(saved, data.practiceStats || null);
+      setAiReviewStatus(data.status === "cached" ? "AI coach review already up to date." : "AI coach review saved.");
+      return;
+    }
+    if (data.status === "unavailable") {
+      setAiReviewStatus("AI coach review is not configured on the server. Rule-based review is still saved.");
+      return;
+    }
+    if (data.status === "skipped") {
+      setAiReviewStatus(data.reason || "AI coach review skipped.");
+      return;
+    }
+    setAiReviewStatus(data.reason || "AI coach review failed. Rule-based review kept.");
+  } catch (error) {
+    console.warn("AI speech review failed", error);
+    setAiReviewStatus("AI coach review failed. Rule-based review kept.");
+  } finally {
+    coach.aiReviewBusy = false;
     renderSpeechCoach();
   }
 };
@@ -418,6 +473,7 @@ const retryQueuedSessions = async ({ visible = false } = {}) => {
       const result = await persistSession(item.session, item.audioBlob);
       await deleteQueuedSession(item.id);
       mergeSavedSession(result.session, result.practiceStats);
+      runAiReviewForSession(result.session);
       saved += 1;
     } catch (error) {
       console.warn("Speech queue retry failed", error);
@@ -821,7 +877,8 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
     coach.info = "Session saved.";
     mergeSavedSession(result.session, result.practiceStats);
     showToast("Speech session saved.");
-    runWhisperRescore(result.session, audioBlob);
+    if (coach.whisperEnabled && audioBlob?.size) runWhisperRescore(result.session, audioBlob);
+    else runAiReviewForSession(result.session);
   } catch (error) {
     console.error("Speech session save failed", error);
     const queuedSession = { ...session, queuedOffline: true };
@@ -954,6 +1011,10 @@ const renderControls = () => {
         <input id="speech-whisper-toggle" type="checkbox" ${coach.whisperEnabled ? "checked" : ""} />
         <span>High-accuracy transcript</span>
       </label>
+      <label class="speech-toggle" title="Runs server-side AI feedback after the transcript is saved. Saving never waits on this.">
+        <input id="speech-ai-review-toggle" type="checkbox" ${coach.aiReviewEnabled ? "checked" : ""} />
+        <span>AI answer review</span>
+      </label>
       ${coach.installPrompt ? `<button id="speech-install" class="btn btn-tertiary">Install PWA</button>` : ""}
     </div>
   `;
@@ -969,6 +1030,16 @@ const renderWhisperStatus = () => {
         <span>${escapeHtml(coach.whisperStatus)}</span>
       </div>
       ${coach.whisperBusy ? `<div class="speech-whisper-bar"><span style="width:${progress}%"></span></div>` : ""}
+    </div>
+  `;
+};
+
+const renderAiReviewStatus = () => {
+  if (!coach.aiReviewStatus) return "";
+  return `
+    <div class="speech-ai-status">
+      <strong>${coach.aiReviewBusy ? "AI review running" : "AI review"}</strong>
+      <span>${escapeHtml(coach.aiReviewStatus)}</span>
     </div>
   `;
 };
@@ -1007,6 +1078,7 @@ const renderResult = () => {
   if (!session) return "";
   const band = getScoreBand(session.score);
   const top = session.topFiller ? `${session.topFiller} (${session.fillerCounts?.[session.topFiller] || 0})` : "None";
+  const aiCombined = session.scoreType === "ai_combined" || session.aiReview?.status === "complete";
   return `
     <div class="speech-result speech-result--${band}">
       <div class="speech-result-score">${session.score}</div>
@@ -1020,12 +1092,14 @@ const renderResult = () => {
           <span>${session.wpm} wpm</span>
           <span>Top: ${escapeHtml(top)}</span>
           ${session.rescored ? `<span>Whisper rescored</span>` : ""}
+          ${aiCombined ? `<span>AI combined</span><span>Base ${Math.round(Number(session.baseScore ?? session.score || 0))}</span>` : ""}
         </div>
         ${coach.audioUrl ? `<audio class="speech-audio" controls src="${coach.audioUrl}"></audio>` : ""}
         ${session.queuedOffline ? `<div class="speech-small-warning">Queued offline. It will sync automatically.</div>` : ""}
       </div>
     </div>
     ${renderSpeechReview(session.speechReview)}
+    ${renderAiReview(session.aiReview)}
   `;
 };
 
@@ -1068,6 +1142,62 @@ const renderSpeechReview = (review) => {
           : ""
       }
       ${review.drill ? `<div class="speech-review-drill"><strong>Next drill:</strong> ${escapeHtml(review.drill)}</div>` : ""}
+    </div>
+  `;
+};
+
+const renderAiReview = (review) => {
+  if (!review || review.status !== "complete") return "";
+  const components = review.components || {};
+  const structure = review.structure || {};
+  const list = (items = []) => items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+  const structureText = [
+    structure.opening ? "opening" : "no opening",
+    structure.body ? "body" : "weak body",
+    structure.close ? "close" : "no close",
+  ].join(" · ");
+  return `
+    <div class="speech-ai-review-card">
+      <div class="speech-review-head">
+        <div>
+          <h3>AI Coach Review</h3>
+          <p>${escapeHtml(String(review.verdict || "review").toUpperCase())} · combined ${Number(review.combinedScore || review.score || 0)}/100</p>
+        </div>
+        <div class="speech-review-score">${Number(review.combinedScore || review.score || 0)}</div>
+      </div>
+      <div class="speech-review-metrics">
+        <span>clarity ${Number(components.clarityScore || 0)}</span>
+        <span>structure ${Number(components.structureScore || 0)}</span>
+        <span>duration ${Number(components.durationScore || 0)}</span>
+        <span>metric ${escapeHtml(review.metricPlacement || "absent")}</span>
+        <span>hedges ${Number(review.hedgingCount || 0)}</span>
+      </div>
+      ${review.diagnosis ? `<div class="speech-ai-diagnosis">${escapeHtml(review.diagnosis)}</div>` : ""}
+      <div class="speech-review-grid">
+        <div>
+          <strong>What worked</strong>
+          <ul>${list(review.strengths || [])}</ul>
+        </div>
+        <div>
+          <strong>Fix next</strong>
+          <ul>${list(review.fixes || [])}</ul>
+        </div>
+      </div>
+      <div class="speech-review-drill"><strong>Structure:</strong> ${escapeHtml(structureText)}</div>
+      ${
+        review.jargonFlags?.length
+          ? `<div class="speech-review-drill"><strong>Unclear phrases:</strong> ${escapeHtml(review.jargonFlags.join(" · "))}</div>`
+          : ""
+      }
+      ${
+        review.betterAnswer
+          ? `<details class="speech-better-answer">
+              <summary>AI tighter version</summary>
+              <div>${escapeHtml(review.betterAnswer)}</div>
+            </details>`
+          : ""
+      }
+      ${review.nextDrill ? `<div class="speech-review-drill"><strong>Next drill:</strong> ${escapeHtml(review.nextDrill)}</div>` : ""}
     </div>
   `;
 };
@@ -1117,6 +1247,7 @@ const renderHistoryRow = (session) => {
           <div class="speech-history-meta">${escapeHtml(job ? getJobLabel(job) : "General drill")} · ${escapeHtml(session.source || "Speech Coach")}</div>
           <div class="speech-stored-transcript">${renderStoredTranscript(session)}</div>
           ${renderSpeechReview(session.speechReview)}
+          ${renderAiReview(session.aiReview)}
           ${session.audioRef ? `<button class="btn btn-tertiary speech-load-audio" data-audio-session="${escapeHtml(session.id)}" data-audio-ref="${escapeHtml(session.audioRef)}">Load audio</button>` : ""}
           ${audioSrc ? `<audio class="speech-audio" controls src="${escapeHtml(audioSrc)}"></audio>` : ""}
         </div>
@@ -1139,6 +1270,7 @@ const renderSpeechCoach = () => {
           ${renderControls()}
           <div class="speech-status-line">${escapeHtml(statusText)}</div>
           ${renderWhisperStatus()}
+          ${renderAiReviewStatus()}
           ${renderLiveStats()}
           ${renderFillerGrid()}
           ${renderResult()}
@@ -1202,6 +1334,14 @@ const bindSpeechCoachEvents = () => {
     coach.whisperStatus = coach.whisperEnabled
       ? "High-accuracy transcript will run after saved sessions."
       : "High-accuracy transcript disabled.";
+    renderSpeechCoach();
+  });
+  root.querySelector("#speech-ai-review-toggle")?.addEventListener("change", (event) => {
+    coach.aiReviewEnabled = event.target.checked;
+    safeLocalStorageSet("speechCoach.aiReviewEnabled", String(coach.aiReviewEnabled));
+    coach.aiReviewStatus = coach.aiReviewEnabled
+      ? "AI coach review will run after the final transcript is saved."
+      : "AI coach review disabled.";
     renderSpeechCoach();
   });
   root.querySelector("#speech-install")?.addEventListener("click", async () => {
