@@ -114,9 +114,11 @@ exports.handler = async (event) => {
     const db = getFirestore();
     const seeded = await seedIfEmpty(db);
     const synced = seeded ? 0 : await syncSeedMetadata(db);
+    const seedIds = new Set(loadNormalizedSeed().map((question) => question.id));
     const snap = await db.collection(QUESTION_COLLECTION).get();
     const questions = snap.docs
       .map(serializeQuestionDoc)
+      .filter((question) => seedIds.has(question.id) || question.modelAnswer)
       .sort((left, right) => `${left.category}:${left.text}`.localeCompare(`${right.category}:${right.text}`));
     return withCors({ ok: true, seeded, synced, questions });
   } catch (error) {
