@@ -435,11 +435,17 @@ const runAiReviewForSession = async (session, options = {}) => {
 
   try {
     const data = await requestAiReviewDocument(session, options);
-    if (data.status === "complete" || data.status === "cached") {
+    if (data.status === "complete" || data.status === "cached" || data.status === "fallback") {
       const saved = data.session || { ...session, aiReview: data.aiReview || session.aiReview };
       coach.lastSession = saved;
       mergeSavedSession(saved, data.practiceStats || null);
-      setAiReviewStatus(data.status === "cached" ? "AI coach review already up to date." : "AI coach review saved.");
+      setAiReviewStatus(
+        data.status === "cached"
+          ? "AI coach review already up to date."
+          : data.status === "fallback"
+            ? "Local Phase 3 fallback review saved; external LLM was unavailable."
+            : "AI coach review saved."
+      );
       return;
     }
     if (data.status === "unavailable") {
@@ -1078,7 +1084,7 @@ const renderResult = () => {
   if (!session) return "";
   const band = getScoreBand(session.score);
   const top = session.topFiller ? `${session.topFiller} (${session.fillerCounts?.[session.topFiller] || 0})` : "None";
-  const aiCombined = session.scoreType === "ai_combined" || session.aiReview?.status === "complete";
+  const aiCombined = session.scoreType === "ai_combined" || ["complete", "fallback"].includes(session.aiReview?.status);
   return `
     <div class="speech-result speech-result--${band}">
       <div class="speech-result-score">${session.score}</div>
@@ -1147,7 +1153,7 @@ const renderSpeechReview = (review) => {
 };
 
 const renderAiReview = (review) => {
-  if (!review || review.status !== "complete") return "";
+  if (!review || !["complete", "fallback"].includes(review.status)) return "";
   const components = review.components || {};
   const structure = review.structure || {};
   const list = (items = []) => items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
@@ -1160,8 +1166,8 @@ const renderAiReview = (review) => {
     <div class="speech-ai-review-card">
       <div class="speech-review-head">
         <div>
-          <h3>AI Coach Review</h3>
-          <p>${escapeHtml(String(review.verdict || "review").toUpperCase())} · combined ${Number(review.combinedScore || review.score || 0)}/100</p>
+          <h3>${review.status === "fallback" ? "Phase 3 Coach Review" : "AI Coach Review"}</h3>
+          <p>${escapeHtml(String(review.verdict || "review").toUpperCase())} · combined ${Number(review.combinedScore || review.score || 0)}/100${review.status === "fallback" ? " · local fallback" : ""}</p>
         </div>
         <div class="speech-review-score">${Number(review.combinedScore || review.score || 0)}</div>
       </div>

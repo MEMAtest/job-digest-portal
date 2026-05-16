@@ -13,6 +13,7 @@ import {
 const require = createRequire(import.meta.url);
 const {
   calculateCombinedScore,
+  generateAiSpeechReview,
   normalizeAiReview,
   safeJsonParse,
 } = require("../netlify/functions/_speech_ai_review.js");
@@ -263,5 +264,36 @@ describe("Phase 3 AI review helpers", () => {
 
   it("parses fenced JSON AI responses", () => {
     expect(safeJsonParse("```json\n{\"clarityScore\":88}\n```")).toEqual({ clarityScore: 88 });
+  });
+
+  it("falls back locally when no external provider is configured", async () => {
+    const previousOpenAi = process.env.OPENAI_API_KEY;
+    const previousGroq = process.env.GROQ_API_KEY;
+    const previousOpenRouter = process.env.OPENROUTER_API_KEY;
+    const previousAnthropic = process.env.ANTHROPIC_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GROQ_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    try {
+      const result = await generateAiSpeechReview({
+        questionText: "How would you improve screening?",
+        questionModelAnswer: "Use Ebury and the 38% false-positive reduction.",
+        transcript: "I would use Ebury. The result was 38% fewer unnecessary manual reviews while preserving control comfort.",
+        duration: 70,
+        fpm: 0,
+        wpm: 110,
+        totalFillers: 0,
+      });
+      expect(result.status).toBe("fallback");
+      expect(result.review.status).toBe("fallback");
+      expect(result.review.provider).toBe("local-fallback");
+      expect(result.review.combinedScore).toBeGreaterThan(0);
+    } finally {
+      if (previousOpenAi) process.env.OPENAI_API_KEY = previousOpenAi;
+      if (previousGroq) process.env.GROQ_API_KEY = previousGroq;
+      if (previousOpenRouter) process.env.OPENROUTER_API_KEY = previousOpenRouter;
+      if (previousAnthropic) process.env.ANTHROPIC_API_KEY = previousAnthropic;
+    }
   });
 });

@@ -134,6 +134,94 @@ Session:
 ${JSON.stringify(context, null, 2)}`;
 };
 
+const countWords = (text) => {
+  const matches = String(text || "").trim().match(/[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)?/g);
+  return matches ? matches.length : 0;
+};
+
+const countSentences = (text) => String(text || "").split(/[.!?]+/).map((item) => item.trim()).filter(Boolean).length;
+
+const buildFallbackRawReview = (session = {}, reason = "") => {
+  const transcript = stringValue(session.transcript || session.whisperTranscript || session.webSpeechTranscript, MAX_TRANSCRIPT_CHARS);
+  const lower = transcript.toLowerCase();
+  const words = countWords(transcript);
+  const sentences = countSentences(transcript);
+  const hasMetric = /\b\d+%|\b\d+\s*(days?|weeks?|months?|records?|jurisdictions?|markets?|k|m|million|thousand|arr|gbp|£)/i.test(transcript);
+  const hasEvidence = /\b(vistra|ebury|n26|elucidate|fenergo|napier|enate|lexisnexis|salesforce|30\+|50,?000|38%|55%|70%|120k|400k)\b/i.test(transcript);
+  const hasOpening = /\b(i would|i'd|my view|the key|the priority|i would start|i would frame|i would use)\b/i.test(transcript.slice(0, 220));
+  const hasClose = /\b(relevant|this shows|in short|therefore|so i would|the key point|for this role|why it matters)\b/i.test(lower.slice(-320));
+  const hasStructure = sentences >= 3 || /\b(first|second|third|then|finally|result|because|therefore)\b/i.test(transcript);
+  const hedgingMatches = lower.match(/\b(i think|probably|maybe|i guess|kind of|sort of|to be honest|i'd say)\b/g) || [];
+  const fpm = numberValue(session.fpm, 0);
+
+  const clarityScore = clampScore(
+    45 +
+      (words >= 70 && words <= 220 ? 16 : words >= 45 ? 8 : -8) +
+      (hasMetric ? 14 : -8) +
+      (hasEvidence ? 14 : -6) +
+      (fpm <= 4 ? 8 : -8) +
+      (hasClose ? 5 : 0)
+  );
+  const structureScore = clampScore(
+    40 +
+      (hasOpening ? 20 : -5) +
+      (hasStructure ? 22 : -8) +
+      (hasClose ? 13 : -5) +
+      (sentences >= 3 ? 5 : 0)
+  );
+  const confidenceScore = clampScore(86 - hedgingMatches.length * 8 - Math.max(0, fpm - 2) * 5);
+
+  const strengths = [];
+  if (hasOpening) strengths.push("Opened with a clear direction.");
+  if (hasMetric) strengths.push("Used a concrete metric.");
+  if (hasEvidence) strengths.push("Anchored the answer in named experience.");
+  if (hasStructure) strengths.push("The answer had a followable structure.");
+  if (!strengths.length) strengths.push("Captured enough transcript to coach from.");
+
+  const fixes = [];
+  if (!hasOpening) fixes.push("Open with the decision or judgement before context.");
+  if (!hasMetric) fixes.push("Put one metric in the first 15 seconds.");
+  if (!hasEvidence) fixes.push("Name the relevant evidence: Ebury, Vistra, N26, Elucidate, Fenergo, Napier or Enate.");
+  if (!hasStructure) fixes.push("Use a simple spine: judgement, evidence, result, relevance.");
+  if (!hasClose) fixes.push("Close by saying why the example matters for the target role.");
+  if (hedgingMatches.length) fixes.push(`Remove hedging: ${Array.from(new Set(hedgingMatches)).slice(0, 3).join(", ")}.`);
+  if (reason) fixes.push("External LLM review was unavailable, so this used the local Phase 3 fallback.");
+
+  const modelAnswer = stringValue(session.questionModelAnswer || "", 1800);
+  return {
+    clarityScore,
+    structureScore,
+    confidenceScore,
+    hedgingCount: hedgingMatches.length,
+    metricPlacement: hasMetric ? (/\b\d+%|\b\d+\s*(days?|weeks?|months?|records?|jurisdictions?|markets?|k|m|million|thousand|arr|gbp|£)/i.test(transcript.slice(0, 220)) ? "first_15s" : "later") : "absent",
+    structure: { opening: hasOpening, body: hasStructure, close: hasClose },
+    jargonFlags: [],
+    lengthVerdict: words < 70 ? "too_short" : words > 230 ? "too_long" : "tight",
+    diagnosis: hasMetric && hasEvidence
+      ? "Specific and evidence-led; tighten the opening and close if either is missing."
+      : "The answer needs earlier proof: lead with a metric and named delivery example.",
+    strengths,
+    fixes,
+    betterAnswer: modelAnswer || "I would open with the judgement, anchor it in a named example, give one metric, and close by explaining why that evidence matters for this role.",
+    nextDrill: fixes[0] || "Repeat once with the metric in sentence one and no hedging.",
+  };
+};
+
+const buildFallbackReview = ({ session = {}, reason = "", providerConfigured = false } = {}) => {
+  const rawReview = buildFallbackRawReview(session, reason);
+  const review = normalizeAiReview({
+    rawReview,
+    session,
+    provider: { name: "local-fallback", model: "deterministic-phase3-v1" },
+  });
+  return {
+    ...review,
+    status: "fallback",
+    fallbackReason: stringValue(reason, 500),
+    providerConfigured: Boolean(providerConfigured),
+  };
+};
+
 const normalizeAiReview = ({ rawReview = {}, session = {}, provider = {} }) => {
   const clarityScore = clampScore(rawReview.clarityScore);
   const structureScore = clampScore(rawReview.structureScore);
@@ -255,11 +343,12 @@ const generateAiSpeechReview = async (session = {}) => {
 
   const providers = buildSpeechReviewProviders();
   if (!providers.length) {
+    const reason = "No speech review LLM provider configured";
     return {
-      status: "unavailable",
+      status: "fallback",
       providerConfigured: false,
-      reason: "No speech review LLM provider configured",
-      review: null,
+      reason,
+      review: buildFallbackReview({ session: { ...session, transcript }, reason, providerConfigured: false }),
     };
   }
 
@@ -286,10 +375,14 @@ const generateAiSpeechReview = async (session = {}) => {
   }
 
   return {
-    status: "failed",
+    status: "fallback",
     providerConfigured: true,
     reason: errors.join(" | ").slice(0, 1000) || "AI review failed",
-    review: null,
+    review: buildFallbackReview({
+      session: { ...session, transcript },
+      reason: errors.join(" | ").slice(0, 1000) || "AI review failed",
+      providerConfigured: true,
+    }),
   };
 };
 

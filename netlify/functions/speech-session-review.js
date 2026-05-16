@@ -159,7 +159,7 @@ exports.handler = async (event) => {
     }
 
     const result = await generateAiSpeechReview({ ...existing, transcriptHash: hash });
-    if (result.status !== "complete" || !result.review) {
+    if (!result.review) {
       return withCors({
         ok: true,
         status: result.status,
@@ -187,8 +187,8 @@ exports.handler = async (event) => {
 
     return withCors({
       ok: true,
-      status: "complete",
-      providerConfigured: true,
+      status: result.status,
+      providerConfigured: Boolean(result.providerConfigured),
       session: serializeSession(sessionId, updated),
       aiReview: update.aiReview,
       practiceStats,
