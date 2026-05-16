@@ -332,6 +332,36 @@ const resetLiveState = ({ keepQuestion = false } = {}) => {
 
 const getTranscriptText = () => coach.finalSegments.map((segment) => segment.text).join(" ").trim();
 
+const commitVisibleInterimTranscript = () => {
+  const interim = String(coach.interimText || "").trim();
+  if (!interim) return;
+
+  const finalText = getTranscriptText();
+  const finalLower = finalText.toLowerCase();
+  const interimLower = interim.toLowerCase();
+  let textToCommit = interim;
+
+  if (finalLower && finalLower.includes(interimLower)) {
+    coach.interimText = "";
+    return;
+  }
+
+  if (finalLower && interimLower.startsWith(finalLower)) {
+    textToCommit = interim.slice(finalText.length).trim();
+  }
+
+  if (!textToCommit) {
+    coach.interimText = "";
+    return;
+  }
+
+  const detected = detectFillers(textToCommit);
+  coach.fillerCounts = mergeFillerCounts(coach.fillerCounts, detected.counts);
+  coach.totalFillers += detected.total;
+  coach.finalSegments.push({ text: textToCommit, matches: detected.matches });
+  coach.interimText = "";
+};
+
 const escapeSegmentWithHighlights = (text, matches = []) => {
   const sorted = [...matches].sort((left, right) => left.start - right.start || right.end - left.end);
   let cursor = 0;
@@ -629,10 +659,11 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
   if (coach.audioUrl) URL.revokeObjectURL(coach.audioUrl);
   coach.audioUrl = audioBlob ? URL.createObjectURL(audioBlob) : "";
 
+  commitVisibleInterimTranscript();
   const transcript = getTranscriptText();
   if (duration < MIN_SAVE_SECONDS || !transcript) {
     coach.status = "idle";
-    coach.info = "Not saved: answer was under 5 seconds or no speech was captured.";
+    coach.info = duration < MIN_SAVE_SECONDS ? "Not saved: answer was under 5 seconds." : "Not saved: no speech was captured.";
     coach.lastSession = null;
     renderSpeechCoach();
     return;
