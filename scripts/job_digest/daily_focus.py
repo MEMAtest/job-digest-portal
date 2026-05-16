@@ -30,7 +30,7 @@ from . import config
 
 
 # (category, headline, body, optional URL, optional CV-grounded model answer)
-# The 5th element is used only by Reflection entries — None elsewhere.
+# The 5th element is used only by Reflection entries, None elsewhere.
 FocusItem = Tuple[str, str, str, Optional[str], Optional[str]]
 
 
@@ -67,15 +67,15 @@ TERMS: List[FocusItem] = [
      "A risk-based model where customer due diligence is refreshed by event triggers (transaction patterns, sanctions changes, beneficial-ownership updates) rather than fixed periodic reviews. FCA, MAS and DNB have all signalled support; tooling maturity is the practical bottleneck.",
      "https://www.fca.org.uk/firms/financial-crime"),
     ("Term", "Three Lines of Defence",
-     "1st line: the business owns the risk and runs controls. 2nd line: compliance/risk function challenges and oversees. 3rd line: internal audit gives assurance to the board. Product Compliance roles often sit at 1.5 — first line but with significant judgement.",
+     "1st line: the business owns the risk and runs controls. 2nd line: compliance/risk function challenges and oversees. 3rd line: internal audit gives assurance to the board. Product Compliance roles often sit at 1.5, first line but with significant judgement.",
      "https://www.theiia.org/en/content/articles/global-knowledge-brief/2020/july/the-three-lines-model/"),
     ("Term", "Alert-to-SAR ratio",
-     "The share of transaction-monitoring alerts that convert to Suspicious Activity Reports. Under ~5% flags noisy rules; unusually high can flag rules too narrow that miss real activity. Always pair with recall — what was missed.", None),
+     "The share of transaction-monitoring alerts that convert to Suspicious Activity Reports. Under ~5% flags noisy rules; unusually high can flag rules too narrow that miss real activity. Always pair with recall, what was missed.", None),
     ("Term", "Model Risk Management",
      "Framework for managing risks from ML and statistical models in fincrime, fraud, credit. Covers development controls, independent validation, explainability, drift monitoring, break-glass procedures. PRA SS1/23 + FCA expectations apply in the UK.",
      "https://www.bankofengland.co.uk/prudential-regulation/publication/2023/may/model-risk-management-principles-for-banks-ss"),
     ("Term", "Risk-Based Approach (RBA)",
-     "The FATF principle that AML/CFT controls should be proportionate to assessed risk. In product terms: don't apply uniform friction — segment customers by risk and adjust onboarding, monitoring intensity, and review cadence accordingly.",
+     "The FATF principle that AML/CFT controls should be proportionate to assessed risk. In product terms: don't apply uniform friction, segment customers by risk and adjust onboarding, monitoring intensity, and review cadence accordingly.",
      "https://www.fatf-gafi.org/en/topics/risk-based-approach.html"),
     ("Term", "Embedded Finance",
      "Non-financial platforms (marketplaces, SaaS, gig apps) offering banking, payments, lending or cards via APIs from a regulated provider. Wise Platform, Airwallex, Marqeta, Adyen all play here. Regulatory ownership splits between platform and licence-holder.", None),
@@ -86,10 +86,10 @@ TERMS: List[FocusItem] = [
     ("Term", "False positive vs false negative trade-off",
      "Lower thresholds catch more true risk but burn analyst capacity. Higher thresholds save cost but increase misses. The right answer depends on regulatory appetite, not just cost.", None),
     ("Term", "JMLSG Guidance",
-     "Joint Money Laundering Steering Group — UK industry guidance the FCA expects firms to follow. Updated regularly; Part II has sector-specific chapters (banking, e-money, money remittance, etc.). Citing the specific paragraph in an interview is gold-standard.",
+     "Joint Money Laundering Steering Group, UK industry guidance the FCA expects firms to follow. Updated regularly; Part II has sector-specific chapters (banking, e-money, money remittance, etc.). Citing the specific paragraph in an interview is gold-standard.",
      "https://www.jmlsg.org.uk/"),
     ("Term", "Travel Rule (FATF Recommendation 16)",
-     "Originating institutions must include originator/beneficiary information with payment messages. Extended to virtual asset service providers in 2019. Implementation varies — UK/EU/US/MAS have different thresholds and timelines.",
+     "Originating institutions must include originator/beneficiary information with payment messages. Extended to virtual asset service providers in 2019. Implementation varies, UK/EU/US/MAS have different thresholds and timelines.",
      "https://www.fatf-gafi.org/en/publications/Virtualassets/Virtual-asset-service-providers.html"),
 ]
 
@@ -98,15 +98,15 @@ REFLECTIONS: List[FocusItem] = [
     ("Reflection", "Hardest call you made",
      "Think of one time you held an unpopular view in a senior stakeholder meeting. What was the call? Did you change your mind? Why or why not? Most senior interviews probe this exactly once.",
      None,
-     "At N26, recommended pausing new feature work for a quarter so the squad could remediate BaFin's transaction monitoring, screening and EDD findings end-to-end. Unpopular with growth leadership at the time, but the right call — 470 PEP backlog cleared, 70% of reviews automated, regulator unblocked. The call held because I framed it as cheapest-to-fix-now versus enforcement risk later."),
+     "At N26, recommended pausing new feature work for a quarter so the squad could remediate BaFin's transaction monitoring, screening and EDD findings end-to-end. Unpopular with growth leadership at the time, but the right call, 470 PEP backlog cleared, 70% of reviews automated, regulator unblocked. The call held because I framed it as cheapest-to-fix-now versus enforcement risk later."),
     ("Reflection", "Your strongest metric story",
      "Pick one outcome you delivered that you can defend with numbers (baseline, scope, method, result). Practise saying it in 60 seconds with the metric in the first sentence.",
      None,
      "At Vistra, cut onboarding cycle time roughly in half (~45 to ~20 days) across 20+ jurisdictions. Baseline came from production tickets; scope was a process bottleneck audit covering KYC, QC and servicing handoffs; method was redesigned QC sampling plus SLA reporting per country, monthly. The metric I'd defend is SLA adherence, because cycle-time alone hides rework."),
     ("Reflection", "The thing you'd do differently",
-     "Pick a project that didn't go to plan. What would you change with hindsight? Strong candidates separate decision quality from outcome quality — bad outcome doesn't mean bad call.",
+     "Pick a project that didn't go to plan. What would you change with hindsight? Strong candidates separate decision quality from outcome quality, bad outcome doesn't mean bad call.",
      None,
-     "At Elucidate, the Tier-1 bank PoC closed at £120k ARR — but I let the UX layer go too wide before we had paid-adoption signal. Outcome was fine; sequencing decision wasn't. Today I'd have shipped a thinner front end and spent the saved cycles on usage analytics so the next conversion conversation had data, not anecdotes."),
+     "At Elucidate, the Tier-1 bank PoC closed at £120k ARR, but I let the UX layer go too wide before we had paid-adoption signal. Outcome was fine; sequencing decision wasn't. Today I'd have shipped a thinner front end and spent the saved cycles on usage analytics so the next conversion conversation had data, not anecdotes."),
     ("Reflection", "Your operating principles",
      "Without thinking too hard: how do you actually work week-to-week? Weekly deep-dives? Single-threaded ownership? Async-first? Knowing your own rhythm makes 'culture fit' answers honest, not performed.",
      None,
@@ -114,26 +114,26 @@ REFLECTIONS: List[FocusItem] = [
     ("Reflection", "What you cannot delegate",
      "Identify two or three things you currently do that nobody else in your org can. Then ask: is that a strength or a single point of failure? Senior interviews care about the answer.",
      None,
-     "Two things: regulator-facing framing (how a finding is described, what evidence supports it, what the firm's response is) and the vendor relationships in Fenergo, Napier and Enate. Both compound on years of judgement and history. Honest answer is that the regulator framing is becoming a single point of failure — I should be building a second person up to do it inside 6 months."),
+     "Two things: regulator-facing framing (how a finding is described, what evidence supports it, what the firm's response is) and the vendor relationships in Fenergo, Napier and Enate. Both compound on years of judgement and history. Honest answer is that the regulator framing is becoming a single point of failure, I should be building a second person up to do it inside 6 months."),
     ("Reflection", "Your regulator-facing instinct",
      "If a regulator asked you tomorrow to walk through a control you own, could you? In what order would you present the evidence? Most people freeze on this; preparation flips it into a quiet advantage.",
      None,
-     "Yes. Order would be: control objective; the specific rule it ties to (MLR 2017 Reg 18 or 19, the relevant JMLSG paragraph, or the FCA expectation in the Handbook); evidence design — what fires, what's recorded, who reviews, who escalates; last 12 months of exceptions with root cause and remediation. That ordering comes from FCA Authorisations associate experience and the N26 BaFin remediation; muscle memory rather than rehearsed."),
+     "Yes. Order would be: control objective; the specific rule it ties to (MLR 2017 Reg 18 or 19, the relevant JMLSG paragraph, or the FCA expectation in the Handbook); evidence design, what fires, what's recorded, who reviews, who escalates; last 12 months of exceptions with root cause and remediation. That ordering comes from FCA Authorisations associate experience and the N26 BaFin remediation; muscle memory rather than rehearsed."),
     ("Reflection", "The data point you trust least",
      "What metric in your current org do you mistrust most, and why? Strong product candidates can name one and explain the bias or measurement gap behind it.",
      None,
-     "Alert-to-SAR ratio in isolation. It only measures the alerts we did generate, never what slipped past — so a 'good' ratio can hide a recall problem. I pair it with sample-based testing on closed alerts, retrospective findings from internal audit, and any typology coverage gaps surfaced in horizon scanning. One number is never enough."),
+     "Alert-to-SAR ratio in isolation. It only measures the alerts we did generate, never what slipped past, so a 'good' ratio can hide a recall problem. I pair it with sample-based testing on closed alerts, retrospective findings from internal audit, and any typology coverage gaps surfaced in horizon scanning. One number is never enough."),
     ("Reflection", "Your bar for shipping",
-     "Where exactly do you draw the line between 'safe to launch' and 'needs more time'? Articulating this — with one example each way — is one of the cleanest ways to show senior judgement.",
+     "Where exactly do you draw the line between 'safe to launch' and 'needs more time'? Articulating this, with one example each way, is one of the cleanest ways to show senior judgement.",
      None,
-     "Two questions before any go-live: can I defend this to a regulator on day one, and can the first-line operator run it without me. If both yes, ship. The Elucidate Tier-1 PoC met that bar at narrow scope — we held back the broader workflow features deliberately. Conversely at N26 we delayed an EDD release a fortnight because the recordkeeping evidence didn't yet survive a walk-through; the right call."),
+     "Two questions before any go-live: can I defend this to a regulator on day one, and can the first-line operator run it without me. If both yes, ship. The Elucidate Tier-1 PoC met that bar at narrow scope, we held back the broader workflow features deliberately. Conversely at N26 we delayed an EDD release a fortnight because the recordkeeping evidence didn't yet survive a walk-through; the right call."),
 ]
 
 
-# Fallback only — used if the FCA RSS fetch fails
+# Fallback only, used if the FCA RSS fetch fails
 INDUSTRY_FALLBACK: List[FocusItem] = [
     ("Industry watch", "FCA Dear CEO letters",
-     "FCA's Dear CEO letters are the clearest signal of where supervisory attention is sharpening. Read the latest one for payments, retail banking or wealth — whichever lines up with your applications. They tell you what the firm is being asked about, often months before the press picks it up.",
+     "FCA's Dear CEO letters are the clearest signal of where supervisory attention is sharpening. Read the latest one for payments, retail banking or wealth, whichever lines up with your applications. They tell you what the firm is being asked about, often months before the press picks it up.",
      "https://www.fca.org.uk/publications/letters"),
     ("Industry watch", "FATF mutual evaluations",
      "Every few years FATF publishes a mutual evaluation of a country's AML/CTF regime. Findings shape what UK firms get audited on for years afterwards. Citing specific deficiencies in interviews makes you sound informed without being preachy.",
@@ -308,7 +308,7 @@ def build_focus_text(now: Optional[datetime] = None) -> str:
     item = pick_focus(now)
     category, headline, body, url = item[:4]
     model_answer = item[4] if len(item) >= 5 else None
-    text = f"[{category}] {headline} — {body}"
+    text = f"[{category}] {headline}, {body}"
     if model_answer:
         text += f"\n  Your CV-grounded answer: {model_answer}"
     if url:

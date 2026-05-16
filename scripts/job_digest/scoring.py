@@ -33,37 +33,68 @@ ADJACENT_ROLE_PATTERNS = (
     "product operations manager",
     "financial crime",
     "fincrime",
-    "compliance manager",
-    "compliance lead",
-    "compliance officer",
-    "compliance director",
-    "compliance advisory",
-    "compliance analyst",
-    "compliance specialist",
-    "head of compliance",
+    "financial crime manager",
+    "financial crime officer",
+    "financial crime risk",
     "head of financial crime",
+    "head of compliance",
+    "head of financial crime risk",
+    "compliance advisory",
+    "compliance director",
+    "compliance lead",
     "mlro",
     "money laundering reporting officer",
     "aml manager",
     "aml officer",
     "aml analyst",
+    "aml compliance",
     "kyc manager",
     "kyc officer",
     "kyc analyst",
+    "kyc compliance",
     "sanctions officer",
     "sanctions analyst",
+    "sanctions compliance",
     "screening analyst",
     "screening officer",
     "onboarding manager",
     "onboarding lead",
-    "risk manager",
-    "risk officer",
-    "operational risk",
     "regulatory affairs",
     "regulatory change",
     "regulatory controls",
-    "financial crime manager",
-    "financial crime officer",
+    "regulatory compliance",
+    "operational risk manager",
+    "operational risk officer",
+)
+
+
+COMPLIANCE_BARE_TOKENS = (
+    "compliance manager",
+    "compliance officer",
+    "compliance analyst",
+    "compliance specialist",
+)
+
+
+RISK_BARE_TOKENS = (
+    "risk manager",
+    "risk officer",
+    "risk analyst",
+    "risk specialist",
+)
+
+
+# Bare "risk manager" or "compliance officer" alone is too broad (Marketing
+# Risk Manager, Workplace Compliance Officer). Require co-occurrence with one
+# of these tight fincrime/regulatory anchors before treating as adjacent.
+FINCRIME_ANCHORS = (
+    "aml", "kyc", "kyb", "cdd", "edd",
+    "financial crime", "fincrime",
+    "money laundering", "sanctions", "screening",
+    "transaction monitoring", "perpetual kyc",
+    "client lifecycle", "client onboarding", "customer lifecycle",
+    "clm", "model risk", "regtech", "fraud",
+    "due diligence", "fca", "mlr", "jmlsg", "bafin", "fatf",
 )
 
 NEGATIVE_ROLE_PATTERNS = (
@@ -96,6 +127,12 @@ def classify_role_family(text: str) -> str:
         return "core"
     if any(pattern in text_l for pattern in ADJACENT_ROLE_PATTERNS):
         return "adjacent"
+    # Bare "risk manager" / "compliance officer" only count as adjacent when
+    # paired with a tight fincrime anchor. DOMAIN_TERMS would let "Marketing
+    # Risk Manager" through because bare "risk" is in there.
+    if any(tok in text_l for tok in COMPLIANCE_BARE_TOKENS + RISK_BARE_TOKENS):
+        if any(anchor in text_l for anchor in FINCRIME_ANCHORS):
+            return "adjacent"
     if "product" in text_l and "manager" in text_l:
         return "core"
     if "product" in text_l or "platform" in text_l:
