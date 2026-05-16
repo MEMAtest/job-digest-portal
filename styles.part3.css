@@ -3194,6 +3194,7 @@
 .speech-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; color: #475569; }
 .speech-field select,
 .speech-field input,
+.speech-field textarea,
 .speech-history-filters select {
   border: 1px solid #cbd5e1;
   border-radius: 10px;
@@ -3202,6 +3203,7 @@
   background: #fff;
   color: #0f172a;
 }
+.speech-field textarea { min-height: 86px; resize: vertical; font-family: inherit; line-height: 1.45; }
 .speech-field--inline { max-width: 360px; }
 .speech-filter-panel { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center; }
 .speech-filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -3252,6 +3254,25 @@
   font-size: 13px;
   line-height: 1.55;
   color: #1e293b;
+}
+.speech-custom-question {
+  margin-top: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+.speech-custom-question summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #0f172a;
+}
+.speech-custom-grid {
+  border-top: 1px solid #e2e8f0;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
 }
 .speech-controls { margin-top: 0; }
 .speech-stop:not(:disabled) { background: #fee2e2; border-color: #fecaca; color: #991b1b; }

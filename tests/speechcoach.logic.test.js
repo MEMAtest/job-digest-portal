@@ -107,6 +107,25 @@ describe("selectQuestion", () => {
     expect(result.reset).toBe(true);
     expect(result.question.id).toBe("a");
   });
+
+  it("weights low-score questions higher for spaced repetition", () => {
+    const result = selectQuestion(questions, {
+      categories: ["behavioural"],
+      sessions: [{ questionId: "a", score: 40, createdAtIso: "2026-05-16T00:00:00.000Z" }],
+      random: () => 0.55,
+    });
+    expect(result.question.id).toBe("a");
+  });
+
+  it("deprioritises recently strong questions", () => {
+    const result = selectQuestion(questions, {
+      categories: ["behavioural"],
+      sessions: [{ questionId: "a", score: 95, createdAtIso: "2026-05-16T00:00:00.000Z" }],
+      now: new Date("2026-05-17T00:00:00.000Z"),
+      random: () => 0.3,
+    });
+    expect(result.question.id).toBe("b");
+  });
 });
 
 describe("calculateTrend", () => {

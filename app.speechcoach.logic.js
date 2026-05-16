@@ -175,10 +175,32 @@ export const selectQuestion = (questions = [], options = {}) => {
     reset = true;
   }
   const random = typeof options.random === "function" ? options.random : Math.random;
-  const index = Math.floor(random() * available.length);
-  const question = available[index];
+  const weights = available.map((question) => getQuestionWeight(question, options.sessions || [], options.now || new Date()));
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  let cursor = random() * (totalWeight || available.length);
+  let question = available[0];
+  for (let index = 0; index < available.length; index += 1) {
+    cursor -= weights[index] || 1;
+    if (cursor <= 0) {
+      question = available[index];
+      break;
+    }
+  }
   asked.add(question.id);
   return { question, asked, reset };
+};
+
+const getQuestionWeight = (question, sessions = [], now = new Date()) => {
+  const latest = [...(Array.isArray(sessions) ? sessions : [])]
+    .filter((session) => session.questionId === question.id)
+    .sort((a, b) => new Date(b.createdAtIso || b.createdAt || 0) - new Date(a.createdAtIso || a.createdAt || 0))[0];
+  if (!latest) return 1;
+  const score = Number(latest.score || 0);
+  if (score < 60) return Math.min(4, 1 + Math.max(0, 60 - score) / 20);
+  const lastDate = new Date(latest.createdAtIso || latest.createdAt || 0);
+  const daysSince = Number.isNaN(lastDate.getTime()) ? 999 : (new Date(now).getTime() - lastDate.getTime()) / 86400000;
+  if (score > 85 && daysSince < 7) return 0.2;
+  return 1;
 };
 
 export const calculateTrend = (sessions = []) => {

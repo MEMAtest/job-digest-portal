@@ -29,6 +29,7 @@ const MAX_SESSION_SECONDS = 120;
 const MIN_SAVE_SECONDS = 5;
 const SPEECH_DB_NAME = "speech-coach-store";
 const QUEUE_STORE = "queuedSessions";
+const CUSTOM_QUESTIONS_KEY = "speechCoach.customQuestions.v1";
 const WHISPER_MODEL = "Xenova/whisper-tiny.en";
 const WHISPER_CDN = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js";
 
@@ -119,6 +120,55 @@ const truncate = (value, max = 120) => {
   return `${text.slice(0, max - 1)}…`;
 };
 
+const splitTags = (value) =>
+  String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const createCustomQuestion = ({ text, category = "behavioural", companyTag = [], modelAnswer = "" } = {}) => ({
+  id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  text: String(text || "").trim(),
+  category: CATEGORIES.includes(category) ? category : "behavioural",
+  roleTag: ["PM", "Director", "Compliance"],
+  companyTag: Array.isArray(companyTag) ? companyTag : splitTags(companyTag),
+  modelAnswer: String(modelAnswer || "").trim(),
+  modelAnswerVersion: 1,
+  timesAsked: 0,
+  avgScore: 0,
+  lastAskedAt: null,
+});
+
+const extractQuestionsFromJd = (text) => {
+  const source = String(text || "").trim();
+  if (source.length < 80) return [];
+  const lower = source.toLowerCase();
+  const questions = [
+    { category: "motivation", text: "Why this role, and why this company now?" },
+    { category: "behavioural", text: "Talk me through the most relevant example from your background for this role." },
+    { category: "product", text: "How would you prioritise the first 90 days for this product area?" },
+  ];
+  if (/\bkyc|cdd|edd|onboarding|clm\b/i.test(lower)) {
+    questions.push({ category: "domain", text: "How would you improve KYC/onboarding conversion without weakening control quality?" });
+  }
+  if (/\bscreening|sanctions|pep|transaction monitoring|aml|financial crime|fincrime\b/i.test(lower)) {
+    questions.push({ category: "domain", text: "How would you reduce false positives while keeping financial-crime controls defensible?" });
+  }
+  if (/\bapi|platform|integration|technical|engineering|architecture\b/i.test(lower)) {
+    questions.push({ category: "scenario", text: "A critical vendor API is unstable during onboarding. How do you triage impact and decide what ships?" });
+  }
+  if (/\bstakeholder|cross-functional|compliance|operations|legal\b/i.test(lower)) {
+    questions.push({ category: "behavioural", text: "Tell me about a time you aligned Compliance, Operations and Engineering around a difficult product decision." });
+  }
+  if (/\bdata|analytics|metric|dashboard|kpi|insight\b/i.test(lower)) {
+    questions.push({ category: "product", text: "Which metrics would you use to prove this product area is improving?" });
+  }
+  if (/\broadmap|strategy|vision|director|lead\b/i.test(lower)) {
+    questions.push({ category: "product", text: "What would your product strategy be if you inherited this area on day one?" });
+  }
+  return Array.from(new Map(questions.map((question) => [question.text, question])).values()).slice(0, 8);
+};
+
 const parseTimestamp = (value) => {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -168,18 +218,38 @@ const normalizeQuestion = (question) => ({
   lastAskedAt: question.lastAskedAt || null,
 });
 
+const loadCustomQuestions = () => {
+  try {
+    const parsed = JSON.parse(safeLocalStorageGet(CUSTOM_QUESTIONS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.map(normalizeQuestion).filter((question) => question.text) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCustomQuestions = (questions = []) => {
+  const custom = questions.filter((question) => String(question.id || "").startsWith("custom-")).slice(-120);
+  safeLocalStorageSet(CUSTOM_QUESTIONS_KEY, JSON.stringify(custom));
+};
+
+const mergeQuestions = (base = []) => {
+  const byId = new Map();
+  [...base, ...loadCustomQuestions()].forEach((question) => byId.set(question.id, normalizeQuestion(question)));
+  return [...byId.values()].filter((question) => question.text);
+};
+
 const loadQuestions = async () => {
   if (coach.questionsLoading || coach.questionsLoaded) return;
   coach.questionsLoading = true;
   try {
     const data = await fetchJson("/.netlify/functions/speech-question-bank");
-    coach.questions = (data.questions || []).map(normalizeQuestion).filter((question) => question.text);
+    coach.questions = mergeQuestions((data.questions || []).map(normalizeQuestion).filter((question) => question.text));
     coach.questionsLoaded = true;
   } catch (error) {
     console.warn("Speech Coach question bank proxy failed, falling back to local JSON", error);
     try {
       const data = await fetchJson("/speech-questions.json");
-      coach.questions = (Array.isArray(data) ? data : data.questions || []).map(normalizeQuestion).filter((question) => question.text);
+      coach.questions = mergeQuestions((Array.isArray(data) ? data : data.questions || []).map(normalizeQuestion).filter((question) => question.text));
       coach.questionsLoaded = true;
       coach.warning = "Using local question bank. Session scoring still works; question stats may not update until Netlify functions are available.";
     } catch (fallbackError) {
@@ -496,12 +566,66 @@ const pickNextQuestion = ({ silent = false } = {}) => {
     categories: [...coach.activeCategories],
     company: coach.companyFilter,
     asked: coach.asked,
+    sessions: coach.sessions,
   });
   coach.currentQuestion = result.question;
   coach.asked = result.asked;
   if (result.reset && !silent) showToast("Question pool reset for this drill.");
   resetLiveState({ keepQuestion: true });
   renderSpeechCoach();
+};
+
+const addCustomQuestion = (question) => {
+  const normalized = normalizeQuestion(question);
+  if (!normalized.text) return null;
+  coach.questions = [...coach.questions.filter((item) => item.id !== normalized.id), normalized];
+  saveCustomQuestions(coach.questions);
+  coach.currentQuestion = normalized;
+  coach.asked.add(normalized.id);
+  resetLiveState({ keepQuestion: true });
+  renderSpeechCoach();
+  return normalized;
+};
+
+const addCustomQuestionFromForm = () => {
+  const text = coach.container?.querySelector("#speech-custom-text")?.value || "";
+  const category = coach.container?.querySelector("#speech-custom-category")?.value || "behavioural";
+  const companyTag = splitTags(coach.container?.querySelector("#speech-custom-company")?.value || coach.companyFilter);
+  const modelAnswer = coach.container?.querySelector("#speech-custom-model")?.value || "";
+  const question = createCustomQuestion({ text, category, companyTag, modelAnswer });
+  if (!question.text) {
+    showToast("Add a question first.");
+    return;
+  }
+  addCustomQuestion(question);
+  showToast("Custom question added.");
+};
+
+const importQuestionsFromJd = () => {
+  const jd = coach.container?.querySelector("#speech-jd-paste")?.value || "";
+  const companyTag = splitTags(coach.companyFilter);
+  const extracted = extractQuestionsFromJd(jd).map((item) =>
+    createCustomQuestion({
+      ...item,
+      companyTag,
+      modelAnswer: "Lead with a direct judgement, use one named delivery example, quantify the result, then close with why it matters for this role.",
+    })
+  );
+  if (!extracted.length) {
+    showToast("Paste a fuller JD first.");
+    return;
+  }
+  const existingText = new Set(coach.questions.map((question) => question.text.toLowerCase()));
+  const newQuestions = extracted.filter((question) => !existingText.has(question.text.toLowerCase()));
+  coach.questions = [...coach.questions, ...newQuestions];
+  saveCustomQuestions(coach.questions);
+  if (newQuestions[0]) {
+    coach.currentQuestion = newQuestions[0];
+    coach.asked.add(newQuestions[0].id);
+    resetLiveState({ keepQuestion: true });
+  }
+  renderSpeechCoach();
+  showToast(`${newQuestions.length || extracted.length} JD question${(newQuestions.length || extracted.length) === 1 ? "" : "s"} added.`);
 };
 
 const resetLiveState = ({ keepQuestion = false } = {}) => {
@@ -998,6 +1122,40 @@ const renderQuestionCard = () => {
             </details>`
           : ""
       }
+      <details class="speech-custom-question">
+        <summary>Add practice question</summary>
+        <div class="speech-custom-grid">
+          <label class="speech-field">
+            <span>Question</span>
+            <textarea id="speech-custom-text" rows="3" placeholder="Paste or write the question you want to drill."></textarea>
+          </label>
+          <label class="speech-field">
+            <span>Category</span>
+            <select id="speech-custom-category">
+              ${CATEGORIES.map((category) => `<option value="${category}">${escapeHtml(toTitle(category))}</option>`).join("")}
+            </select>
+          </label>
+          <label class="speech-field">
+            <span>Company tags</span>
+            <input id="speech-custom-company" type="text" value="${escapeHtml(coach.companyFilter)}" placeholder="JPM, Wise, Barclays" />
+          </label>
+          <label class="speech-field">
+            <span>Model answer optional</span>
+            <textarea id="speech-custom-model" rows="3" placeholder="Short target answer or evidence points."></textarea>
+          </label>
+          <button id="speech-custom-add" class="btn btn-tertiary">Add question</button>
+        </div>
+      </details>
+      <details class="speech-custom-question">
+        <summary>Paste JD → add questions</summary>
+        <div class="speech-custom-grid">
+          <label class="speech-field">
+            <span>Job description</span>
+            <textarea id="speech-jd-paste" rows="5" placeholder="Paste the JD. The app will create targeted practice questions locally."></textarea>
+          </label>
+          <button id="speech-jd-import" class="btn btn-tertiary">Create JD questions</button>
+        </div>
+      </details>
     </div>
   `;
 };
@@ -1361,6 +1519,8 @@ const bindSpeechCoachEvents = () => {
     pickNextQuestion({ silent: true });
   });
   root.querySelector("#speech-new-question")?.addEventListener("click", () => pickNextQuestion());
+  root.querySelector("#speech-custom-add")?.addEventListener("click", () => addCustomQuestionFromForm());
+  root.querySelector("#speech-jd-import")?.addEventListener("click", () => importQuestionsFromJd());
   root.querySelector("#speech-read-question")?.addEventListener("click", () => readQuestion());
   root.querySelector("#speech-read-start")?.addEventListener("click", () => beginSession({ readFirst: true }));
   root.querySelector("#speech-start-now")?.addEventListener("click", () => beginSession({ readFirst: false }));
