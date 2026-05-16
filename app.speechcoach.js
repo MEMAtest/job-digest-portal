@@ -8,6 +8,7 @@ import {
 import {
   FILLER_KEYS,
   buildSessionPayload,
+  calculateSpeechPatterns,
   detectFillers,
   getScoreBand,
   mergeFillerCounts,
@@ -431,7 +432,7 @@ const runAiReviewForSession = async (session, options = {}) => {
   if (!coach.aiReviewEnabled || !session?.id || session.queuedOffline) return;
   if (!String(session.transcript || "").trim()) return;
   coach.aiReviewBusy = true;
-  setAiReviewStatus("AI coach review running in the background…");
+  setAiReviewStatus(options.force ? "AI coach review rerunning…" : "AI coach review running in the background…");
 
   try {
     const data = await requestAiReviewDocument(session, options);
@@ -1102,6 +1103,7 @@ const renderResult = () => {
         </div>
         ${coach.audioUrl ? `<audio class="speech-audio" controls src="${coach.audioUrl}"></audio>` : ""}
         ${session.queuedOffline ? `<div class="speech-small-warning">Queued offline. It will sync automatically.</div>` : ""}
+        <button class="btn btn-tertiary speech-review-again" data-review-session="${escapeHtml(session.id)}" ${session.queuedOffline ? "disabled" : ""}>Rerun AI review</button>
       </div>
     </div>
     ${renderSpeechReview(session.speechReview)}
@@ -1157,6 +1159,10 @@ const renderAiReview = (review) => {
   const components = review.components || {};
   const structure = review.structure || {};
   const list = (items = []) => items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+  const providerLabel =
+    review.status === "fallback"
+      ? `local fallback · ${review.model || "deterministic"}`
+      : `${review.provider || "provider"} · ${review.model || "model"}`;
   const structureText = [
     structure.opening ? "opening" : "no opening",
     structure.body ? "body" : "weak body",
@@ -1172,6 +1178,7 @@ const renderAiReview = (review) => {
         <div class="speech-review-score">${Number(review.combinedScore || review.score || 0)}</div>
       </div>
       <div class="speech-review-metrics">
+        <span>${escapeHtml(providerLabel)}</span>
         <span>clarity ${Number(components.clarityScore || 0)}</span>
         <span>structure ${Number(components.structureScore || 0)}</span>
         <span>duration ${Number(components.durationScore || 0)}</span>
@@ -1179,6 +1186,7 @@ const renderAiReview = (review) => {
         <span>hedges ${Number(review.hedgingCount || 0)}</span>
       </div>
       ${review.diagnosis ? `<div class="speech-ai-diagnosis">${escapeHtml(review.diagnosis)}</div>` : ""}
+      ${review.fallbackReason ? `<div class="speech-small-warning">Provider fallback reason: ${escapeHtml(truncate(review.fallbackReason, 180))}</div>` : ""}
       <div class="speech-review-grid">
         <div>
           <strong>What worked</strong>
@@ -1208,6 +1216,31 @@ const renderAiReview = (review) => {
   `;
 };
 
+const renderPatternPanel = (rows) => {
+  const patterns = calculateSpeechPatterns(rows);
+  if (!patterns.length) return "";
+  return `
+    <div class="speech-pattern-panel">
+      <div>
+        <strong>Last-10 pattern check</strong>
+        <span>Uses saved sessions for this current filter.</span>
+      </div>
+      <div class="speech-pattern-list">
+        ${patterns
+          .map(
+            (pattern) => `
+              <div class="speech-pattern speech-pattern--${escapeHtml(pattern.severity || "amber")}">
+                <strong>${escapeHtml(pattern.title)}</strong>
+                <span>${escapeHtml(pattern.detail)}</span>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+};
+
 const renderHistory = () => {
   const rows = getSessionRows();
   const selectedJob = getSelectedJob();
@@ -1228,6 +1261,7 @@ const renderHistory = () => {
         </div>
       </div>
       <div class="speech-history-list">
+        ${renderPatternPanel(rows)}
         ${rows.length ? rows.map(renderHistoryRow).join("") : `<div class="speech-empty">No speech sessions yet.</div>`}
       </div>
     </div>
@@ -1254,6 +1288,7 @@ const renderHistoryRow = (session) => {
           <div class="speech-stored-transcript">${renderStoredTranscript(session)}</div>
           ${renderSpeechReview(session.speechReview)}
           ${renderAiReview(session.aiReview)}
+          <button class="btn btn-tertiary speech-review-again" data-review-session="${escapeHtml(session.id)}" ${session.queuedOffline ? "disabled" : ""}>Rerun AI review</button>
           ${session.audioRef ? `<button class="btn btn-tertiary speech-load-audio" data-audio-session="${escapeHtml(session.id)}" data-audio-ref="${escapeHtml(session.audioRef)}">Load audio</button>` : ""}
           ${audioSrc ? `<audio class="speech-audio" controls src="${escapeHtml(audioSrc)}"></audio>` : ""}
         </div>
@@ -1386,6 +1421,17 @@ const bindSpeechCoachEvents = () => {
         console.error(error);
         showToast("Audio could not be loaded.");
       }
+    });
+  });
+  root.querySelectorAll(".speech-review-again").forEach((button) => {
+    button.addEventListener("click", () => {
+      const sessionId = button.dataset.reviewSession;
+      const session = [coach.lastSession, ...coach.sessions].find((item) => item?.id === sessionId);
+      if (!session) {
+        showToast("Session not found.");
+        return;
+      }
+      runAiReviewForSession(session, { force: true });
     });
   });
 };

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createRequire } from "module";
 import {
   buildSessionPayload,
+  calculateSpeechPatterns,
   calculateSpeechScore,
   calculateTrend,
   detectFillers,
@@ -127,6 +128,34 @@ describe("calculateTrend", () => {
       createdAtIso: `2026-05-${String(15 - idx).padStart(2, "0")}T00:00:00.000Z`,
     }));
     expect(calculateTrend(sessions)).toMatchObject({ direction: "improving", delta: 3 });
+  });
+});
+
+describe("calculateSpeechPatterns", () => {
+  it("detects late metrics and weak closes across recent sessions", () => {
+    const sessions = Array.from({ length: 6 }, (_, idx) => ({
+      id: `s${idx}`,
+      createdAtIso: `2026-05-${String(17 - idx).padStart(2, "0")}T00:00:00.000Z`,
+      score: 70,
+      fpm: 2,
+      speechReview: { metrics: { hasMetric: idx > 4, hasEvidence: true, hasClose: false } },
+      aiReview: { metricPlacement: idx > 4 ? "first_15s" : "later", structure: { close: false } },
+    }));
+    const patterns = calculateSpeechPatterns(sessions);
+    expect(patterns.map((pattern) => pattern.title)).toContain("Metric arrives too late");
+    expect(patterns.map((pattern) => pattern.title)).toContain("Close is not landing");
+  });
+
+  it("returns a healthy pattern when recent score and fpm are strong", () => {
+    const sessions = Array.from({ length: 4 }, (_, idx) => ({
+      id: `s${idx}`,
+      createdAtIso: `2026-05-${String(17 - idx).padStart(2, "0")}T00:00:00.000Z`,
+      score: 85,
+      fpm: 1.5,
+      speechReview: { metrics: { hasMetric: true, hasEvidence: true, hasClose: true } },
+      aiReview: { metricPlacement: "first_15s", structure: { close: true } },
+    }));
+    expect(calculateSpeechPatterns(sessions)[0]).toMatchObject({ severity: "green", title: "Recent pattern is healthy" });
   });
 });
 

@@ -195,6 +195,82 @@ export const calculateTrend = (sessions = []) => {
   return { direction, delta, lastAvg: Number(lastAvg.toFixed(1)), priorAvg: Number(priorAvg.toFixed(1)) };
 };
 
+export const calculateSpeechPatterns = (sessions = []) => {
+  if (!Array.isArray(sessions) || sessions.length < 3) return [];
+  const sorted = [...sessions]
+    .filter((session) => session && !session.smokeTest)
+    .sort((a, b) => new Date(b.createdAtIso || b.createdAt || 0) - new Date(a.createdAtIso || a.createdAt || 0))
+    .slice(0, 10);
+  if (sorted.length < 3) return [];
+
+  const count = (predicate) => sorted.filter(predicate).length;
+  const avg = (selector) => sorted.reduce((sum, item) => sum + Number(selector(item) || 0), 0) / sorted.length;
+  const patterns = [];
+  const metricLateOrAbsent = count((session) => {
+    const placement = session.aiReview?.metricPlacement;
+    const deterministicMetric = session.speechReview?.metrics?.hasMetric;
+    return placement ? placement !== "first_15s" : !deterministicMetric;
+  });
+  const weakClose = count((session) => {
+    const aiClose = session.aiReview?.structure?.close;
+    const deterministicClose = session.speechReview?.metrics?.hasClose;
+    return aiClose === false || deterministicClose === false;
+  });
+  const highFiller = count((session) => Number(session.fpm || 0) > 4);
+  const fallbackReviews = count((session) => session.aiReview?.status === "fallback");
+  const missingEvidence = count((session) => session.speechReview?.metrics?.hasEvidence === false);
+  const avgFpm = avg((session) => session.fpm);
+  const avgScore = avg((session) => session.score);
+
+  if (metricLateOrAbsent >= Math.ceil(sorted.length * 0.5)) {
+    patterns.push({
+      severity: "amber",
+      title: "Metric arrives too late",
+      detail: `${metricLateOrAbsent}/${sorted.length} recent answers did not land a metric in the opening. Put the number in sentence one.`,
+    });
+  }
+  if (weakClose >= Math.ceil(sorted.length * 0.5)) {
+    patterns.push({
+      severity: "amber",
+      title: "Close is not landing",
+      detail: `${weakClose}/${sorted.length} recent answers did not clearly close with why the example matters for the role.`,
+    });
+  }
+  if (highFiller >= Math.ceil(sorted.length * 0.4)) {
+    patterns.push({
+      severity: "red",
+      title: "Filler rate above target",
+      detail: `${highFiller}/${sorted.length} recent answers were above 4.0 fillers/min. Current recent average is ${avgFpm.toFixed(1)} fpm.`,
+    });
+  }
+  if (missingEvidence >= Math.ceil(sorted.length * 0.5)) {
+    patterns.push({
+      severity: "amber",
+      title: "Named evidence missing",
+      detail: `${missingEvidence}/${sorted.length} recent answers did not name a concrete example such as Ebury, Vistra, N26, Elucidate, Fenergo or Napier.`,
+    });
+  }
+  if (fallbackReviews >= Math.ceil(sorted.length * 0.5)) {
+    patterns.push({
+      severity: "amber",
+      title: "AI provider fallback",
+      detail: `${fallbackReviews}/${sorted.length} recent reviews used the local fallback. Check OpenRouter provider health if this persists.`,
+    });
+  }
+  if (!patterns.length) {
+    patterns.push({
+      severity: avgScore >= 75 && avgFpm <= 4 ? "green" : "amber",
+      title: avgScore >= 75 && avgFpm <= 4 ? "Recent pattern is healthy" : "No dominant pattern yet",
+      detail:
+        avgScore >= 75 && avgFpm <= 4
+          ? `Last ${sorted.length} sessions average ${Math.round(avgScore)} with ${avgFpm.toFixed(1)} fpm. Keep repeating against target roles.`
+          : `Last ${sorted.length} sessions average ${Math.round(avgScore)} with ${avgFpm.toFixed(1)} fpm. Keep collecting samples.`,
+    });
+  }
+
+  return patterns.slice(0, 4);
+};
+
 export const buildSessionPayload = ({
   sessionId,
   jobId = null,

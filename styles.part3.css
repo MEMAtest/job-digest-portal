@@ -3434,6 +3434,35 @@
   line-height: 1.45;
   margin: 10px 0;
 }
+.speech-pattern-panel {
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}
+.speech-pattern-panel > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.speech-pattern-panel strong { color: #0f172a; }
+.speech-pattern-panel span { color: #64748b; font-size: 12px; }
+.speech-pattern-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.speech-pattern {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.speech-pattern--green { background: #f0fdf4; border-color: #bbf7d0; }
+.speech-pattern--amber { background: #fffbeb; border-color: #fde68a; }
+.speech-pattern--red { background: #fef2f2; border-color: #fecaca; }
+.speech-pattern strong { font-size: 13px; }
+.speech-pattern span { line-height: 1.4; }
 .speech-history-panel { padding: 16px; }
 .speech-history-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
 .speech-history-filters { margin-top: 0; }
@@ -3485,7 +3514,8 @@
   .speech-live-grid,
   .speech-filler-grid,
   .speech-job-practice-stats { grid-template-columns: 1fr 1fr; }
-  .speech-review-grid { grid-template-columns: 1fr; }
+  .speech-review-grid,
+  .speech-pattern-list { grid-template-columns: 1fr; }
   .speech-history-head { flex-direction: column; }
   .speech-history-main { grid-template-columns: 1fr 58px; }
   .speech-history-main span:nth-child(1),
