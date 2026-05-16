@@ -3233,10 +3233,42 @@
 .speech-question-actions,
 .speech-controls,
 .speech-history-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.speech-model-answer {
+  margin-top: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+.speech-model-answer summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+.speech-model-answer div {
+  border-top: 1px solid #bfdbfe;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1e293b;
+}
 .speech-controls { margin-top: 0; }
 .speech-stop:not(:disabled) { background: #fee2e2; border-color: #fecaca; color: #991b1b; }
 .speech-toggle { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: #475569; }
 .speech-status-line { min-height: 20px; font-size: 13px; color: #475569; }
+.speech-whisper-status {
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #eff6ff;
+  padding: 10px 12px;
+  color: #1e3a8a;
+}
+.speech-whisper-status div:first-child { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.speech-whisper-status strong { font-weight: 900; }
+.speech-whisper-status span { color: #475569; }
+.speech-whisper-bar { height: 7px; background: #dbeafe; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+.speech-whisper-bar span { display: block; height: 100%; background: #2563eb; transition: width 0.2s ease; }
 .speech-alert {
   border: 1px solid #fed7aa;
   background: #fff7ed;

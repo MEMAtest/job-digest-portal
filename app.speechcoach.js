@@ -11,6 +11,7 @@ import {
   detectFillers,
   getScoreBand,
   mergeFillerCounts,
+  rescoreSessionWithTranscript,
   selectQuestion,
 } from "./app.speechcoach.logic.js";
 
@@ -27,6 +28,8 @@ const MAX_SESSION_SECONDS = 120;
 const MIN_SAVE_SECONDS = 5;
 const SPEECH_DB_NAME = "speech-coach-store";
 const QUEUE_STORE = "queuedSessions";
+const WHISPER_MODEL = "onnx-community/whisper-tiny.en";
+const WHISPER_CDN = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/transformers.min.js";
 
 const emptyFillerCounts = () => Object.fromEntries(FILLER_KEYS.map((key) => [key, 0]));
 
@@ -74,6 +77,12 @@ const coach = {
   lastFinalChunk: "",
   lastFinalAt: 0,
   beepEnabled: safeLocalStorageGet("speechCoach.beepEnabled") === "true",
+  whisperEnabled: safeLocalStorageGet("speechCoach.whisperEnabled") !== "false",
+  whisperBusy: false,
+  whisperStatus: "",
+  whisperProgress: 0,
+  whisperPipelinePromise: null,
+  whisperDevice: "",
   installPrompt: null,
 };
 
@@ -148,6 +157,8 @@ const normalizeQuestion = (question) => ({
   category: String(question.category || "behavioural"),
   roleTag: Array.isArray(question.roleTag) ? question.roleTag : [],
   companyTag: Array.isArray(question.companyTag) ? question.companyTag : [],
+  modelAnswer: String(question.modelAnswer || ""),
+  modelAnswerVersion: Number(question.modelAnswerVersion || 0),
   timesAsked: Number(question.timesAsked || 0),
   avgScore: Number(question.avgScore || 0),
   lastAskedAt: question.lastAskedAt || null,
@@ -268,6 +279,19 @@ const persistSession = async (session, audioBlob) => {
   return { session: data.session || payload, practiceStats: data.practiceStats || null };
 };
 
+const saveRescoredSessionDocument = async (session, whisperTranscript) => {
+  const data = await fetchJson("/.netlify/functions/speech-session-rescore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: session.id,
+      transcript: whisperTranscript,
+      model: WHISPER_MODEL,
+    }),
+  });
+  return data;
+};
+
 const mergeSavedSession = (session, practiceStats = null) => {
   coach.sessions = [session, ...coach.sessions.filter((item) => item.id !== session.id)].slice(0, 50);
   if (session.jobId && practiceStats) {
@@ -275,6 +299,109 @@ const mergeSavedSession = (session, practiceStats = null) => {
     if (job) job.practiceStats = practiceStats;
   }
   if (state.handlers.renderJobs) state.handlers.renderJobs();
+};
+
+const setWhisperStatus = (status, progress = coach.whisperProgress) => {
+  coach.whisperStatus = status;
+  coach.whisperProgress = Number(progress || 0);
+  renderSpeechCoach();
+};
+
+const loadWhisperPipeline = async () => {
+  if (coach.whisperPipelinePromise) return coach.whisperPipelinePromise;
+  coach.whisperPipelinePromise = (async () => {
+    setWhisperStatus("Loading Whisper model. First run downloads about 75MB once.", 5);
+    const transformers = await import(WHISPER_CDN);
+    const { env, pipeline } = transformers;
+    if (env) {
+      env.allowLocalModels = false;
+      if (env.backends?.onnx?.wasm && navigator.hardwareConcurrency) {
+        env.backends.onnx.wasm.numThreads = Math.min(4, navigator.hardwareConcurrency);
+      }
+    }
+
+    const progressCallback = (progress = {}) => {
+      if (progress.status === "progress" && Number.isFinite(progress.progress)) {
+        setWhisperStatus(`Downloading Whisper model… ${Math.round(progress.progress)}%`, progress.progress);
+      } else if (progress.status) {
+        setWhisperStatus(`Whisper: ${progress.status}`, coach.whisperProgress);
+      }
+    };
+
+    if (navigator.gpu) {
+      try {
+        coach.whisperDevice = "webgpu";
+        return await pipeline("automatic-speech-recognition", WHISPER_MODEL, {
+          device: "webgpu",
+          progress_callback: progressCallback,
+        });
+      } catch (error) {
+        console.warn("Whisper WebGPU load failed; falling back to WASM", error);
+      }
+    }
+
+    coach.whisperDevice = "wasm";
+    try {
+      return await pipeline("automatic-speech-recognition", WHISPER_MODEL, {
+        device: "wasm",
+        progress_callback: progressCallback,
+      });
+    } catch (error) {
+      console.warn("Whisper explicit WASM load failed; retrying default backend", error);
+      coach.whisperDevice = "default";
+      return pipeline("automatic-speech-recognition", WHISPER_MODEL, {
+        progress_callback: progressCallback,
+      });
+    }
+  })();
+  return coach.whisperPipelinePromise;
+};
+
+const transcribeWithWhisper = async (audioBlob) => {
+  if (!audioBlob?.size) throw new Error("No audio available for Whisper");
+  const transcriber = await loadWhisperPipeline();
+  const audioUrl = URL.createObjectURL(audioBlob);
+  try {
+    setWhisperStatus("Running Whisper final transcript…", 100);
+    const result = await transcriber(audioUrl, {
+      chunk_length_s: 30,
+      stride_length_s: 5,
+      language: "english",
+      task: "transcribe",
+    });
+    return String(result?.text || "").trim();
+  } finally {
+    URL.revokeObjectURL(audioUrl);
+  }
+};
+
+const runWhisperRescore = async (session, audioBlob) => {
+  if (!coach.whisperEnabled || !session?.id || !audioBlob?.size) return;
+  coach.whisperBusy = true;
+  coach.whisperProgress = 0;
+  coach.whisperStatus = "Preparing high-accuracy transcript…";
+  renderSpeechCoach();
+
+  try {
+    const whisperTranscript = await transcribeWithWhisper(audioBlob);
+    if (!whisperTranscript) throw new Error("Whisper returned an empty transcript");
+    const localRescore = rescoreSessionWithTranscript(session, whisperTranscript, { model: WHISPER_MODEL });
+    coach.lastSession = localRescore;
+    mergeSavedSession(localRescore);
+    setWhisperStatus("Whisper transcript ready. Saving rescore…", 100);
+    const data = await saveRescoredSessionDocument(localRescore, whisperTranscript);
+    const saved = data.session || localRescore;
+    coach.lastSession = saved;
+    mergeSavedSession(saved, data.practiceStats || null);
+    coach.whisperStatus = `Whisper rescored with ${coach.whisperDevice || "local"} model.`;
+    showToast("Whisper transcript saved.");
+  } catch (error) {
+    console.warn("Whisper rescore failed", error);
+    coach.whisperStatus = "Whisper unavailable. Kept the live Web Speech transcript.";
+  } finally {
+    coach.whisperBusy = false;
+    renderSpeechCoach();
+  }
 };
 
 const retryQueuedSessions = async ({ visible = false } = {}) => {
@@ -691,6 +818,7 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
     coach.info = "Session saved.";
     mergeSavedSession(result.session, result.practiceStats);
     showToast("Speech session saved.");
+    runWhisperRescore(result.session, audioBlob);
   } catch (error) {
     console.error("Speech session save failed", error);
     const queuedSession = { ...session, queuedOffline: true };
@@ -795,6 +923,14 @@ const renderQuestionCard = () => {
         <button id="speech-new-question" class="btn btn-secondary" ${coach.questions.length ? "" : "disabled"}>New question</button>
         <button id="speech-read-question" class="btn btn-tertiary" ${question && supportsTts() && !isBusy() ? "" : "disabled"}>Read only</button>
       </div>
+      ${
+        question?.modelAnswer
+          ? `<details class="speech-model-answer">
+              <summary>Model answer</summary>
+              <div>${escapeHtml(question.modelAnswer).replace(/\r?\n/g, "<br>")}</div>
+            </details>`
+          : ""
+      }
     </div>
   `;
 };
@@ -811,7 +947,25 @@ const renderControls = () => {
         <input id="speech-beep-toggle" type="checkbox" ${coach.beepEnabled ? "checked" : ""} />
         <span>Beep on filler</span>
       </label>
+      <label class="speech-toggle" title="Runs local Whisper after stop. First run downloads the model once.">
+        <input id="speech-whisper-toggle" type="checkbox" ${coach.whisperEnabled ? "checked" : ""} />
+        <span>High-accuracy transcript</span>
+      </label>
       ${coach.installPrompt ? `<button id="speech-install" class="btn btn-tertiary">Install PWA</button>` : ""}
+    </div>
+  `;
+};
+
+const renderWhisperStatus = () => {
+  if (!coach.whisperStatus) return "";
+  const progress = Math.max(0, Math.min(100, Number(coach.whisperProgress || 0)));
+  return `
+    <div class="speech-whisper-status">
+      <div>
+        <strong>${coach.whisperBusy ? "Whisper running" : "Whisper"}</strong>
+        <span>${escapeHtml(coach.whisperStatus)}</span>
+      </div>
+      ${coach.whisperBusy ? `<div class="speech-whisper-bar"><span style="width:${progress}%"></span></div>` : ""}
     </div>
   `;
 };
@@ -862,6 +1016,7 @@ const renderResult = () => {
           <span>${formatDuration(session.duration)}</span>
           <span>${session.wpm} wpm</span>
           <span>Top: ${escapeHtml(top)}</span>
+          ${session.rescored ? `<span>Whisper rescored</span>` : ""}
         </div>
         ${coach.audioUrl ? `<audio class="speech-audio" controls src="${coach.audioUrl}"></audio>` : ""}
         ${session.queuedOffline ? `<div class="speech-small-warning">Queued offline. It will sync automatically.</div>` : ""}
@@ -935,6 +1090,7 @@ const renderSpeechCoach = () => {
           ${renderQuestionCard()}
           ${renderControls()}
           <div class="speech-status-line">${escapeHtml(statusText)}</div>
+          ${renderWhisperStatus()}
           ${renderLiveStats()}
           ${renderFillerGrid()}
           ${renderResult()}
@@ -991,6 +1147,14 @@ const bindSpeechCoachEvents = () => {
   root.querySelector("#speech-beep-toggle")?.addEventListener("change", (event) => {
     coach.beepEnabled = event.target.checked;
     safeLocalStorageSet("speechCoach.beepEnabled", String(coach.beepEnabled));
+  });
+  root.querySelector("#speech-whisper-toggle")?.addEventListener("change", (event) => {
+    coach.whisperEnabled = event.target.checked;
+    safeLocalStorageSet("speechCoach.whisperEnabled", String(coach.whisperEnabled));
+    coach.whisperStatus = coach.whisperEnabled
+      ? "High-accuracy transcript will run after saved sessions."
+      : "High-accuracy transcript disabled.";
+    renderSpeechCoach();
   });
   root.querySelector("#speech-install")?.addEventListener("click", async () => {
     if (!coach.installPrompt) return;

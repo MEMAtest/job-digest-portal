@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildSessionPayload, calculateSpeechScore, calculateTrend, detectFillers, selectQuestion } from "../app.speechcoach.logic.js";
+import {
+  buildSessionPayload,
+  calculateSpeechScore,
+  calculateTrend,
+  detectFillers,
+  rescoreSessionWithTranscript,
+  selectQuestion,
+} from "../app.speechcoach.logic.js";
 
 describe("detectFillers", () => {
   it("counts multi-word and single-word fillers", () => {
@@ -135,5 +142,30 @@ describe("buildSessionPayload", () => {
       audioRef: "speech-audio/abc.webm",
     });
     expect(typeof parsed.createdAtIso).toBe("string");
+  });
+});
+
+describe("rescoreSessionWithTranscript", () => {
+  it("uses the Whisper transcript as canonical and recalculates filler counts", () => {
+    const session = buildSessionPayload({
+      sessionId: "abc",
+      question: { id: "q1", text: "Question?", category: "product" },
+      transcript: "clean " + "word ".repeat(120),
+      duration: 60,
+      fillerCounts: detectFillers("clean").counts,
+    });
+    const rescored = rescoreSessionWithTranscript(session, `I think probably ${"word ".repeat(120)}`, {
+      model: "test-whisper",
+    });
+    expect(rescored).toMatchObject({
+      id: "abc",
+      rescored: true,
+      whisperModel: "test-whisper",
+      transcriptionSource: "whisper",
+      totalFillers: 2,
+      topFiller: "I think",
+    });
+    expect(rescored.fillerCounts["I think"]).toBe(1);
+    expect(rescored.fillerCounts.probably).toBe(1);
   });
 });

@@ -202,3 +202,32 @@ export const buildSessionPayload = ({
     queuedOffline: false,
   };
 };
+
+export const rescoreSessionWithTranscript = (session = {}, transcript = "", options = {}) => {
+  const canonicalTranscript = String(transcript || "").trim();
+  if (!session?.id || !canonicalTranscript) return session;
+
+  const detected = detectFillers(canonicalTranscript);
+  const scoreData = calculateSpeechScore({
+    duration: session.duration,
+    totalFillers: detected.total,
+    transcript: canonicalTranscript,
+  });
+  const top = getTopFiller(detected.counts);
+
+  return {
+    ...session,
+    transcript: canonicalTranscript,
+    whisperTranscript: canonicalTranscript,
+    whisperModel: options.model || "onnx-community/whisper-tiny.en",
+    transcriptionSource: "whisper",
+    rescored: true,
+    rescoredAt: new Date().toISOString(),
+    fillerCounts: detected.counts,
+    totalFillers: detected.total,
+    fpm: scoreData.fpm,
+    wpm: scoreData.wpm,
+    score: scoreData.score,
+    topFiller: top?.filler || null,
+  };
+};
