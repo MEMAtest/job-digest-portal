@@ -28,8 +28,8 @@ const MAX_SESSION_SECONDS = 120;
 const MIN_SAVE_SECONDS = 5;
 const SPEECH_DB_NAME = "speech-coach-store";
 const QUEUE_STORE = "queuedSessions";
-const WHISPER_MODEL = "onnx-community/whisper-tiny.en";
-const WHISPER_CDN = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0/dist/transformers.min.js";
+const WHISPER_MODEL = "Xenova/whisper-tiny.en";
+const WHISPER_CDN = "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js";
 
 const emptyFillerCounts = () => Object.fromEntries(FILLER_KEYS.map((key) => [key, 0]));
 
@@ -82,7 +82,7 @@ const coach = {
   whisperStatus: "",
   whisperProgress: 0,
   whisperPipelinePromise: null,
-  whisperDevice: "",
+  whisperDevice: "wasm",
   installPrompt: null,
 };
 

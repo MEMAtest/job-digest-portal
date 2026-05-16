@@ -43,6 +43,7 @@ const serializeSession = (doc) => {
     createdAt: data.createdAtIso || toIso(data.createdAt),
     interrupted: Boolean(data.interrupted),
     queuedOffline: Boolean(data.queuedOffline),
+    smokeTest: Boolean(data.smokeTest),
     source: data.source || "Speech Coach",
   };
 };
@@ -58,7 +59,7 @@ exports.handler = async (event) => {
     const category = String(params.category || "").trim();
     const db = getFirestore();
     const snap = await db.collection(SESSION_COLLECTION).orderBy("createdAt", "desc").limit(Math.max(limit, 50)).get();
-    let sessions = snap.docs.map(serializeSession);
+    let sessions = snap.docs.map(serializeSession).filter((session) => !session.smokeTest);
     if (jobId) sessions = sessions.filter((session) => session.jobId === jobId);
     if (category) sessions = sessions.filter((session) => session.category === category);
     sessions = sessions.slice(0, limit);

@@ -69,6 +69,7 @@ const sanitizeSession = (raw = {}) => {
     device: stringValue(raw.device, 1000),
     interrupted: Boolean(raw.interrupted),
     queuedOffline: Boolean(raw.queuedOffline),
+    smokeTest: Boolean(raw.smokeTest),
     source: "Speech Coach",
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -101,6 +102,7 @@ const serializeSession = (id, data = {}) => ({
   device: data.device || "",
   interrupted: Boolean(data.interrupted),
   queuedOffline: Boolean(data.queuedOffline),
+  smokeTest: Boolean(data.smokeTest),
   source: data.source || "Speech Coach",
 });
 

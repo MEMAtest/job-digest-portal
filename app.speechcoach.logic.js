@@ -219,7 +219,7 @@ export const rescoreSessionWithTranscript = (session = {}, transcript = "", opti
     ...session,
     transcript: canonicalTranscript,
     whisperTranscript: canonicalTranscript,
-    whisperModel: options.model || "onnx-community/whisper-tiny.en",
+    whisperModel: options.model || "Xenova/whisper-tiny.en",
     transcriptionSource: "whisper",
     rescored: true,
     rescoredAt: new Date().toISOString(),

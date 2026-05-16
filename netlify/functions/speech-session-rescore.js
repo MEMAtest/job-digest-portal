@@ -144,6 +144,7 @@ const serializeSession = (id, data = {}) => ({
   createdAt: data.createdAtIso || toIso(data.createdAt),
   interrupted: Boolean(data.interrupted),
   queuedOffline: Boolean(data.queuedOffline),
+  smokeTest: Boolean(data.smokeTest),
   source: data.source || "Speech Coach",
 });
 const calculateTrend = (sessions) => {
@@ -209,7 +210,7 @@ exports.handler = async (event) => {
     const payload = JSON.parse(event.body || "{}");
     const sessionId = cleanId(payload.sessionId || payload.id);
     const transcript = stringValue(payload.transcript || payload.whisperTranscript || "").trim();
-    const model = stringValue(payload.model || "onnx-community/whisper-tiny.en", 200);
+    const model = stringValue(payload.model || "Xenova/whisper-tiny.en", 200);
     if (!sessionId) return withCors({ error: "Missing session id" }, 400);
     if (!transcript) return withCors({ error: "Missing transcript" }, 400);
 
