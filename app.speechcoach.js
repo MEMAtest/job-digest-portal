@@ -677,7 +677,9 @@ const startCapture = async () => {
   try {
     coach.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mimeType = chooseMimeType();
-    const recorder = new MediaRecorder(coach.stream, mimeType ? { mimeType } : undefined);
+    const recorderOptions = { audioBitsPerSecond: 32000 };
+    if (mimeType) recorderOptions.mimeType = mimeType;
+    const recorder = new MediaRecorder(coach.stream, recorderOptions);
     coach.recorderChunks = [];
     recorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) coach.recorderChunks.push(event.data);

@@ -1,4 +1,4 @@
-const { getStorageBucket, getStorageBucketCandidates } = require("./_firebase");
+const { getFirestore, getStorageBucket, getStorageBucketCandidates } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
 
 exports.handler = async (event) => {
@@ -7,9 +7,24 @@ exports.handler = async (event) => {
 
   try {
     const audioRef = String(event.queryStringParameters?.audioRef || "").trim();
-    if (!audioRef || !audioRef.startsWith("speech-audio/") || audioRef.includes("..")) {
+    if (!audioRef || audioRef.includes("..") || (!audioRef.startsWith("speech-audio/") && !audioRef.startsWith("firestore-audio/"))) {
       return withCors({ error: "Invalid audioRef" }, 400);
     }
+
+    if (audioRef.startsWith("firestore-audio/")) {
+      const sessionId = audioRef.slice("firestore-audio/".length);
+      const snap = await getFirestore().collection("session_audio").doc(sessionId).get();
+      if (!snap.exists) return withCors({ error: "Audio not found" }, 404);
+      const data = snap.data() || {};
+      if (!data.audioBase64 || !data.contentType) return withCors({ error: "Audio data incomplete" }, 404);
+      return withCors({
+        ok: true,
+        url: `data:${data.contentType};base64,${data.audioBase64}`,
+        storageFallback: true,
+        bytes: data.bytes || 0,
+      });
+    }
+
     const candidates = getStorageBucketCandidates();
     let lastError = null;
     for (const bucketName of candidates) {

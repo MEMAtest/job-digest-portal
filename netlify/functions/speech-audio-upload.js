@@ -1,7 +1,9 @@
-const { getStorageBucket, getStorageBucketCandidates } = require("./_firebase");
+const admin = require("firebase-admin");
+const { getFirestore, getStorageBucket, getStorageBucketCandidates } = require("./_firebase");
 const { withCors, handleOptions } = require("./_cors");
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
+const MAX_FIRESTORE_AUDIO_BYTES = 720 * 1024;
 const cleanId = (value) => String(value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 120);
 
 const getHeader = (headers = {}, name) => {
@@ -42,6 +44,26 @@ exports.handler = async (event) => {
         console.warn(`speech audio upload failed for bucket ${bucketName}`, error.message);
       }
     }
+
+    if (buffer.length <= MAX_FIRESTORE_AUDIO_BYTES) {
+      const audioRef = `firestore-audio/${sessionId}`;
+      const db = getFirestore();
+      await db.collection("session_audio").doc(sessionId).set(
+        {
+          sessionId,
+          contentType,
+          encoding: "base64",
+          audioBase64: buffer.toString("base64"),
+          bytes: buffer.length,
+          storageFallback: true,
+          storageError: lastError?.message || "No Firebase Storage bucket candidates available",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return withCors({ ok: true, audioRef, storageFallback: true, bytes: buffer.length });
+    }
+
     throw lastError || new Error("No Firebase Storage bucket candidates available");
   } catch (error) {
     console.error("speech-audio-upload error", error);
