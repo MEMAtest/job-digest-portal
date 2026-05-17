@@ -18,6 +18,7 @@ const {
   normalizeAiReview,
   safeJsonParse,
 } = require("../netlify/functions/_speech_ai_review.js");
+const fs = require("fs");
 
 describe("detectFillers", () => {
   it("counts multi-word and single-word fillers", () => {
@@ -343,5 +344,18 @@ describe("Phase 3 AI review helpers", () => {
       if (previousOpenRouter) process.env.OPENROUTER_API_KEY = previousOpenRouter;
       if (previousAnthropic) process.env.ANTHROPIC_API_KEY = previousAnthropic;
     }
+  });
+});
+
+describe("speech question model answers", () => {
+  it("answers the PEP, sanctions, adverse media and transaction monitoring comparison directly", () => {
+    const questions = JSON.parse(fs.readFileSync("speech-questions.json", "utf8"));
+    const question = questions.find((item) => item.id === "dom-11");
+    expect(question.text).toMatch(/PEP, sanctions, adverse media and transaction monitoring/i);
+    expect(question.modelAnswer).toMatch(/PEP/i);
+    expect(question.modelAnswer).toMatch(/Sanctions/i);
+    expect(question.modelAnswer).toMatch(/Adverse media/i);
+    expect(question.modelAnswer).toMatch(/Transaction monitoring/i);
+    expect(question.modelAnswer).toMatch(/different data|SLAs|false-positive patterns|governance/i);
   });
 });

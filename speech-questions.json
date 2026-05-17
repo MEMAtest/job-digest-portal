@@ -385,8 +385,8 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would answer sanctions through a control lens: coverage, matching quality, alert handling and governance. I would first define what must not fail: list coverage, customer and counterparty screening, auditability and escalation. Then I would look at tuning quality using test packs, historical alerts, false-positive analysis and sampled true-positive scenarios. I would not present threshold reduction as the goal; the goal is better risk discrimination. The product angle is to make sanctions controls measurable, explainable and operationally sustainable.",
-    "modelAnswerVersion": 1
+    "modelAnswer": "I would compare them by trigger, data, decision and operating model. PEP screening is relationship and risk-rating led: identify politically exposed people, apply seniority/jurisdiction context, then decide onboarding, EDD and periodic review intensity. Sanctions is stricter and list-led: customer, counterparty and payment screening must protect coverage, escalation, audit trail and true-match handling, because a missed hit is high-risk. Adverse media is intelligence-led: the challenge is source quality, relevance, recency and whether the media changes the customer risk view. Transaction monitoring is behavioural and ongoing: scenarios look for unusual activity after onboarding, using thresholds, typologies, investigation queues and SAR/escalation decisions. Operationally, the product problem is to keep these controls connected but not identical: different data, SLAs, false-positive patterns, evidence standards and governance.",
+    "modelAnswerVersion": 2
   },
   {
     "id": "dom-12",
@@ -880,7 +880,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -896,7 +896,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -912,7 +912,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -928,7 +928,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -944,7 +944,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -960,7 +960,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -976,7 +976,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -992,7 +992,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -1008,7 +1008,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -1024,7 +1024,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -1040,7 +1040,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -1056,7 +1056,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -1072,7 +1072,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
@@ -1088,7 +1088,7 @@
     "timesAsked": 0,
     "avgScore": 0,
     "lastAskedAt": null,
-    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company\u2019s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
+    "modelAnswer": "I would keep this answer specific rather than flattering. I am strongest where product, financial crime controls and operational complexity meet. The role appeals because it needs someone who can translate ambiguous regulatory and workflow problems into scalable product decisions. I would connect the company’s context to my evidence: Fenergo and Napier ownership, multi-jurisdiction onboarding, API/vendor integration, measurable cycle-time and review-quality improvements. The close should be: I am not a generic PM; I bring regulated product judgement.",
     "modelAnswerVersion": 1
   },
   {
