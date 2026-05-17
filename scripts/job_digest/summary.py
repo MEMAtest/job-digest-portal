@@ -279,12 +279,15 @@ def append_to_gmail_inbox(raw_bytes: bytes) -> bool:
                     typ, _ = imap.uid("STORE", appended_uid, "+X-GM-LABELS", quoted_label)
                     print(f"Applied label {label!r}: {typ}")
                 if skip_inbox:
-                    # System label format is "\Inbox" in IMAP wire — one
-                    # backslash, not two. Earlier draft had four backslashes
-                    # in Python source which sent "\\Inbox" on the wire and
-                    # silently no-op'd.
-                    typ, _ = imap.uid("STORE", appended_uid, "-X-GM-LABELS", "\\Inbox")
-                    print(f"Removed \\Inbox label: {typ}")
+                    # STORE -X-GM-LABELS "\Inbox" from INBOX context returns
+                    # OK but silently no-ops in Gmail. Use the canonical
+                    # idiom instead: mark \Deleted + EXPUNGE removes the
+                    # message from the current label folder (INBOX) only;
+                    # the message stays in All Mail with whatever other
+                    # labels are applied (e.g. "Job Digest" from above).
+                    typ, _ = imap.uid("STORE", appended_uid, "+FLAGS", "(\\Deleted)")
+                    typ_e, expunged = imap.expunge()
+                    print(f"Removed from Inbox via \\Deleted+EXPUNGE: store={typ} expunge={typ_e}")
 
                 print(
                     f"Email delivered to Inbox via IMAP APPEND (unread): "
