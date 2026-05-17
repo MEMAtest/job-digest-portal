@@ -7,6 +7,7 @@
     "validate:cv-builder": "node scripts/validate-cv-builder.mjs",
     "test:smoke": "node scripts/smoke-e2e.mjs",
     "test:smoke:prod": "node scripts/smoke-e2e.mjs --url=https://adejob.netlify.app/",
+    "test:speech-mobile:prod": "node scripts/speech-mobile-fallback-e2e.mjs --url=https://adejob.netlify.app/",
     "test:smoke:install": "playwright install chromium",
     "test:unit": "vitest run"
   },
