@@ -195,22 +195,42 @@ const renderDetail = (container, interviewId) => {
       const catColor = categoryColor(q.category);
       const pills = scorePillHtml(q.score, q.id, iv.id);
       const scoreLabel_ = scoreLabel(q.score);
-      const modelRow = q.model
-        ? `<div class="ilog-q-model"><strong>Guide:</strong> ${q.model}</div>`
-        : "";
       const notesVal = (q.notes || "").replace(/"/g, "&quot;");
+      const frameworkChip = q.framework
+        ? `<span class="ilog-q-framework">${q.framework}</span>`
+        : "";
+      const actualCard = q.candidate_answer
+        ? `<details class="ilog-q-answer-card ilog-q-answer-card--actual">
+             <summary>What you said</summary>
+             <div class="ilog-q-answer-body">${q.candidate_answer}</div>
+           </details>`
+        : "";
+      const refinedCard = q.refined_answer
+        ? `<details class="ilog-q-answer-card ilog-q-answer-card--refined">
+             <summary>Refined version ${q.framework ? `<span class="ilog-q-framework-inline">${q.framework}</span>` : ""}</summary>
+             <div class="ilog-q-answer-body">${q.refined_answer}</div>
+           </details>`
+        : "";
+      const modelCard = q.model
+        ? `<details class="ilog-q-answer-card ilog-q-answer-card--model">
+             <summary>Ideal CAI answer</summary>
+             <div class="ilog-q-answer-body">${q.model}</div>
+           </details>`
+        : "";
       return `
         <div class="ilog-q-row">
-          <div class="ilog-q-cat" style="border-color:${catColor};color:${catColor}">${q.category}</div>
+          <div class="ilog-q-cat" style="border-color:${catColor};color:${catColor}">${q.category}${frameworkChip}</div>
           <div class="ilog-q-text">${q.text}</div>
           <div class="ilog-q-score">
             ${pills}
             <span class="ilog-q-score-label">${scoreLabel_}</span>
           </div>
+          ${actualCard}
+          ${refinedCard}
+          ${modelCard}
           <details class="ilog-q-notes-wrap">
             <summary>Notes</summary>
             <textarea class="ilog-q-notes" rows="2" data-ilog-action="note" data-iid="${iv.id}" data-qid="${q.id}" placeholder="What you said / what to improve…">${notesVal}</textarea>
-            ${modelRow}
           </details>
         </div>`;
     })

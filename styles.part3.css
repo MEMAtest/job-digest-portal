@@ -3546,6 +3546,32 @@
   .speech-question-text { font-size: 19px; }
 }
 
+/* ─── Interview Log: candidate / refined / model answer cards ─ */
+.ilog-q-framework {
+  display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px;
+  background: #ede9fe; color: #5b21b6; font-size: 10px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+.ilog-q-framework-inline {
+  margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #ede9fe;
+  color: #5b21b6; font-size: 10px; font-weight: 700;
+}
+.ilog-q-answer-card {
+  margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 8px 12px; background: #fff;
+}
+.ilog-q-answer-card summary {
+  cursor: pointer; font-weight: 600; color: #334155; padding: 2px 0; font-size: 13px;
+}
+.ilog-q-answer-card[open] summary { margin-bottom: 8px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; }
+.ilog-q-answer-body { color: #0f172a; line-height: 1.6; font-size: 13px; white-space: pre-wrap; }
+.ilog-q-answer-card--actual { border-left: 3px solid #94a3b8; }
+.ilog-q-answer-card--actual summary { color: #475569; }
+.ilog-q-answer-card--refined { border-left: 3px solid #6366f1; background: #fafaff; }
+.ilog-q-answer-card--refined summary { color: #4338ca; }
+.ilog-q-answer-card--model { border-left: 3px solid #92400e; background: #fffbeb; }
+.ilog-q-answer-card--model summary { color: #92400e; }
+
 /* ─── Podcasts tab ─────────────────────────────────────────── */
 .pod-shell { max-width: 1100px; margin: 0 auto; padding: 24px 20px 48px; }
 .pod-header { margin-bottom: 28px; }
