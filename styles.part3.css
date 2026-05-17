@@ -3377,6 +3377,7 @@
 .speech-result--amber { border-color: #fde68a; background: #fffbeb; }
 .speech-result--red { border-color: #fecaca; background: #fef2f2; }
 .speech-result-score { font-size: 42px; font-weight: 900; color: #0f172a; text-align: center; }
+.speech-result-score--pending { font-size: 17px; line-height: 1.1; overflow-wrap: anywhere; }
 .speech-result p { margin: 4px 0 8px; color: #334155; }
 .speech-result-meta { display: flex; gap: 7px; flex-wrap: wrap; }
 .speech-result-meta span,
@@ -3544,4 +3545,61 @@
   .speech-history-main span:nth-child(3) { grid-column: 1 / -1; }
   .speech-question-text { font-size: 19px; }
 }
+
+/* ─── Podcasts tab ─────────────────────────────────────────── */
+.pod-shell { max-width: 1100px; margin: 0 auto; padding: 24px 20px 48px; }
+.pod-header { margin-bottom: 28px; }
+.pod-header h1 { font-size: 28px; color: #0f172a; margin: 0 0 6px; }
+.pod-header p { color: #475569; margin: 0; font-size: 14px; line-height: 1.55; }
+.pod-section { margin-bottom: 32px; }
+.pod-section__heading { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+.pod-section__heading h2 { font-size: 18px; color: #0f172a; margin: 0; }
+.pod-section__heading p { font-size: 12px; color: #94a3b8; margin: 0; }
+.pod-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.pod-card {
+  text-align: left; cursor: pointer; padding: 14px 16px; border-radius: 12px;
+  border: 1px solid #e2e8f0; background: #fff; display: flex; flex-direction: column;
+  gap: 6px; transition: border-color .15s, box-shadow .15s; font: inherit;
+}
+.pod-card:hover, .pod-card:focus-visible {
+  border-color: #6366f1; box-shadow: 0 4px 14px rgba(99,102,241,.12); outline: none;
+}
+.pod-card__guest { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #6366f1; font-weight: 700; }
+.pod-card__title { font-size: 14px; font-weight: 600; color: #0f172a; line-height: 1.35; }
+.pod-card__headline { font-size: 13px; color: #334155; line-height: 1.5; }
+.pod-card__tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.pod-card__meta { font-size: 11px; color: #94a3b8; }
+.pod-tag {
+  display: inline-block; background: #eef2ff; color: #4338ca; font-size: 10px;
+  padding: 2px 7px; border-radius: 999px; font-weight: 600; letter-spacing: .02em;
+}
+.pod-viewer__top { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+.pod-back {
+  align-self: flex-start; background: none; border: 0; color: #6366f1; cursor: pointer;
+  font: inherit; font-weight: 600; padding: 0;
+}
+.pod-viewer__show { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #6366f1; font-weight: 700; margin-bottom: 4px; }
+.pod-viewer__meta h1 { font-size: 24px; color: #0f172a; margin: 0 0 6px; line-height: 1.3; }
+.pod-viewer__sub { font-size: 13px; color: #64748b; margin-bottom: 10px; }
+.pod-viewer__links { display: flex; gap: 8px; }
+.pod-listen {
+  background: #f1f5f9; color: #334155; padding: 4px 10px; border-radius: 6px;
+  font-size: 12px; font-weight: 600; text-decoration: none;
+}
+.pod-listen:hover { background: #e2e8f0; }
+.pod-article {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 22px;
+}
+.pod-article__headline {
+  font-size: 17px; color: #0f172a; font-weight: 600; line-height: 1.5;
+  padding-bottom: 16px; border-bottom: 1px solid #f1f5f9; margin-bottom: 18px;
+}
+.pod-article__section { margin-bottom: 18px; }
+.pod-article__section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #6366f1; margin: 0 0 8px; font-weight: 700; }
+.pod-article__section ul { margin: 0; padding-left: 20px; color: #334155; line-height: 1.6; }
+.pod-article__section li { margin-bottom: 6px; }
+.pod-article__apply { background: #fffbeb; border-left: 3px solid #92400e; border-radius: 6px; padding: 14px 16px; }
+.pod-article__apply h2 { color: #92400e; }
+.pod-article__apply p { margin: 0; color: #451a03; line-height: 1.55; }
+.pod-article__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 /* ─────────────────────────────────────────────────────────────── */

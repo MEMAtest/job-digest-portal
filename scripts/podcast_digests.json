@@ -1,0 +1,175 @@
+[
+  {
+    "episode_number": "ep004",
+    "show": "Lenny's Podcast",
+    "title": "Mental models for building products people love ft. Stewart Butterfield",
+    "guest": "Unknown",
+    "published": "2024-12-01",
+    "duration": "1.0h 30.0m",
+    "topics": [
+      "product",
+      "founder",
+      "mental model"
+    ],
+    "relevance_score": 5,
+    "youtube_url": "https://www.youtube.com/watch?v=kLe-zy5r0Mk",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Stuart Butterfield discusses the importance of utility curves, taste, and comprehension in product development",
+      "key_takeaways": [
+        "Utility curves help determine where to invest in product development to maximize value",
+        "Taste and craftsmanship are essential for creating a great product experience",
+        "Comprehension is a critical challenge in product design, and reducing friction is not always the solution"
+      ],
+      "use_cases": [
+        "Slack's implementation of a 'magic link' experience for user authentication",
+        "Google Calendar's poorly designed time zone picker feature"
+      ],
+      "apply_to_prep": "As a product leader, understanding the concept of utility curves can help inform decisions on where to invest in product development, similar to how I optimized EDD review automation at N26, resulting in a 70% automation rate",
+      "framework_tags": [
+        "utility curves",
+        "comprehension",
+        "taste"
+      ]
+    }
+  },
+  {
+    "episode_number": "ep030",
+    "show": "Lenny's Podcast",
+    "title": "Brian Chesky's secret mentor who scaled Airbnb (after dying 9 times & building a hotel empire)",
+    "guest": "Unknown",
+    "published": "2024-06-01",
+    "duration": "1.0h 19.0m",
+    "topics": [
+      "strategy",
+      "founder",
+      "scale"
+    ],
+    "relevance_score": 5,
+    "youtube_url": "https://www.youtube.com/watch?v=R5_ypwiRIyo",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Intergenerational collaboration is key to success in tech, where older brains connect the dots and younger team members are fast and focused",
+      "key_takeaways": [
+        "Older workers bring valuable experience and wisdom to tech companies",
+        "Intergenerational collaboration can lead to brilliant outcomes",
+        "Age diversity is essential for a well-rounded team"
+      ],
+      "use_cases": [
+        "Airbnb's success can be attributed to the collaboration between older and younger team members",
+        "The Modern Elder Academy provides a platform for older individuals to share their wisdom and experience"
+      ],
+      "apply_to_prep": "Ade's experience at N26, where he worked with a team of diverse ages and backgrounds, demonstrates the value of intergenerational collaboration, a skill that can be applied to Senior PM, Director, and Head-of-FinCrime-Product roles",
+      "framework_tags": [
+        "intergenerational collaboration",
+        "age diversity",
+        "emotional intelligence"
+      ]
+    }
+  },
+  {
+    "episode_number": "ep032",
+    "show": "Lenny's Podcast",
+    "title": "Pricing your AI product: Lessons from 400+ companies and 50 unicorns | Madhavan Ramanujam",
+    "guest": "Madhavan Ramanujam",
+    "published": "2024-06-01",
+    "duration": "1.0h 11.0m",
+    "topics": [
+      "product",
+      "strategy",
+      "pricing"
+    ],
+    "relevance_score": 5,
+    "youtube_url": "https://www.youtube.com/watch?v=NR85H55eYkM",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Mastering monetization and pricing strategy is crucial for AI companies to achieve profitable growth",
+      "key_takeaways": [
+        "Founders need to dominate both market share and wallet share to build a successful business",
+        "AI pricing is different from traditional pricing due to cost dynamics and value capture",
+        "Mastering negotiations is critical to extract full value from every deal"
+      ],
+      "use_cases": [
+        "Using a simple pricing strategy to tell a value story, such as Superhuman's $30 per month premium email experience",
+        "Implementing a land and expand strategy to design a free product that can expand into paid offerings"
+      ],
+      "apply_to_prep": "As a fincrime product manager, understanding the importance of mastering monetization and pricing strategy can be applied to my experience at N26, where I cleared a 470 PEP backlog and automated 70% of EDD reviews, demonstrating the value of effective pricing and monetization in a regulated industry",
+      "framework_tags": [
+        "outcome-based pricing",
+        "value selling",
+        "negotiation strategy"
+      ]
+    }
+  },
+  {
+    "episode_number": "ep011",
+    "show": "Lenny's Podcast",
+    "title": "How to measure AI developer productivity in 2025 | Nicole Forsgren",
+    "guest": "Nicole Forsgren",
+    "published": "2024-10-01",
+    "duration": "1.0h 7.0m",
+    "topics": [
+      "product",
+      "framework"
+    ],
+    "relevance_score": 4,
+    "youtube_url": "https://www.youtube.com/watch?v=SWcDfPVTizQ",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Measuring AI-driven developer productivity requires rethinking traditional metrics and focusing on developer experience",
+      "key_takeaways": [
+        "Traditional productivity metrics are often misleading and need to be reevaluated in the context of AI-driven development",
+        "Developer experience is crucial for productivity and happiness, and includes factors like flow state, cognitive load, and feedback loops",
+        "AI can both help and hinder developer productivity, and its impact depends on how it is integrated into workflows and processes"
+      ],
+      "use_cases": [
+        "A company using AI to automate code reviews and testing, resulting in faster deployment and reduced bugs",
+        "A development team leveraging AI to generate code snippets and reduce manual coding time"
+      ],
+      "apply_to_prep": "As a product manager with experience in fincrime and regulated products, such as my work at N26 and Vistra, I can apply the insights from this episode to improve the productivity and happiness of my development teams, and ultimately drive better outcomes for our customers",
+      "framework_tags": [
+        "DEVX",
+        "Dora metrics",
+        "Space framework"
+      ]
+    }
+  },
+  {
+    "episode_number": "ep016",
+    "show": "Lenny's Podcast",
+    "title": "A 4-step framework for building delightful products | Nesrine Changuel (Spotify, Google, Skype)",
+    "guest": "Nesrine Changuel",
+    "published": "2024-09-01",
+    "duration": "1.0h 24.0m",
+    "topics": [
+      "product",
+      "framework"
+    ],
+    "relevance_score": 4,
+    "youtube_url": "https://www.youtube.com/watch?v=tX6nwT1Bsuo",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Nesrine Changuel shares a 4-step framework for building delightful products by removing friction, anticipating needs, and exceeding expectations",
+      "key_takeaways": [
+        "Delight is a combination of joy and surprise, and can be achieved by removing friction, anticipating needs, and exceeding expectations",
+        "The delight model is a 4-step framework for building delightful products, starting with identifying users' motivators",
+        "Emotional motivators are a crucial part of the delight model, and can be personal or social in nature"
+      ],
+      "use_cases": [
+        "Uber's two-click refund process is an example of removing friction and delighting users",
+        "Revolut's eSIM feature is an example of anticipating users' needs and exceeding expectations"
+      ],
+      "apply_to_prep": "As a product leader, understanding how to build delightful products can help me stand out in a competitive market, similar to how N26's BaFin remediation and 70% EDD review automation helped the company differentiate itself",
+      "framework_tags": [
+        "delight model",
+        "JTBD",
+        "emotional motivators"
+      ]
+    }
+  }
+]

@@ -13,4 +13,5 @@ import "./app.learn.js";
 import "./app.autoApplyPrefs.js";
 import "./app.autoApplyQueue.js";
 import "./app.ilog.js";
+import "./app.podcasts.js";
 import "./app.bootstrap.js";
