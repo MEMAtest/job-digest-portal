@@ -279,7 +279,11 @@ def append_to_gmail_inbox(raw_bytes: bytes) -> bool:
                     typ, _ = imap.uid("STORE", appended_uid, "+X-GM-LABELS", quoted_label)
                     print(f"Applied label {label!r}: {typ}")
                 if skip_inbox:
-                    typ, _ = imap.uid("STORE", appended_uid, "-X-GM-LABELS", "\\\\Inbox")
+                    # System label format is "\Inbox" in IMAP wire — one
+                    # backslash, not two. Earlier draft had four backslashes
+                    # in Python source which sent "\\Inbox" on the wire and
+                    # silently no-op'd.
+                    typ, _ = imap.uid("STORE", appended_uid, "-X-GM-LABELS", "\\Inbox")
                     print(f"Removed \\Inbox label: {typ}")
 
                 print(
