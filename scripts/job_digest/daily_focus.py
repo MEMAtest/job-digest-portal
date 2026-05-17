@@ -156,8 +156,10 @@ def _category_for_hour(hour_utc: int) -> str:
     """Map UTC hour to category. 8/12/16/20 BST = 7/11/15/19 UTC.
     Honour JOB_DIGEST_FORCE_FOCUS env override (used for manual verification)."""
     forced = (os.getenv("JOB_DIGEST_FORCE_FOCUS") or "").strip().capitalize()
-    if forced in {"Quote", "Term", "Reflection", "Industry"}:
+    if forced in {"Quote", "Term", "Reflection", "Industry", "Podcast"}:
         return forced
+    if hour_utc in (3, 4):
+        return "Podcast"
     if hour_utc in (7, 8):
         return "Quote"
     if hour_utc in (11, 12):
@@ -202,6 +204,52 @@ def _pick_unseen(pool: List[FocusItem], recent_keys: List[str]) -> FocusItem:
 def _key(item: FocusItem) -> str:
     cat, head = item[0], item[1]
     return f"{cat}::{head}"
+
+
+def _pick_podcast(recent_keys: List[str]) -> Optional[FocusItem]:
+    """Pick the freshest unseen summarised podcast episode."""
+    candidates: List[dict] = []
+    # Find the repo's scripts/podcast_digests.json by walking up from this file
+    here = Path(__file__).resolve()
+    for parent in [here.parent.parent.parent, here.parent.parent]:
+        candidate = parent / "podcast_digests.json"
+        if candidate.exists():
+            try:
+                candidates = json.loads(candidate.read_text(encoding="utf-8"))
+                break
+            except Exception:
+                pass
+    if not candidates:
+        return None
+    # Newest first by published date
+    candidates.sort(key=lambda d: d.get("published", ""), reverse=True)
+    for digest in candidates:
+        summary = digest.get("summary") or {}
+        head_line = (summary.get("headline") or digest.get("title") or "").strip()
+        title = (digest.get("title") or "").strip()
+        guest = (digest.get("guest") or "").strip()
+        ep_num = digest.get("episode_number") or title
+        key = f"Podcast::{ep_num}"
+        if not head_line or key in recent_keys:
+            continue
+        takeaways = summary.get("key_takeaways") or []
+        apply_line = (summary.get("apply_to_prep") or "").strip()
+        # Compose an email-friendly body. Keep under ~600 chars so the block
+        # stays scannable in the Daily Focus card.
+        body_parts = [head_line]
+        if takeaways:
+            body_parts.append("Key takeaways: " + " · ".join(t.rstrip(".") for t in takeaways[:3]))
+        if apply_line:
+            body_parts.append("Apply to your prep: " + apply_line)
+        body = "  ".join(body_parts)
+        if len(body) > 700:
+            body = body[:697].rstrip() + "..."
+        link = digest.get("youtube_url") or digest.get("spotify_url") or digest.get("apple_url") or ""
+        head = title
+        if guest and guest != "Unknown":
+            head = f"{guest}: {title}" if title else guest
+        return ("Podcast", head, body, link, None)
+    return None
 
 
 def _fetch_fca_industry(recent_keys: List[str]) -> Optional[FocusItem]:
@@ -257,6 +305,12 @@ def pick_focus(now: Optional[datetime] = None) -> FocusItem:
         item = _pick_unseen(TERMS, recent_keys)
     elif category == "Reflection":
         item = _pick_unseen(REFLECTIONS, recent_keys)
+    elif category == "Podcast":
+        item = _pick_podcast(recent_keys)
+        if item is None:
+            # No summarised episodes yet — fall back to a Quote so the email
+            # still renders rather than emitting an empty block.
+            item = _pick_unseen(QUOTES, recent_keys)
     else:
         item = _pick_unseen(QUOTES, recent_keys)
 

@@ -24,6 +24,7 @@ on:
           - Term
           - Reflection
           - Industry
+          - Podcast
 
 concurrency:
   group: digest-cron
