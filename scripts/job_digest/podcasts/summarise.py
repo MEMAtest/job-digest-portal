@@ -36,7 +36,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GROQ_MODEL = os.environ.get("JOB_DIGEST_GROQ_MODEL", "llama-3.3-70b-versatile")
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 
-MAX_TRANSCRIPT_CHARS = 38_000  # ~9.5k tokens — Groq's free-tier TPM is 12k
+MAX_TRANSCRIPT_CHARS = 24_000  # ~6k tokens — leaves headroom under Groq's 12k TPM ceiling so the rolling-minute limit doesn't stall consecutive calls
 RETRY = 4
 RETRY_BACKOFF = 5
 
