@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v27';
+const CACHE_VERSION = 'v28';
 const CACHE_NAME = `job-digest-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -31,6 +31,8 @@ const APP_SHELL = [
   '/config.js',
   '/speech-questions.json',
   '/favicon.svg',
+  '/icon-192.png',
+  '/icon-512.png',
   '/manifest.webmanifest',
 ];
 

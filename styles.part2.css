@@ -1001,10 +1001,14 @@
     gap: 8px;
   }
   .brand-badge {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     font-size: 12px;
-    border-radius: 8px;
+    border-radius: 10px;
+  }
+  .logo-mark {
+    width: 31px;
+    height: 31px;
   }
   .brand-title { font-size: 14px; }
   .brand-subtitle { font-size: 10px; }

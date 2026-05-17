@@ -37,36 +37,40 @@ body {
 }
 
 .brand-badge {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: #4f46e5;
+  width: 50px;
+  height: 50px;
+  border-radius: 15px;
+  background: radial-gradient(circle at 65% 22%, rgba(163, 255, 18, 0.2), transparent 22%),
+    linear-gradient(145deg, #111827 0%, #050608 72%);
+  border: 1px solid rgba(163, 255, 18, 0.18);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(67, 36, 232, 0.28);
   display: grid;
   place-items: center;
   color: #fff;
   font-weight: 700;
   flex-shrink: 0;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .brand-badge::after {
   content: "";
   position: absolute;
-  inset: -6px;
-  border-radius: 16px;
-  background: radial-gradient(circle, rgba(99,102,241,0.4) 0%, rgba(15,23,42,0) 70%);
-  opacity: 0.6;
+  inset: -8px;
+  border-radius: 18px;
+  background: radial-gradient(circle, rgba(163, 255, 18, 0.28) 0%, rgba(67, 36, 232, 0.18) 42%, rgba(15,23,42,0) 72%);
+  opacity: 0.68;
   animation: pulseGlow 2.4s ease-in-out infinite;
   z-index: 0;
   pointer-events: none;
 }
 
 .logo-mark {
-  width: 32px;
-  height: 32px;
+  width: 46px;
+  height: 46px;
   z-index: 1;
   position: relative;
+  display: block;
 }
 
 @keyframes pulseGlow {
@@ -77,13 +81,26 @@ body {
 
 .brand-title {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 800;
   color: #fff;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+  transform: skew(-7deg);
+}
+
+.brand-title strong {
+  color: #a3ff12;
+  font-weight: 900;
+  text-shadow: 0 0 18px rgba(163, 255, 18, 0.24);
 }
 
 .brand-subtitle {
   font-size: 12px;
-  color: #94a3b8;
+  color: #f8fafc;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .nav {

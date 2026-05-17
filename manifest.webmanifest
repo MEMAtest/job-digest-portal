@@ -1,14 +1,14 @@
 {
   "id": "/",
-  "name": "Job Digest Portal",
+  "name": "Make Money - London + Remote",
   "short_name": "Make Money",
   "start_url": "/index.html",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f4f6fb",
-  "theme_color": "#4f46e5",
+  "background_color": "#07080d",
+  "theme_color": "#07080d",
   "lang": "en",
-  "description": "Daily job intelligence — tailored CVs, applications, and preparation",
+  "description": "London and remote job intelligence, applications, CVs, and interview preparation",
   "icons": [
     {
       "src": "favicon.svg",
@@ -19,7 +19,8 @@
     {
       "src": "icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "maskable any"
     },
     {
       "src": "icon-512.png",

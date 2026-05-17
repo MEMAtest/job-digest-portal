@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Generate PWA icon PNGs from scratch using raw PNG encoding.
- * Creates a gradient circle on a solid background matching the brand.
+ * Creates the Make Money badge: black app tile, purple brush arc,
+ * rough white M, and lime growth arrow.
  * No external dependencies required.
  */
 import { writeFileSync } from 'fs';
@@ -14,49 +15,163 @@ const ROOT = join(__dirname, '..');
 
 function createPNG(size) {
   const pixels = new Uint8Array(size * size * 4);
-  const cx = size / 2, cy = size / 2, r = size * 0.47;
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      const dx = x - cx, dy = y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dx = (x / Math.max(1, size - 1));
+      const dy = (y / Math.max(1, size - 1));
+      const vignette = Math.min(1, Math.hypot(dx - 0.5, dy - 0.48) * 1.45);
+      const glow = Math.max(0, 1 - Math.hypot(dx - 0.72, dy - 0.2) * 4.8);
 
-      if (dist <= r) {
-        // Gradient from #4f46e5 (top-left) to #0f172a (bottom-right)
-        const t = Math.min(1, Math.max(0, (dx + dy) / (2 * r) + 0.5));
-        pixels[i]     = Math.round(79 * (1 - t) + 15 * t);   // R
-        pixels[i + 1] = Math.round(70 * (1 - t) + 23 * t);   // G
-        pixels[i + 2] = Math.round(229 * (1 - t) + 42 * t);  // B
-        pixels[i + 3] = 255;
-
-        // Draw the star/compass shape in white
-        const nx = (x - cx) / r, ny = (y - cy) / r;
-        const starDist = Math.abs(nx) + Math.abs(ny);
-        if (starDist < 0.55) {
-          // Inner diamond/star
-          const alpha = Math.max(0, 1 - starDist / 0.55);
-          const blend = Math.min(1, alpha * 2);
-          pixels[i]     = Math.round(pixels[i] * (1 - blend * 0.75) + 255 * blend * 0.75);
-          pixels[i + 1] = Math.round(pixels[i + 1] * (1 - blend * 0.75) + 255 * blend * 0.75);
-          pixels[i + 2] = Math.round(pixels[i + 2] * (1 - blend * 0.75) + 255 * blend * 0.75);
-        }
-
-        // Anti-alias circle edge
-        if (dist > r - 1.5) {
-          const aa = Math.max(0, (r - dist) / 1.5);
-          pixels[i + 3] = Math.round(255 * aa);
-        }
-      } else {
-        // Background: #f4f6fb
-        pixels[i]     = 0xf4;
-        pixels[i + 1] = 0xf6;
-        pixels[i + 2] = 0xfb;
-        pixels[i + 3] = 255;
-      }
+      pixels[i] = Math.round(8 + 9 * (1 - vignette) + 14 * glow);
+      pixels[i + 1] = Math.round(9 + 10 * (1 - vignette) + 24 * glow);
+      pixels[i + 2] = Math.round(15 + 18 * (1 - vignette) + 4 * glow);
+      pixels[i + 3] = 255;
     }
   }
+
+  drawTexture(pixels, size);
+  drawArc(pixels, size, size * 0.5, size * 0.5, size * 0.37, 210, 35, size * 0.052, [67, 36, 232, 242]);
+  drawArc(pixels, size, size * 0.5, size * 0.5, size * 0.32, 216, 24, size * 0.017, [67, 36, 232, 205]);
+  drawLine(pixels, size, 0.19, 0.75, 0.38, 0.28, 0.105, [5, 6, 8, 210]);
+  drawLine(pixels, size, 0.38, 0.28, 0.50, 0.62, 0.105, [5, 6, 8, 210]);
+  drawLine(pixels, size, 0.50, 0.62, 0.66, 0.30, 0.105, [5, 6, 8, 210]);
+  drawLine(pixels, size, 0.66, 0.30, 0.77, 0.74, 0.105, [5, 6, 8, 210]);
+  drawLine(pixels, size, 0.18, 0.74, 0.37, 0.27, 0.072, [248, 250, 252, 255]);
+  drawLine(pixels, size, 0.37, 0.27, 0.49, 0.61, 0.07, [248, 250, 252, 255]);
+  drawLine(pixels, size, 0.49, 0.61, 0.65, 0.30, 0.07, [248, 250, 252, 255]);
+  drawLine(pixels, size, 0.65, 0.30, 0.76, 0.72, 0.07, [248, 250, 252, 255]);
+  drawLine(pixels, size, 0.61, 0.51, 0.80, 0.31, 0.062, [163, 255, 18, 255]);
+  drawPolygon(pixels, size, [[0.77, 0.30], [0.77, 0.45], [0.89, 0.19], [0.62, 0.29]], [163, 255, 18, 255]);
+  drawLine(pixels, size, 0.21, 0.79, 0.73, 0.76, 0.017, [248, 250, 252, 155]);
+  drawSplatters(pixels, size);
+
   return encodePNG(size, size, pixels);
+}
+
+function drawTexture(pixels, size) {
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const n = pseudoNoise(x, y);
+      if (n > 0.986) blendPixel(pixels, size, x, y, [255, 255, 255, 22]);
+      if (n < 0.018) blendPixel(pixels, size, x, y, [0, 0, 0, 34]);
+    }
+  }
+}
+
+function drawArc(pixels, size, cx, cy, radius, startDeg, endDeg, width, rgba) {
+  const start = (startDeg * Math.PI) / 180;
+  const end = (endDeg * Math.PI) / 180;
+  const sweep = end < start ? end + Math.PI * 2 - start : end - start;
+  const steps = Math.max(12, Math.round((radius * sweep) / 4));
+  let prev = null;
+  for (let i = 0; i <= steps; i++) {
+    const angle = start + (sweep * i) / steps;
+    const next = [cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius];
+    if (prev) drawLinePixels(pixels, size, prev[0], prev[1], next[0], next[1], width, rgba);
+    prev = next;
+  }
+}
+
+function drawLine(pixels, size, x1, y1, x2, y2, width, rgba) {
+  drawLinePixels(pixels, size, x1 * size, y1 * size, x2 * size, y2 * size, width * size, rgba);
+}
+
+function drawLinePixels(pixels, size, x1, y1, x2, y2, width, rgba) {
+  const pad = width + 3;
+  const minX = Math.max(0, Math.floor(Math.min(x1, x2) - pad));
+  const maxX = Math.min(size - 1, Math.ceil(Math.max(x1, x2) + pad));
+  const minY = Math.max(0, Math.floor(Math.min(y1, y2) - pad));
+  const maxY = Math.min(size - 1, Math.ceil(Math.max(y1, y2) + pad));
+  const radius = width / 2;
+  const vx = x2 - x1;
+  const vy = y2 - y1;
+  const len2 = vx * vx + vy * vy || 1;
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const t = Math.max(0, Math.min(1, ((x - x1) * vx + (y - y1) * vy) / len2));
+      const px = x1 + t * vx;
+      const py = y1 + t * vy;
+      const dist = Math.hypot(x - px, y - py);
+      const alpha = Math.max(0, Math.min(1, radius + 0.9 - dist));
+      if (alpha > 0) blendPixel(pixels, size, x, y, [rgba[0], rgba[1], rgba[2], Math.round(rgba[3] * alpha)]);
+    }
+  }
+}
+
+function drawPolygon(pixels, size, points, rgba) {
+  const scaled = points.map(([x, y]) => [x * size, y * size]);
+  const xs = scaled.map(([x]) => x);
+  const ys = scaled.map(([, y]) => y);
+  const minX = Math.max(0, Math.floor(Math.min(...xs)));
+  const maxX = Math.min(size - 1, Math.ceil(Math.max(...xs)));
+  const minY = Math.max(0, Math.floor(Math.min(...ys)));
+  const maxY = Math.min(size - 1, Math.ceil(Math.max(...ys)));
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      if (pointInPolygon(x + 0.5, y + 0.5, scaled)) blendPixel(pixels, size, x, y, rgba);
+    }
+  }
+}
+
+function pointInPolygon(x, y, points) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const xi = points[i][0], yi = points[i][1];
+    const xj = points[j][0], yj = points[j][1];
+    const intersects = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || 1) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function drawSplatters(pixels, size) {
+  const dots = [
+    [0.13, 0.58, 0.012, [67, 36, 232, 210]],
+    [0.21, 0.27, 0.009, [67, 36, 232, 190]],
+    [0.85, 0.50, 0.011, [67, 36, 232, 205]],
+    [0.72, 0.19, 0.01, [163, 255, 18, 190]],
+    [0.86, 0.35, 0.009, [163, 255, 18, 175]],
+  ];
+  for (const [cx, cy, r, rgba] of dots) {
+    drawCircle(pixels, size, cx * size, cy * size, r * size, rgba);
+  }
+}
+
+function drawCircle(pixels, size, cx, cy, radius, rgba) {
+  const minX = Math.max(0, Math.floor(cx - radius - 1));
+  const maxX = Math.min(size - 1, Math.ceil(cx + radius + 1));
+  const minY = Math.max(0, Math.floor(cy - radius - 1));
+  const maxY = Math.min(size - 1, Math.ceil(cy + radius + 1));
+
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      const alpha = Math.max(0, Math.min(1, radius + 0.8 - Math.hypot(x - cx, y - cy)));
+      if (alpha > 0) blendPixel(pixels, size, x, y, [rgba[0], rgba[1], rgba[2], Math.round(rgba[3] * alpha)]);
+    }
+  }
+}
+
+function blendPixel(pixels, size, x, y, rgba) {
+  if (x < 0 || y < 0 || x >= size || y >= size) return;
+  const i = (y * size + x) * 4;
+  const alpha = rgba[3] / 255;
+  const baseAlpha = pixels[i + 3] / 255;
+  const outAlpha = alpha + baseAlpha * (1 - alpha);
+  if (outAlpha <= 0) return;
+
+  pixels[i] = Math.round((rgba[0] * alpha + pixels[i] * baseAlpha * (1 - alpha)) / outAlpha);
+  pixels[i + 1] = Math.round((rgba[1] * alpha + pixels[i + 1] * baseAlpha * (1 - alpha)) / outAlpha);
+  pixels[i + 2] = Math.round((rgba[2] * alpha + pixels[i + 2] * baseAlpha * (1 - alpha)) / outAlpha);
+  pixels[i + 3] = Math.round(outAlpha * 255);
+}
+
+function pseudoNoise(x, y) {
+  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+  return n - Math.floor(n);
 }
 
 function encodePNG(w, h, rgba) {
