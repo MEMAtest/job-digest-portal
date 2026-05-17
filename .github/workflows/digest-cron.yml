@@ -124,6 +124,11 @@ jobs:
           JOB_DIGEST_RUN_DEADLINE_SECONDS: '1200'
           # Manual override for Daily Focus category (empty = normal hour-based pick)
           JOB_DIGEST_FORCE_FOCUS: ${{ github.event.inputs.force_focus }}
+          # Gmail label + skip-inbox applied post-APPEND via IMAP X-GM-LABELS.
+          # Gmail filters don't run on APPEND'd messages so this is the only
+          # reliable way to label / skip-inbox the digest mail.
+          JOB_DIGEST_INBOX_LABEL: ${{ secrets.JOB_DIGEST_INBOX_LABEL }}
+          JOB_DIGEST_SKIP_INBOX: ${{ secrets.JOB_DIGEST_SKIP_INBOX }}
         run: |
           mkdir -p digest-data/digests
           EXTRA_FLAGS=""

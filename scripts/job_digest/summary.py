@@ -264,6 +264,24 @@ def append_to_gmail_inbox(raw_bytes: bytes) -> bool:
             if appended_uid:
                 imap.select("INBOX")
                 imap.uid("STORE", appended_uid, "-FLAGS", "(\\Seen)")
+
+                # Gmail filters do not run on APPEND'd messages, so any
+                # "Skip Inbox + apply label" filter you've set up in the
+                # Gmail UI is silently ignored for digest mail. Apply the
+                # label and the skip-inbox toggle directly via the
+                # X-GM-LABELS IMAP extension.
+                import os as _os
+                label = (_os.getenv("JOB_DIGEST_INBOX_LABEL") or "").strip()
+                skip_inbox = (_os.getenv("JOB_DIGEST_SKIP_INBOX") or "").strip().lower() in {"1", "true", "yes"}
+
+                if label:
+                    quoted_label = f'"{label}"'
+                    typ, _ = imap.uid("STORE", appended_uid, "+X-GM-LABELS", quoted_label)
+                    print(f"Applied label {label!r}: {typ}")
+                if skip_inbox:
+                    typ, _ = imap.uid("STORE", appended_uid, "-X-GM-LABELS", "\\\\Inbox")
+                    print(f"Removed \\Inbox label: {typ}")
+
                 print(
                     f"Email delivered to Inbox via IMAP APPEND (unread): "
                     f"UID {appended_uid.decode()} response={response}"
