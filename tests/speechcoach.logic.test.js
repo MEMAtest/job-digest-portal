@@ -203,6 +203,34 @@ describe("buildSessionPayload", () => {
     expect(parsed.speechReview.score).toBeGreaterThan(0);
     expect(typeof parsed.createdAtIso).toBe("string");
   });
+
+  it("can save an audio-only mobile session while transcript is pending", () => {
+    const payload = buildSessionPayload({
+      sessionId: "mobile-audio",
+      question: { id: "q1", text: "Question?", category: "domain" },
+      transcript: "",
+      duration: 62,
+      fillerCounts: detectFillers("").counts,
+      transcriptionSource: "audio_pending",
+      transcriptPending: true,
+      audioCaptured: true,
+    });
+
+    expect(payload).toMatchObject({
+      id: "mobile-audio",
+      transcript: "",
+      webSpeechTranscript: "",
+      transcriptionSource: "audio_pending",
+      transcriptPending: true,
+      audioCaptured: true,
+      scoreType: "transcript_pending",
+      score: 0,
+      totalFillers: 0,
+      fpm: 0,
+      wpm: 0,
+      speechReview: null,
+    });
+  });
 });
 
 describe("rescoreSessionWithTranscript", () => {
@@ -220,6 +248,7 @@ describe("rescoreSessionWithTranscript", () => {
     expect(rescored).toMatchObject({
       id: "abc",
       rescored: true,
+      transcriptPending: false,
       whisperModel: "test-whisper",
       transcriptionSource: "whisper",
       totalFillers: 2,

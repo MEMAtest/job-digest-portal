@@ -304,20 +304,29 @@ export const buildSessionPayload = ({
   device = "",
   interrupted = false,
   webSpeechTranscript = "",
+  transcriptionSource = "web_speech",
+  transcriptPending = false,
+  audioCaptured = false,
 } = {}) => {
-  const totalFillers = Object.values(fillerCounts || {}).reduce((sum, value) => sum + Number(value || 0), 0);
-  const scoreData = calculateSpeechScore({ duration, totalFillers, transcript });
-  const top = getTopFiller(fillerCounts);
+  const pending = Boolean(transcriptPending);
+  const cleanFillerCounts = { ...emptyCounts(), ...(fillerCounts || {}) };
+  const totalFillers = pending ? 0 : Object.values(cleanFillerCounts).reduce((sum, value) => sum + Number(value || 0), 0);
+  const scoreData = pending
+    ? { score: 0, fpm: 0, wpm: 0, words: 0, duration: Math.max(0, Number(duration) || 0) }
+    : calculateSpeechScore({ duration, totalFillers, transcript });
+  const top = pending ? null : getTopFiller(cleanFillerCounts);
   const now = new Date().toISOString();
-  const speechReview = reviewSpeechAnswer({
-    transcript,
-    modelAnswer: question?.modelAnswer || "",
-    duration: scoreData.duration,
-    fillerCounts,
-    fpm: scoreData.fpm,
-    wpm: scoreData.wpm,
-    category: question?.category || "",
-  });
+  const speechReview = pending
+    ? null
+    : reviewSpeechAnswer({
+        transcript,
+        modelAnswer: question?.modelAnswer || "",
+        duration: scoreData.duration,
+        fillerCounts: cleanFillerCounts,
+        fpm: scoreData.fpm,
+        wpm: scoreData.wpm,
+        category: question?.category || "",
+      });
   return {
     id: sessionId,
     sessionId,
@@ -329,18 +338,21 @@ export const buildSessionPayload = ({
     transcript: transcript || "",
     webSpeechTranscript: webSpeechTranscript || transcript || "",
     duration: scoreData.duration,
-    fillerCounts: { ...emptyCounts(), ...(fillerCounts || {}) },
+    fillerCounts: cleanFillerCounts,
     totalFillers,
     fpm: scoreData.fpm,
     wpm: scoreData.wpm,
     baseScore: scoreData.score,
     score: scoreData.score,
     phase3Score: null,
-    scoreType: "filler_score",
+    scoreType: pending ? "transcript_pending" : "filler_score",
     topFiller: top?.filler || null,
     speechReview,
     aiReview: null,
     audioRef: audioRef || null,
+    transcriptionSource: pending ? "audio_pending" : transcriptionSource,
+    transcriptPending: pending,
+    audioCaptured: Boolean(audioCaptured || audioRef),
     createdAtIso: now,
     device,
     interrupted: Boolean(interrupted),
@@ -375,6 +387,8 @@ export const rescoreSessionWithTranscript = (session = {}, transcript = "", opti
     whisperTranscript: canonicalTranscript,
     whisperModel: options.model || "Xenova/whisper-tiny.en",
     transcriptionSource: "whisper",
+    transcriptPending: false,
+    audioCaptured: Boolean(session.audioCaptured || session.audioRef),
     rescored: true,
     rescoredAt: new Date().toISOString(),
     fillerCounts: detected.counts,

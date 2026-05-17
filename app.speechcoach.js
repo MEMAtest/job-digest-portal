@@ -505,7 +505,9 @@ const runWhisperRescore = async (session, audioBlob) => {
     runAiReviewForSession(saved);
   } catch (error) {
     console.warn("Whisper rescore failed", error);
-    coach.whisperStatus = "Whisper unavailable. Kept the live Web Speech transcript.";
+    coach.whisperStatus = session.transcriptPending
+      ? "Whisper unavailable. Audio is saved, but no transcript was captured on this device."
+      : "Whisper unavailable. Kept the live Web Speech transcript.";
     runAiReviewForSession(coach.lastSession || session);
   } finally {
     coach.whisperBusy = false;
@@ -993,9 +995,13 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
 
   commitVisibleInterimTranscript();
   const transcript = getTranscriptText();
-  if (duration < MIN_SAVE_SECONDS || !transcript) {
+  const hasAudioCapture = Boolean(audioBlob?.size);
+  const transcriptPending = !transcript && hasAudioCapture;
+  if (duration < MIN_SAVE_SECONDS || (!transcript && !hasAudioCapture)) {
     coach.status = "idle";
-    coach.info = duration < MIN_SAVE_SECONDS ? "Not saved: answer was under 5 seconds." : "Not saved: no speech was captured.";
+    coach.info = duration < MIN_SAVE_SECONDS
+      ? "Not saved: answer was under 5 seconds."
+      : "Not saved: no transcript or audio was captured. Check Android Chrome microphone permission, then retry.";
     coach.lastSession = null;
     renderSpeechCoach();
     return;
@@ -1012,6 +1018,9 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
     audioRef: null,
     device: navigator.userAgent || "",
     interrupted,
+    transcriptionSource: transcriptPending ? "audio_pending" : "web_speech",
+    transcriptPending,
+    audioCaptured: hasAudioCapture,
   });
   coach.lastSession = session;
   renderSpeechCoach();
@@ -1020,16 +1029,22 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
     const result = await persistSession(session, audioBlob);
     coach.lastSession = result.session;
     coach.status = "idle";
-    coach.info = "Session saved.";
+    coach.info = result.session.transcriptPending
+      ? "Audio saved. Web Speech missed the transcript; high-accuracy transcript is running."
+      : "Session saved.";
     mergeSavedSession(result.session, result.practiceStats);
     if (result.audioUploadError) {
       coach.warning = "Session saved, but remote audio upload failed. Local replay is still available for this session.";
       showToast("Session saved; audio upload failed.");
+    } else if (result.session.transcriptPending) {
+      showToast("Audio saved; transcribing now.");
     } else {
       showToast("Speech session saved.");
     }
     if (coach.whisperEnabled && audioBlob?.size) runWhisperRescore(result.session, audioBlob);
-    else runAiReviewForSession(result.session);
+    else if (result.session.transcriptPending) {
+      coach.warning = "Audio was saved but live speech text was not captured. Turn on High-accuracy transcript, then retry or record again.";
+    } else runAiReviewForSession(result.session);
   } catch (error) {
     console.error("Speech session save failed", error);
     const queuedSession = { ...session, queuedOffline: true };
@@ -1261,28 +1276,28 @@ const renderFillerGrid = () => `
 const renderResult = () => {
   const session = coach.lastSession;
   if (!session) return "";
-  const band = getScoreBand(session.score);
+  const transcriptPending = Boolean(session.transcriptPending || session.scoreType === "transcript_pending");
+  const band = transcriptPending ? "amber" : getScoreBand(session.score);
   const top = session.topFiller ? `${session.topFiller} (${session.fillerCounts?.[session.topFiller] || 0})` : "None";
   const aiCombined = session.scoreType === "ai_combined" || ["complete", "fallback"].includes(session.aiReview?.status);
   return `
     <div class="speech-result speech-result--${band}">
-      <div class="speech-result-score">${session.score}</div>
+      <div class="speech-result-score ${transcriptPending ? "speech-result-score--pending" : ""}">${transcriptPending ? "Pending" : session.score}</div>
       <div>
         <h3>Last session</h3>
         <p>${escapeHtml(session.questionText || "Question")}</p>
         <div class="speech-result-meta">
-          <span>${session.totalFillers} fillers</span>
-          <span>${session.fpm} fpm</span>
+          ${transcriptPending ? `<span>Transcript pending</span><span>Audio captured</span>` : `<span>${session.totalFillers} fillers</span><span>${session.fpm} fpm</span>`}
           <span>${formatDuration(session.duration)}</span>
-          <span>${session.wpm} wpm</span>
-          <span>Top: ${escapeHtml(top)}</span>
+          ${transcriptPending ? "" : `<span>${session.wpm} wpm</span><span>Top: ${escapeHtml(top)}</span>`}
           ${session.rescored ? `<span>Whisper rescored</span>` : ""}
           ${aiCombined ? `<span>AI combined</span><span>Base ${Math.round(Number((session.baseScore ?? session.score) || 0))}</span>` : ""}
         </div>
         ${coach.audioUrl ? `<audio class="speech-audio" controls src="${coach.audioUrl}"></audio>` : ""}
+        ${transcriptPending ? `<div class="speech-small-warning">Web Speech missed the transcript on this device. The audio is saved and Whisper will rescore it when the transcript completes.</div>` : ""}
         ${session.queuedOffline ? `<div class="speech-small-warning">Queued offline. It will sync automatically.</div>` : ""}
         ${session.audioUploadError ? `<div class="speech-small-warning">Session saved. Remote audio upload failed, but local playback remains available here.</div>` : ""}
-        <button class="btn btn-tertiary speech-review-again" data-review-session="${escapeHtml(session.id)}" ${session.queuedOffline ? "disabled" : ""}>Rerun AI review</button>
+        <button class="btn btn-tertiary speech-review-again" data-review-session="${escapeHtml(session.id)}" ${session.queuedOffline || transcriptPending ? "disabled" : ""}>Rerun AI review</button>
       </div>
     </div>
     ${renderSpeechReview(session.speechReview)}

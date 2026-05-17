@@ -30,6 +30,8 @@ const serializeSession = (doc) => {
     whisperTranscript: data.whisperTranscript || "",
     whisperModel: data.whisperModel || "",
     transcriptionSource: data.transcriptionSource || "web_speech",
+    transcriptPending: Boolean(data.transcriptPending),
+    audioCaptured: Boolean(data.audioCaptured || data.audioRef),
     rescored: Boolean(data.rescored),
     rescoredAt: data.rescoredAt || "",
     duration: numberValue(data.duration, 0),
