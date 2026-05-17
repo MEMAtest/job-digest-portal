@@ -1015,15 +1015,28 @@
   .sidebar-footer { display: none; }
   .nav {
     flex-direction: row;
-    gap: 4px;
+    gap: 6px;
+    width: 100%;
+    max-width: calc(100vw - 28px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 0 6px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav::-webkit-scrollbar {
+    display: none;
   }
   .nav-item {
-    flex: 1;
+    flex: 0 0 auto;
     text-align: center;
-    padding: 8px 4px;
-    font-size: 11px;
+    min-width: max-content;
+    padding: 9px 12px;
+    font-size: 13px;
     white-space: nowrap;
-    border-radius: 8px;
+    border-radius: 12px;
+    scroll-snap-align: start;
   }
 
   /* Content */
