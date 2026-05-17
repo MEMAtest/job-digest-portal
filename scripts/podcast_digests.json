@@ -154,21 +154,55 @@
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Nesrine Changuel shares a 4-step framework for building delightful products by removing friction, anticipating needs, and exceeding expectations",
+      "headline": "Nesrine Changuel presents a 4-step framework for building delightful products that create emotional connections with users",
       "key_takeaways": [
-        "Delight is a combination of joy and surprise, and can be achieved by removing friction, anticipating needs, and exceeding expectations",
-        "The delight model is a 4-step framework for building delightful products, starting with identifying users' motivators",
-        "Emotional motivators are a crucial part of the delight model, and can be personal or social in nature"
+        "Delight is an emotion that combines joy and surprise, and is essential for creating products that stand out",
+        "Removing friction, anticipating needs, and exceeding expectations are key pillars for building delightful products",
+        "The Delight Model is a 4-step framework for identifying and prioritizing delightful features, including identifying user motivators, converting motivators into opportunities, identifying solutions, and validating features"
       ],
       "use_cases": [
-        "Uber's two-click refund process is an example of removing friction and delighting users",
-        "Revolut's eSIM feature is an example of anticipating users' needs and exceeding expectations"
+        "Uber's two-click refund process for cancelled rides is an example of removing friction and creating a delightful experience",
+        "Revolut's eSIM feature for international travel is an example of anticipating user needs and exceeding expectations"
       ],
-      "apply_to_prep": "As a product leader, understanding how to build delightful products can help me stand out in a competitive market, similar to how N26's BaFin remediation and 70% EDD review automation helped the company differentiate itself",
+      "apply_to_prep": "As a product leader, understanding how to build delightful products can help me stand out in my role, particularly in competitive markets, and is relevant to my experience at N26 where I led the team to automate 70% of EDD reviews, which improved the overall user experience",
       "framework_tags": [
         "delight model",
         "JTBD",
-        "emotional motivators"
+        "emotional connection"
+      ]
+    }
+  },
+  {
+    "episode_number": "ep001",
+    "show": "Lenny's Podcast",
+    "title": "Why AI is disrupting traditional product management | Tomer Cohen (LinkedIn CPO)",
+    "guest": "Tomer Cohen",
+    "published": "2024-12-01",
+    "duration": "1.0h 7.0m",
+    "topics": [
+      "product",
+      "pm",
+      "cpo"
+    ],
+    "relevance_score": 3,
+    "youtube_url": "https://www.youtube.com/watch?v=R-zCfLQD_84",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "LinkedIn's Chief Product Officer Tomer Cohen is piloting a new way of building products that fully embraces AI",
+      "key_takeaways": [
+        "By 2030, 70% of the skills required to do a job will change, making it necessary to rethink traditional product management",
+        "The full stack builder model aims to empower builders to take ideas to market, regardless of their role or team",
+        "Automation will focus on tasks outside of vision, empathy, communication, creativity, and judgment, which are key traits for builders"
+      ],
+      "use_cases": [
+        "LinkedIn's trust agent helps identify vulnerabilities and potential harm vectors in product specs",
+        "The growth agent critiques ideas and provides feedback on their potential impact"
+      ],
+      "apply_to_prep": "The emphasis on automation and AI-driven product development at LinkedIn aligns with my experience at N26, where I automated 70% of EDD reviews, and can be applied to future roles in fincrime product management",
+      "framework_tags": [
+        "product development lifecycle",
+        "AI-driven product management"
       ]
     }
   }
