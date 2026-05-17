@@ -16,6 +16,19 @@ exports.handler = async (event) => {
       const snap = await getFirestore().collection("session_audio").doc(sessionId).get();
       if (!snap.exists) return withCors({ error: "Audio not found" }, 404);
       const data = snap.data() || {};
+      if (data.chunked) {
+        const chunksSnap = await snap.ref.collection("chunks").orderBy("index", "asc").get();
+        const audioBase64 = chunksSnap.docs.map((doc) => doc.data()?.audioBase64 || "").join("");
+        if (!audioBase64 || !data.contentType) return withCors({ error: "Audio data incomplete" }, 404);
+        return withCors({
+          ok: true,
+          url: `data:${data.contentType};base64,${audioBase64}`,
+          storageFallback: true,
+          chunked: true,
+          chunks: chunksSnap.size,
+          bytes: data.bytes || 0,
+        });
+      }
       if (!data.audioBase64 || !data.contentType) return withCors({ error: "Audio data incomplete" }, 404);
       return withCors({
         ok: true,

@@ -347,10 +347,25 @@ const saveSessionDocument = async (session) => {
 };
 
 const persistSession = async (session, audioBlob) => {
-  const audioRef = await uploadAudio(session.id, audioBlob);
-  const payload = { ...session, audioRef: audioRef || session.audioRef || null, queuedOffline: false };
+  let audioRef = session.audioRef || null;
+  let audioUploadError = "";
+
+  if (audioBlob?.size) {
+    try {
+      audioRef = await uploadAudio(session.id, audioBlob);
+    } catch (error) {
+      audioUploadError = error.message || "Audio upload failed";
+      console.warn("Speech audio upload failed; saving session without remote audio", error);
+    }
+  }
+
+  const payload = { ...session, audioRef: audioRef || null, queuedOffline: false };
   const data = await saveSessionDocument(payload);
-  return { session: data.session || payload, practiceStats: data.practiceStats || null };
+  return {
+    session: { ...(data.session || payload), audioUploadError },
+    practiceStats: data.practiceStats || null,
+    audioUploadError,
+  };
 };
 
 const saveRescoredSessionDocument = async (session, whisperTranscript) => {
@@ -1007,7 +1022,12 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
     coach.status = "idle";
     coach.info = "Session saved.";
     mergeSavedSession(result.session, result.practiceStats);
-    showToast("Speech session saved.");
+    if (result.audioUploadError) {
+      coach.warning = "Session saved, but remote audio upload failed. Local replay is still available for this session.";
+      showToast("Session saved; audio upload failed.");
+    } else {
+      showToast("Speech session saved.");
+    }
     if (coach.whisperEnabled && audioBlob?.size) runWhisperRescore(result.session, audioBlob);
     else runAiReviewForSession(result.session);
   } catch (error) {
@@ -1261,6 +1281,7 @@ const renderResult = () => {
         </div>
         ${coach.audioUrl ? `<audio class="speech-audio" controls src="${coach.audioUrl}"></audio>` : ""}
         ${session.queuedOffline ? `<div class="speech-small-warning">Queued offline. It will sync automatically.</div>` : ""}
+        ${session.audioUploadError ? `<div class="speech-small-warning">Session saved. Remote audio upload failed, but local playback remains available here.</div>` : ""}
         <button class="btn btn-tertiary speech-review-again" data-review-session="${escapeHtml(session.id)}" ${session.queuedOffline ? "disabled" : ""}>Rerun AI review</button>
       </div>
     </div>

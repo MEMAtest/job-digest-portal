@@ -4,6 +4,7 @@ const { withCors, handleOptions } = require("./_cors");
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const MAX_FIRESTORE_AUDIO_BYTES = 720 * 1024;
+const FIRESTORE_AUDIO_CHUNK_CHARS = 650 * 1024;
 const cleanId = (value) => String(value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 120);
 
 const getHeader = (headers = {}, name) => {
@@ -25,29 +26,30 @@ exports.handler = async (event) => {
     if (!buffer.length) return withCors({ error: "Empty audio body" }, 400);
     if (buffer.length > MAX_AUDIO_BYTES) return withCors({ error: "Audio file too large" }, 413);
 
-    const audioRef = `speech-audio/${sessionId}.webm`;
+    const storageAudioRef = `speech-audio/${sessionId}.webm`;
     const candidates = getStorageBucketCandidates();
     let lastError = null;
     for (const bucketName of candidates) {
       try {
         const bucket = getStorageBucket(bucketName);
-        await bucket.file(audioRef).save(buffer, {
+        await bucket.file(storageAudioRef).save(buffer, {
           resumable: false,
           metadata: {
             contentType,
             metadata: { sessionId, createdBy: "speech-coach" },
           },
         });
-        return withCors({ ok: true, audioRef, bucket: bucketName, bytes: buffer.length });
+        return withCors({ ok: true, audioRef: storageAudioRef, bucket: bucketName, bytes: buffer.length });
       } catch (error) {
         lastError = error;
         console.warn(`speech audio upload failed for bucket ${bucketName}`, error.message);
       }
     }
 
+    const audioRef = `firestore-audio/${sessionId}`;
+    const db = getFirestore();
+
     if (buffer.length <= MAX_FIRESTORE_AUDIO_BYTES) {
-      const audioRef = `firestore-audio/${sessionId}`;
-      const db = getFirestore();
       await db.collection("session_audio").doc(sessionId).set(
         {
           sessionId,
@@ -64,7 +66,36 @@ exports.handler = async (event) => {
       return withCors({ ok: true, audioRef, storageFallback: true, bytes: buffer.length });
     }
 
-    throw lastError || new Error("No Firebase Storage bucket candidates available");
+    const base64 = buffer.toString("base64");
+    const chunks = [];
+    for (let index = 0; index < base64.length; index += FIRESTORE_AUDIO_CHUNK_CHARS) {
+      chunks.push(base64.slice(index, index + FIRESTORE_AUDIO_CHUNK_CHARS));
+    }
+    const batch = db.batch();
+    const audioDoc = db.collection("session_audio").doc(sessionId);
+    batch.set(
+      audioDoc,
+      {
+        sessionId,
+        contentType,
+        encoding: "base64",
+        chunked: true,
+        chunkCount: chunks.length,
+        bytes: buffer.length,
+        storageFallback: true,
+        storageError: lastError?.message || "No Firebase Storage bucket candidates available",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+    chunks.forEach((chunk, index) => {
+      batch.set(audioDoc.collection("chunks").doc(String(index).padStart(4, "0")), {
+        index,
+        audioBase64: chunk,
+      });
+    });
+    await batch.commit();
+    return withCors({ ok: true, audioRef, storageFallback: true, chunked: true, chunks: chunks.length, bytes: buffer.length });
   } catch (error) {
     console.error("speech-audio-upload error", error);
     return withCors({ error: error.message || "Audio upload failed" }, 500);
