@@ -1,5 +1,44 @@
 [
   {
+    "episode_number": "ep049",
+    "show": "Lenny's Podcast",
+    "title": "How Anthropic, Costco, and Patagonia all build incorruptible companies",
+    "guest": "Eric Ries",
+    "published": "2026-05-10",
+    "duration": "1h 35m",
+    "topics": [
+      "corporate governance",
+      "mission protection",
+      "founder control",
+      "public benefit corporations",
+      "organisational integrity",
+      "lean startup revisited"
+    ],
+    "relevance_score": 4,
+    "youtube_url": "https://www.youtube.com/watch?v=PoJ1vTdHpks",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Companies are structurally guaranteed to betray their founders unless legal instruments such as PBC filings and perpetual purpose trusts encode the mission before success makes the organisation a target.",
+      "key_takeaways": [
+        "File as a public benefit corporation at incorporation; the two-page Delaware filing costs nothing but legally removes the fiduciary duty to maximise shareholder returns above all else, closing the loophole that forced Vectura's board to sell to Philip Morris.",
+        "Adopt the 'harder is easier' principle: Cloudflare gave away SSL encryption for free because it matched their 'make a better internet' mission, and the resulting trust compounded into a 70-billion-dollar market cap, outperforming the short-term revenue foregone.",
+        "Pair ethos with structural integrity through a 'spiritual holding company': Nova Nordisk's foundation ownership since 1923 and Anthropic's Long-Term Benefit Trust both prove that companies governed for mission, not quarterly returns, produce superior investor returns over time."
+      ],
+      "use_cases": [
+        "Anthropic wrote mission-protective provisions and a PBC filing from inception, then pledged equity and a board seat to the Long-Term Benefit Trust at Series C; this structure enabled them to turn down a $200m Pentagon contract without investors forcing their hand.",
+        "Costco's governance fortress embeds mission so deeply in its charter that when analysts complained it was 'taking money that rightfully belongs to shareholders' and investing it in customer experience, the board was legally authorised to ignore them."
+      ],
+      "apply_to_prep": "Mirrors how Ade's N26 BaFin remediation embedded structural accountability into the remediation programme; just as Ries argues that 'mission drive' means encoding values into OKRs and audit checkpoints rather than aspirational statements, Ade closed 12 BaFin audit points by treating each as a governance fixture with a measurable completion state, not a one-off fix.",
+      "framework_tags": [
+        "mission-protective governance",
+        "harder is easier",
+        "spiritual holding company",
+        "culture bank"
+      ]
+    }
+  },
+  {
     "episode_number": "ep050",
     "show": "Lenny's Podcast",
     "title": "How Anthropic's product team moves faster than anyone else | Cat Wu (Head of Product, Claude Code)",
@@ -31,6 +70,86 @@
         "research-preview-velocity",
         "taste-over-process",
         "cross-functional-launch-loop"
+      ]
+    }
+  },
+  {
+    "episode_number": "ep051",
+    "show": "Lenny's Podcast",
+    "title": "Head of Growth (Anthropic): Anthropic is automating its own growth",
+    "guest": "Kieran Flanagan",
+    "published": "2026-04-05",
+    "duration": "1h 12m",
+    "topics": [
+      "growth at hypergrowth scale",
+      "agentic growth automation",
+      "activation and onboarding",
+      "PM and engineering role evolution",
+      "focus and constraint-driven strategy",
+      "capability overhead problem"
+    ],
+    "relevance_score": 5,
+    "youtube_url": "https://www.youtube.com/watch?v=k-H4nsOTuxU",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Anthropic's 1-to-19-billion ARR in 14 months came from betting on exponential product value over funnel micro-optimisation, with the growth team now using Claude to automate experimentation end-to-end.",
+      "key_takeaways": [
+        "Shift the growth team's bet ratio: at Anthropic, roughly 70 percent of effort goes to large, exponential-upside bets rather than small optimisations because model capability improvements mean product value in two years could be a thousand times today's value.",
+        "Counter-intuitively, adding friction to onboarding drives higher conversion: asking new users who they are and what they need, as Anthropic, MasterClass and Mercury all do, increases activation because it routes users to the right product and creates lifecycle data for targeted re-engagement.",
+        "CACHE (Claude Accelerates Sustainable hypergrowth) is a live internal initiative where Claude identifies, builds, and analyses growth experiments end-to-end; as of Opus 4.6 it is performing at junior-PM win rates and reducing the time humans spend on each stage of the shipping loop."
+      ],
+      "use_cases": [
+        "Amol schedules a daily Claude Co-work task that scans 20 to 25 metric dashboards via Hex links and the Slack MCP, then surfaces anomalies and insights in Slack; this replaced a manual chart review and caught product issues proactively across a rapidly growing product portfolio.",
+        "At Mercury, the growth team spent an entire quarter focused solely on qualitative onboarding quality, deliberately ignoring conversion metrics; the resulting experience improvements produced what Amol called the single most impactful quarter of his career in terms of measurable growth impact."
+      ],
+      "apply_to_prep": "Directly mirrors Ade's Ebury work compressing onboarding-equivalent customer lifecycle steps: the 38 percent false-positive reduction and 20 percent conversion uplift Ade delivered at Ebury came from the same logic Amol articulates, namely routing users to the right product faster by investing in the intake questions rather than stripping them out.",
+      "framework_tags": [
+        "agentic growth loop",
+        "capability overhead",
+        "exponential betting",
+        "freedom through constraints",
+        "activation friction"
+      ]
+    }
+  },
+  {
+    "episode_number": "ep052",
+    "show": "Lenny's Podcast",
+    "title": "The design process is dead. Here's what's replacing it.",
+    "guest": "Jenny Wen",
+    "published": "2026-03-01",
+    "duration": "1h 5m",
+    "topics": [
+      "design process evolution",
+      "agentic engineering impact on design",
+      "IC versus management in AI era",
+      "design hiring and archetypes",
+      "building trust through speed",
+      "legibility framework for product ideas"
+    ],
+    "relevance_score": 4,
+    "youtube_url": "https://www.youtube.com/watch?v=eh8bcBIAAFo",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "With engineers running multiple Claude agents simultaneously, the diverge-converge design process is obsolete; designers now enable velocity through short-horizon vision, direct implementation, and spotting illegible ideas before they become obvious.",
+      "key_takeaways": [
+        "The design time allocation has inverted: where 60 to 70 percent was once mocking and prototyping, Jenny now spends 30 to 40 percent mocking and 30 to 40 percent pairing directly with engineers in code, with a new slice devoted to last-mile implementation polishing.",
+        "Release as a research preview with an explicit promise to iterate fast; Claude Co-work shipped in ten days from internal prototype to external launch after a long internal gestation, and the 'worst it will ever be' framing preserved brand trust while generating immediate user signal.",
+        "When hiring designers now, prioritise three archetypes: the block-shaped strong generalist who is 80th-percentile good across multiple skills; the deep T-shaped specialist at the top 10 percent in one domain; and the craft new grad with a blank slate who is eager and fast-learning rather than burdened by old process rituals."
+      ],
+      "use_cases": [
+        "Jenny used Claude Co-work to read several years of her personal notes and interview documents and generate a rubric for evaluating design craft in interviews, surfacing implicit standards she had never formally articulated; she describes this as her favourite Co-work use case for introspection.",
+        "The 'legibility framework' from Evan Tana at SPC guided Jenny to spot an internally-built prototype called Claude Studio that was dense and confusing but surrounded by high internal energy; her pattern recognition on that illegible idea eventually contributed directional input to the Co-work skills and plan-preview features."
+      ],
+      "apply_to_prep": "Mirrors the zero-to-one velocity Ade applied at Elucidate: shipping a Tier-1 PoC to £120k ARR in six weeks required the same 'research preview' logic Jenny describes, accepting incomplete polish in exchange for rapid user signal, then compounding trust through visible iteration rather than waiting for a perfect release.",
+      "framework_tags": [
+        "research preview distribution",
+        "legibility framework",
+        "design-as-enabling",
+        "craft new grad archetype",
+        "trust through speed"
       ]
     }
   },
