@@ -264,7 +264,7 @@ export const PODCAST_DIGESTS = [
       "headline": "Product management is not disappearing; it's evolving to focus on deep customer insight, sharp problem selection and editorial taste as coding becomes easier.",
       "key_takeaways": [
         "The 'shipyard team' (PM, design, engineering, research, data, product marketing) works best as a flat, collaborative unit where boundaries blur and ownership is distributed.",
-        "PMs must solve for sharp problems—ones so painful that solving them 10X better creates immediate demand; this is learnable through customer immersion and rigorous hypothesis testing.",
+        "PMs must solve for sharp problems, ones so painful that solving them 10X better creates immediate demand; this is learnable through customer immersion and rigorous hypothesis testing.",
         "AI democratises building, so the bar for PMs rises: they must curate ideas ruthlessly, make bold calls and defend taste rather than just managing consensus.",
         "Ethics and responsibility matter more; PM builders have power to shape behaviour at scale and must ask 'should we?' not just 'can we build it?'."
       ],
@@ -301,7 +301,7 @@ export const PODCAST_DIGESTS = [
       "headline": "The most important question in product is 'who have we not yet convinced?' because conviction gaps reveal misaligned teams and doomed strategies.",
       "key_takeaways": [
         "Ask your team 'who have we not yet convinced?' to expose hidden disagreement about direction; misalignment on why sinks more products than execution.",
-        "Product success depends on collective conviction, not consensus; silence doesn't mean agreement—it often means people are waiting for direction.",
+        "Product success depends on collective conviction, not consensus; silence doesn't mean agreement, it often means people are waiting for direction.",
         "Career growth comes from building genuine expertise, not jumping between roles; deep knowledge and resilience matter more than title changes."
       ],
       "use_cases": [
@@ -512,7 +512,7 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "High-growth product leadership at scale demands obsessive detail, extreme ownership and clarity on what single KPI drives the business—not optimising for comfort.",
+      "headline": "High-growth product leadership at scale demands obsessive detail, extreme ownership and clarity on the single KPI that drives the business, not optimising for comfort.",
       "key_takeaways": [
         "Care about every user, even the outlier in Congo struggling with onboarding; N26 reduced KYC failure from 98% to near-zero by treating every conversion point as sacred.",
         "Run products via daily standups during critical moments; extreme ownership means the owner is in the trenches solving it personally, not just delegating.",
@@ -523,7 +523,7 @@ export const PODCAST_DIGESTS = [
         "In a fastmoving company, pick your top 10% problems by leverage and go deep; this is not scalable to all 80 products but creates visible wins that build momentum.",
         "Hiring for high agency and ownership; early-career PMs should find companies where their growth-compounding rate is maximum, not where compensation peaks."
       ],
-      "apply_to_prep": "MOST RELEVANT: Mayur led N26's product and compliance transformation—Ade's own regulatory experience at N26 involved clearing 470-PEP backlog and driving 70% EDD review automation, directly overlapping with Mayur's playbook.",
+      "apply_to_prep": "MOST RELEVANT: Mayur led N26's product and compliance transformation, Ade's own regulatory experience at N26 involved clearing 470-PEP backlog and driving 70% EDD review automation, directly overlapping with Mayur's playbook.",
       "framework_tags": [
         "ownership",
         "KPI clarity",
