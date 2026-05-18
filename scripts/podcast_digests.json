@@ -1,5 +1,45 @@
 [
   {
+    "episode_number": "ep050",
+    "show": "Lenny's Podcast",
+    "title": "How Anthropic's product team moves faster than anyone else | Cat Wu (Head of Product, Claude Code)",
+    "guest": "Cat Wu",
+    "published": "2026-04-23",
+    "duration": "1h 12m",
+    "topics": [
+      "AI tooling",
+      "product velocity",
+      "agentic systems"
+    ],
+    "relevance_score": 5,
+    "youtube_url": "https://www.youtube.com/watch?v=PplmzlgE0kg",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Speed and taste beat process: compress feature cycles from six months to one week by removing barriers to shipping, embracing research preview, and hiring engineers with strong product judgement.",
+      "key_takeaways": [
+        "Ship features in research preview weekly, not quarterly; reduce commitment, get user feedback fast, iterate based on what breaks. Enables parallel cross-team workflows (docs/PMM/eng in single Slack room).",
+        "Define clear goals upfront because LLMs are general-purpose; specify who you build for, what problem you solve, top three use cases. Rules out ambiguous approaches and guides team decision-making.",
+        "Evaluate model capabilities through taste and evals; spend time using models, ask them to introspect, find five trusted users for feedback, build ten focused evals. Quantifies progress on hard-to-measure alignment/quality goals.",
+        "Hire engineers with product taste over generic PMs; they move faster end-to-end, reduce overhead. Engineer background helps estimate effort (hard vs easy features). Character and personality of Claude (low ego, positive, competent) drive adoption.",
+        "Ladder up from single-task reliability to multi-agent orchestration and self-improvement; as models improve, remove scaffolding (to-do lists, explicit prompts), then unlock entirely new capabilities (code review at operator confidence)."
+      ],
+      "use_cases": [
+        "Research PM (Diane): customer feedback to research team; model launch shepherding. Applied AI engineers: prototype rapid customer implementations, synthesise customer context nightly (Slack+Gmail+Drive) for next day calls.",
+        "Sales engineer builds custom deck generator (Web app + Salesforce + Gong) that adds HIPAA/compliance slides based on customer profile, reducing prep from 20-30 min to seconds. Tarek/Lydia integrated Figma MCP for brand consistency.",
+        "Product lead uses Co-Work overnight to synthesise 20-page conference talk deck: feeds in PMM draft + Twitter launch history + team Slack demos + Google Drive. Reduces manual synthesis; PM refines outline and demos, approves polish."
+      ],
+      "apply_to_prep": "Direct echo of Ade's N26 BaFin remediation: compress audit response cycles (6-month roadmaps to 1-week feature ships) by removing cross-functional blockers, shipping research previews, and empowering the team to make trade-offs in service of the mission (regulator confidence).",
+      "framework_tags": [
+        "research-preview-gating",
+        "taste-over-process",
+        "task-to-agent-ladder",
+        "mission-above-org-KPIs",
+        "evals-for-product-definition"
+      ]
+    }
+  },
+  {
     "episode_number": "ep004",
     "show": "Lenny's Podcast",
     "title": "Mental models for building products people love ft. Stewart Butterfield",
@@ -72,7 +112,7 @@
     "episode_number": "ep003",
     "show": "Lenny's Podcast",
     "title": "A guide to difficult conversations, building high-trust teams, and designing a life you love",
-    "guest": "Rachel Lockett",
+    "guest": "Unknown",
     "published": "2024-12-01",
     "duration": "1.0h 45.0m",
     "topics": [
@@ -84,22 +124,21 @@
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Executive presence and emotional intelligence are learnable skills that unlock trust, resilience, and authentic leadership across teams.",
+      "headline": "Effective leaders know when to coach and when to advise, empowering their teams to solve hard problems",
       "key_takeaways": [
-        "Difficult conversations require preparation, empathy and clarity of intent; avoiding them erodes team trust and compounds problems over time.",
-        "High-trust teams thrive when leaders demonstrate vulnerability, admit mistakes openly and invest in individual relationships beyond tasks.",
-        "Emotional resilience and self-awareness allow leaders to stay calm under pressure, regulate team anxiety and model behaviour that others emulate."
+        "Great leaders understand that having all the answers can hinder team growth",
+        "Coaching is a learnable skill that unlocks brilliance in teams",
+        "Active listening and powerful questions are core skills for effective coaching"
       ],
       "use_cases": [
-        "Navigating a team crisis or conflict by holding direct conversations with stakeholders about what went wrong and how to rebuild.",
-        "Building psychological safety where team members feel confident raising concerns and experimenting without fear of humiliation.",
-        "Managing your own stress and emotional triggers so you show up as the leader your team needs rather than reactive."
+        "A technical leader learning to coach their team to solve complex problems",
+        "A founder creating a high-trust team environment through effective communication"
       ],
-      "apply_to_prep": "Relates to Ade's experience managing large cross-functional remediation teams at N26, where holding difficult feedback loops and maintaining team morale through regulatory pressure was critical to success.",
+      "apply_to_prep": "As a Senior PM or Director, understanding when to coach and when to advise is crucial, much like my experience at Vistra where I had to balance advising and coaching to successfully rollout Fenergo, Napier, and Enate across 20+ jurisdictions",
       "framework_tags": [
-        "psychological safety",
-        "emotional intelligence",
-        "trust building"
+        "coaching",
+        "active listening",
+        "powerful questions"
       ]
     }
   },
@@ -225,22 +264,21 @@
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Leadership is changing from command-and-control to collaborative sensemaking where humans and AI agents work together on higher-order problems.",
+      "headline": "Management skills are transferable to working with AI tools and agents, requiring clarity, communication, and goal definition.",
       "key_takeaways": [
-        "Leaders must shift from managing people's daily tasks to directing intelligent agents and curating their outputs; this requires new mental models about delegation.",
-        "AI accelerates work cycles; leaders need systems to learn quickly from experiments, iterate on strategy and communicate updated context constantly.",
-        "Authenticity and emotional honesty in leadership become more valuable as routine work gets automated; people follow leaders who show up as whole humans."
+        "Defining the goal and outcome is crucial for effective management and AI tooling",
+        "Clarity and communication are essential skills for managers to develop",
+        "Traditional role distinctions are dissolving, and teams can become more flexible and autonomous"
       ],
       "use_cases": [
-        "Using AI agents to handle routine analysis, research and drafting so your team focuses on strategy, creativity and relationship-building with stakeholders.",
-        "Creating feedback loops where teams experiment with AI tools, surface unexpected wins and learn what works before rolling out to the broader organisation.",
-        "Building a culture of relentless learning by celebrating failures, asking 'what changed?' and staying humble even as you advance into more senior roles."
+        "Using AI to automate data analysis and provide objective measures of success",
+        "Empowering engineers to take on more responsibilities and make decisions without relying on traditional role distinctions"
       ],
-      "apply_to_prep": "Applies to Ade's scaling challenges at Vistra and N26: managing global compliance programmes requires orchestrating people and systems; AI now offers a third lever.",
+      "apply_to_prep": "As a fincrime product manager, Ade can apply the principles of clarity, communication, and goal definition to his work, particularly in the context of N26's BaFin remediation and automation of EDD reviews, where clear objectives and outcomes are critical to success.",
       "framework_tags": [
-        "AI collaboration",
-        "delegation",
-        "learning systems"
+        "north-star metric",
+        "OKRs",
+        "outcome roadmap"
       ]
     }
   },
@@ -281,42 +319,6 @@
     }
   },
   {
-    "episode_number": "ep028",
-    "show": "Lenny's Podcast",
-    "title": "The one question that saves product careers | Matt LeMay",
-    "guest": "Matt LeMay",
-    "published": "2024-07-01",
-    "duration": "1.0h 32.0m",
-    "topics": [
-      "product",
-      "career",
-      "startup"
-    ],
-    "relevance_score": 3,
-    "youtube_url": "https://www.youtube.com/watch?v=ts9ZvlkeWGs",
-    "spotify_url": "",
-    "apple_url": "",
-    "summary": {
-      "headline": "The most important question in product is 'who have we not yet convinced?' because conviction gaps reveal misaligned teams and doomed strategies.",
-      "key_takeaways": [
-        "Ask your team 'who have we not yet convinced?' to expose hidden disagreement about direction; misalignment on why sinks more products than execution.",
-        "Product success depends on collective conviction, not consensus; silence doesn't mean agreement, it often means people are waiting for direction.",
-        "Career growth comes from building genuine expertise, not jumping between roles; deep knowledge and resilience matter more than title changes."
-      ],
-      "use_cases": [
-        "When proposing a new strategy, explicitly ask who is unconvinced and why; address the reasons, not the person, and create space for people to change minds.",
-        "Noticing when your team has stopped asking questions and become too compliant; this signals either full alignment (rare) or checked-out disengagement (common).",
-        "Building a career by staying in craft long enough to see projects through multiple cycles, learning from failures and building hard-won judgment."
-      ],
-      "apply_to_prep": "Directly applicable to Ade's remediation work at N26: regulatory challenges require stakeholder alignment across product, legal, ops and risk; asking 'who isn't convinced?' unearths blockers.",
-      "framework_tags": [
-        "conviction",
-        "alignment",
-        "career depth"
-      ]
-    }
-  },
-  {
     "episode_number": "ep027",
     "show": "Lenny's Podcast",
     "title": "Why ChatGPT will be the next big growth channel (and how to capitalize on it) | Brian Balfour",
@@ -333,22 +335,56 @@
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "AI chat platforms are a new distribution channel; products must optimise for recommendation, discoverability and integration into LLM workflows to grow.",
+      "headline": "ChatGPT is predicted to be the next big growth channel, offering a huge opportunity for companies to get on it before it becomes saturated",
       "key_takeaways": [
-        "ChatGPT, Claude and other LLM interfaces represent a paradigm shift in how users discover and use products; SEO lessons apply but context is different.",
-        "Products embedded in AI workflows (as prompts, integrations or agent actions) gain exponential reach; building for this requires rethinking positioning and user flow.",
-        "Network effects and platform dynamics will create winners; early movers who establish trust and utility in AI interfaces gain defensibility before the space consolidates."
+        "Building a great product is necessary but not sufficient for success, with distribution being a key differentiator",
+        "New distribution platforms emerge, giving startups an opportunity to gain escape velocity before incumbents can copy",
+        "The four-step cycle of new distribution platforms includes conditions being met, a moat being established, a platform opening, and a platform closing for control and monetization"
       ],
       "use_cases": [
-        "Redesigning your product to be consumable via chat: if someone asks an AI for your use case, does it recommend you and can it call your API?",
-        "Building integrations and plugins that let AI agents use your product as a tool; become native to the AI platforms your users depend on.",
-        "Rethinking growth loops; instead of optimising for SEO keywords, optimise for being helpful within AI recommendation and agent-action contexts."
+        "Companies like Zingha grew massively on Facebook, then became huge companies",
+        "Cursor overtook GitHub Copilot's market share in just nine months, demonstrating the potential for rapid growth on new platforms"
       ],
-      "apply_to_prep": "Applies to future-proofing RegTech products: as AI advisory tools and compliance agents become standard, FinCrime/sanctions products must be discoverable and integrated within those workflows.",
+      "apply_to_prep": "As a product manager with experience in regulated environments, such as N26 and Vistra, I can apply this understanding of new distribution platforms to identify opportunities for growth and disruption in the fincrime and regtech spaces",
       "framework_tags": [
-        "distribution",
-        "AI integration",
-        "platform dynamics"
+        "distribution strategy",
+        "growth channels",
+        "escape velocity"
+      ]
+    }
+  },
+  {
+    "episode_number": "ep028",
+    "show": "Lenny's Podcast",
+    "title": "The one question that saves product careers | Matt LeMay",
+    "guest": "Matt LeMay",
+    "published": "2024-07-01",
+    "duration": "1.0h 32.0m",
+    "topics": [
+      "product",
+      "career",
+      "startup"
+    ],
+    "relevance_score": 3,
+    "youtube_url": "https://www.youtube.com/watch?v=ts9ZvlkeWGs",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "Product teams must align their work with business critical outcomes to avoid layoffs and drive impact",
+      "key_takeaways": [
+        "Aligning work to business critical outcomes is crucial for product teams to be evaluated and invested in by the business",
+        "Product managers should think like CEOs and consider the existential market-level success of the business",
+        "Teams should stress test their thinking by asking if they would fully fund their own team if they were the CEO"
+      ],
+      "use_cases": [
+        "A product team at a music review site like Pitchfork can drive business impact by focusing on features that increase user engagement and revenue",
+        "A team can use the question 'if you were the CEO, would you fully fund your own team' to provoke a discussion on their impact and value to the business"
+      ],
+      "apply_to_prep": "As a fincrime product manager, I can apply this idea to my work at N26, where I cleared a 470 PEP backlog and automated 70% of EDD reviews, by ensuring that my team's work is aligned with business critical outcomes and driving impact",
+      "framework_tags": [
+        "impact first",
+        "OKRs",
+        "business critical outcomes"
       ]
     }
   },
@@ -511,22 +547,20 @@
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "High-growth product leadership at scale demands obsessive detail, extreme ownership and clarity on the single KPI that drives the business, not optimising for comfort.",
+      "headline": "Mayur Kamat shares unconventional product lessons from Binance, N26, and Google",
       "key_takeaways": [
-        "Care about every user, even the outlier in Congo struggling with onboarding; N26 reduced KYC failure from 98% to near-zero by treating every conversion point as sacred.",
-        "Run products via daily standups during critical moments; extreme ownership means the owner is in the trenches solving it personally, not just delegating.",
-        "The 55-direct-report flat structure and no-managers-between-CEO-and-ICs model works when: (1) hyper-growth compounds learning, (2) employees are well-compensated, (3) there is mission alignment."
+        "Don't take on projects that are too long-term, as they can be hard to control",
+        "Build experimentation to make product management scientific",
+        "Focus on how fast you can go from hypothesis to data"
       ],
       "use_cases": [
-        "When KYC conversion crashes (as it did post-regulation), build a spreadsheet of every country, every document type, every failure point and own improvement cell by cell.",
-        "In a fastmoving company, pick your top 10% problems by leverage and go deep; this is not scalable to all 80 products but creates visible wins that build momentum.",
-        "Hiring for high agency and ownership; early-career PMs should find companies where their growth-compounding rate is maximum, not where compensation peaks."
+        "Binance's extreme ownership culture led to rapid problem-solving",
+        "N26's focus on experimentation and data-driven decision making"
       ],
-      "apply_to_prep": "MOST RELEVANT: Mayur led N26's product and compliance transformation, Ade's own regulatory experience at N26 involved clearing 470-PEP backlog and driving 70% EDD review automation, directly overlapping with Mayur's playbook.",
+      "apply_to_prep": "Ade can apply Mayur's advice on focusing on strengths and finding companies that are growing fast to his own career development, particularly in his experience at N26 where he cleared a 470 PEP backlog and automated 70% of EDD reviews",
       "framework_tags": [
-        "ownership",
-        "KPI clarity",
-        "growth compounding"
+        "experimentation",
+        "data-driven decision making"
       ]
     }
   }
