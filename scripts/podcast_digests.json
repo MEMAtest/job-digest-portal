@@ -40,6 +40,44 @@
     }
   },
   {
+    "episode_number": "ep053",
+    "show": "Lenny's Podcast",
+    "title": "Head of Claude Code: What happens after coding is solved | Boris Cherny",
+    "guest": "Boris Cherny",
+    "published": "2026-02-19",
+    "duration": "1h 30m",
+    "topics": [
+      "AI tooling",
+      "agentic systems",
+      "Claude Code"
+    ],
+    "relevance_score": 5,
+    "youtube_url": "https://www.youtube.com/watch?v=We7BZVKbCVw",
+    "spotify_url": "",
+    "apple_url": "",
+    "summary": {
+      "headline": "The terminal beat the IDE: AI agents are now the primary interface for coding, and agentic design beats scaffolding, always ship for the next model, not today's.",
+      "key_takeaways": [
+        "100% Claude Code-authored production code is now normal; 4% of GitHub commits already AI-generated; productivity per engineer jumped 200% with agent-first workflows.",
+        "Underfund projects intentionally to force engineers toward delegation; bet on general models over fine-tuning; give teams unlimited tokens early so they discover novel applications before optimising.",
+        "Agent design works best loosely coupled to tools; let the model choose how to solve problems rather than forcing rigid orchestration; yesterday's scaffolding loses to the next model's capabilities.",
+        "Build products for the model six months ahead, not today's capabilities; expect discomfort when product-market fit is weak, but launch early (as research preview) to study safety in the wild.",
+        "Agentic AI expands to product, design, data science, and any computer-mediated work; the printing press analogy holds, encoding talent will diffuse, new skills (taste, taste in agents, system design) will emerge."
+      ],
+      "use_cases": [
+        "Memory leak debugging: instead of heap snapshots and debuggers, just ask Claude Code to figure it out; newer engineers solve it faster than experienced ones following old patterns.",
+        "Project management automation: single spreadsheet for team status; Claude Code sends Slack reminders to engineers who haven't filled weekly updates on Monday mornings.",
+        "Chrome automation for tedious work: co-work fills medical PDFs, logs into accounts, cancels subscriptions, responds to emails, all unattended while you make coffee."
+      ],
+      "apply_to_prep": "Mirrors Ade's zero-to-one RegTech SaaS success at Elucidate (40% MAU uplift, £120k Tier-1 PoC) by inverting the team-size constraint: underfunding forces product taste and 6-week deployment cycles instead of waterfall; applies the same 'give the model tools and get out of the way' philosophy to product strategy (Ebury's false-positive reduction moved from rules to agent-driven classification).",
+      "framework_tags": [
+        "agent-first product design",
+        "research preview distribution",
+        "build for models not yet shipped"
+      ]
+    }
+  },
+  {
     "episode_number": "ep004",
     "show": "Lenny's Podcast",
     "title": "Mental models for building products people love ft. Stewart Butterfield",
