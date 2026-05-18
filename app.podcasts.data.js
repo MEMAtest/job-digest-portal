@@ -44,34 +44,41 @@ export const PODCAST_DIGESTS = [
     "episode_number": "ep004",
     "show": "Lenny's Podcast",
     "title": "Mental models for building products people love ft. Stewart Butterfield",
-    "guest": "Unknown",
+    "guest": "Stewart Butterfield",
     "published": "2024-12-01",
     "duration": "1.0h 30.0m",
     "topics": [
       "product",
       "founder",
-      "mental model"
+      "mental model",
+      "craft",
+      "utility curves"
     ],
     "relevance_score": 5,
     "youtube_url": "https://www.youtube.com/watch?v=kLe-zy5r0Mk",
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Stuart Butterfield discusses the importance of utility curves, taste, and comprehension in product development",
+      "headline": "Slack founder Stewart Butterfield reveals that utility curves, taste, and comprehension are the three pillars separating beloved products from forgettable ones.",
       "key_takeaways": [
-        "Utility curves help determine where to invest in product development to maximize value",
-        "Taste and craftsmanship are essential for creating a great product experience",
-        "Comprehension is a critical challenge in product design, and reducing friction is not always the solution"
+        "Map utility curves to identify where to invest: which features generate disproportionate value? Invest in the steep slope; avoid the flat tail where effort yields minimal gains.",
+        "Taste and craftsmanship define the gap between good and great; intentional design choices matter more than feature count. How Slack designed the magic link UX teaches users implicitly without documentation.",
+        "Comprehension is the silent killer; reducing friction isn't always the solution. Bad UX hides complexity that needs surfacing. Google Calendar's time zone picker is cluttered but honest about trade-offs.",
+        "Excellence requires alignment between aesthetic intention and functional delivery; both must reinforce each other or the product feels compromised.",
+        "Build products that teach through interaction, not manuals; users should intuit how to use it through careful, intentional design that respects their intelligence."
       ],
       "use_cases": [
-        "Slack's implementation of a 'magic link' experience for user authentication",
-        "Google Calendar's poorly designed time zone picker feature"
+        "Slack's frictionless magic-link authentication; user opens email, clicks link, authenticated—no password managers, no friction, magic feeling that rewards curiosity.",
+        "Lyft's transparent pricing model (vs Uber surge pricing) builds trust through honest comprehension, turning a potential pain point into competitive advantage.",
+        "Apple products: utility (does the job), taste (beautiful, intentional), comprehension (learnable without a manual)—all three reinforce trust and premium positioning."
       ],
-      "apply_to_prep": "As a product leader, understanding the concept of utility curves can help inform decisions on where to invest in product development, similar to how I optimized EDD review automation at N26, resulting in a 70% automation rate",
+      "apply_to_prep": "Ade's 70% EDD review automation at N26: move beyond just shipping the feature; invest in taste and comprehension so compliance workflows feel intuitive and trustworthy rather than bureaucratic.",
       "framework_tags": [
-        "utility curves",
+        "utility-curves",
+        "taste",
         "comprehension",
-        "taste"
+        "craftsmanship",
+        "design-intent"
       ]
     }
   },
@@ -85,27 +92,35 @@ export const PODCAST_DIGESTS = [
     "topics": [
       "product",
       "pm",
-      "cpo"
+      "cpo",
+      "AI",
+      "full stack builder"
     ],
-    "relevance_score": 3,
+    "relevance_score": 4,
     "youtube_url": "https://www.youtube.com/watch?v=R-zCfLQD_84",
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "LinkedIn's Chief Product Officer Tomer Cohen is piloting a new way of building products that fully embraces AI",
+      "headline": "LinkedIn's CPO dismantles functional silos by empowering full-stack builders with AI agents, compressing months-long roadmaps into week-long ship cycles.",
       "key_takeaways": [
-        "By 2030, 70% of the skills required to do a job will change, making it necessary to rethink traditional product management",
-        "The full stack builder model aims to empower builders to take ideas to market, regardless of their role or team",
-        "Automation will focus on tasks outside of vision, empathy, communication, creativity, and judgment, which are key traits for builders"
+        "Skills required for any job change 70% by 2030; rebuild product development from first principles using cross-functional pods where engineers, designers, and PMs flex across domains.",
+        "Full stack builders focus on vision, empathy, communication, creativity, and judgment; automate everything else via trust agents, growth agents, research agents that reason over institutional knowledge.",
+        "Invest upfront in platform foundations (composable UI, server-side rendering) and customisation with tool makers; off-the-shelf agents fail on legacy codebases without this groundwork.",
+        "Top talent adopt new tools fastest; create culture that celebrates wins, provides training, shows examples of career mobility (researcher becomes growth PM), and removes permission friction.",
+        "Feed agents gold examples of success patterns, not raw knowledge bases; garbage in, garbage out. Curate knowledge corpus carefully; team engagement and feedback loops drive better outcomes."
       ],
       "use_cases": [
-        "LinkedIn's trust agent helps identify vulnerabilities and potential harm vectors in product specs",
-        "The growth agent critiques ideas and provides feedback on their potential impact"
+        "PM synthesises 20-page conference talk deck (Twitter history, team Slack, Google Drive) using overnight AI co-worker, then refines outline and approves polish in minutes vs hours.",
+        "Sales engineer builds custom Salesforce-connected deck generator that injects HIPAA/compliance slides based on customer profile; reduces prep from 20-30 minutes to seconds.",
+        "UXR team queries growth agent to understand which customer insights unlock biggest growth opportunities without having to manually digest all past research and feedback tickets."
       ],
-      "apply_to_prep": "The emphasis on automation and AI-driven product development at LinkedIn aligns with my experience at N26, where I automated 70% of EDD reviews, and can be applied to future roles in fincrime product management",
+      "apply_to_prep": "Mirrors Ade's N26 BaFin remediation: compress regulatory audit cycles (6-month roadmaps to weekly feature ships) by removing cross-functional gatekeeping, empowering the team to ship research previews, and trusting them to trade off scope in service of regulator confidence.",
       "framework_tags": [
-        "product development lifecycle",
-        "AI-driven product management"
+        "full-stack-builder",
+        "agent-orchestration",
+        "research-preview",
+        "platform-as-foundation",
+        "culture-of-shipping"
       ]
     }
   },
@@ -152,28 +167,36 @@ export const PODCAST_DIGESTS = [
     "duration": "1.0h 7.0m",
     "topics": [
       "product",
-      "framework"
+      "framework",
+      "developer experience",
+      "DORA",
+      "SPACE"
     ],
     "relevance_score": 4,
     "youtube_url": "https://www.youtube.com/watch?v=SWcDfPVTizQ",
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Measuring AI-driven developer productivity requires rethinking traditional metrics and focusing on developer experience",
+      "headline": "Lines-of-code metrics are obsolete for AI-era productivity; instead measure flow state, cognitive load, and feedback loops—and invest in developer experience as a business lever.",
       "key_takeaways": [
-        "Traditional productivity metrics are often misleading and need to be reevaluated in the context of AI-driven development",
-        "Developer experience is crucial for productivity and happiness, and includes factors like flow state, cognitive load, and feedback loops",
-        "AI can both help and hinder developer productivity, and its impact depends on how it is integrated into workflows and processes"
+        "DORA metrics (deployment frequency, lead time, MTTR, change failure rate) remain useful for assessing pipeline speed and stability, but don't reveal AI's real impact on flow and cognitive load.",
+        "Developers spend more time reviewing AI-generated code than writing it; interruptions from agent feedback loops fragment flow. Redesign work blocks (45-minute slots now viable if agents context-switch burden).",
+        "SPACE framework (Satisfaction, Performance, Activity, Communication, Efficiency, Flow) covers what matters; track what your leadership cares about (market share → speed; margins → cost savings) and measure backwards.",
+        "Trust is now a critical metric: is the code hallucinating? Does it match style? Build dashboards showing code survivability (what percent of AI output ships to prod), not just volume.",
+        "Charge your DX team with product mindset: identify problems, run MVPs, test hypotheses, measure impact; celebrate wins; don't just automate processes. Most teams can move faster but face 4+ hours of deep work ceiling."
       ],
       "use_cases": [
-        "A company using AI to automate code reviews and testing, resulting in faster deployment and reduced bugs",
-        "A development team leveraging AI to generate code snippets and reduce manual coding time"
+        "Team cleaning up flaky test suite saves time, reduces toil (engineers don't re-run tests), and surfaces cost savings via lower cloud spend; correlate to revenue impact if you can.",
+        "Org-wide process simplification (e.g., removing email approval steps, automating provisioning) recovers weeks of human hours; compute via headcount saved or capacity freed for higher-value work.",
+        "Senior engineer mentoring junior on code review is invisible productivity; if you can unblock them via AI code review + human spot-check, that's leverage most teams miss."
       ],
-      "apply_to_prep": "As a product manager with experience in fincrime and regulated products, such as my work at N26 and Vistra, I can apply the insights from this episode to improve the productivity and happiness of my development teams, and ultimately drive better outcomes for our customers",
+      "apply_to_prep": "Ade's Vistra global CLM rollout (onboarding cycle ~45 → ~20 days): apply SPACE framework (flow, efficiency, communication) to measure whether Fenergo/Napier/Enate automation actually freed teams to improve downstream trust and regulatory confidence.",
       "framework_tags": [
+        "SPACE-framework",
+        "flow-state",
         "DEVX",
-        "Dora metrics",
-        "Space framework"
+        "code-review",
+        "cognitive-load"
       ]
     }
   },
@@ -223,28 +246,35 @@ export const PODCAST_DIGESTS = [
     "duration": "1.0h 24.0m",
     "topics": [
       "product",
-      "framework"
+      "framework",
+      "delight",
+      "emotional design"
     ],
     "relevance_score": 4,
     "youtube_url": "https://www.youtube.com/watch?v=tX6nwT1Bsuo",
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Nesrine Changuel presents a 4-step framework for building delightful products that create emotional connections with users",
+      "headline": "Delight is joy plus surprise, engineered systematically: identify emotional motivators, convert them to opportunities, grade solutions by depth, then validate via inclusion and habituation.",
       "key_takeaways": [
-        "Delight is an emotion that combines joy and surprise, and is essential for creating products that stand out",
-        "Removing friction, anticipating needs, and exceeding expectations are key pillars for building delightful products",
-        "The Delight Model is a 4-step framework for identifying and prioritizing delightful features, including identifying user motivators, converting motivators into opportunities, identifying solutions, and validating features"
+        "Delight solves for functional AND emotional needs; joy plus surprise create the feeling. 50% low-delight (function only), 40% deep-delight (function + emotion), 10% surface-delight (emotion only) in roadmaps avoids confetti traps.",
+        "Segment users by emotional motivators (feel secure, feel seen, feel productive, avoid loneliness); these unlock pricing power and differentiation that feature lists cannot. Spotify Discover Weekly works because discovery + being understood.",
+        "Remove friction at moments of stress (Uber refund: 2 clicks); anticipate unmet needs (Revolut eSIM for travellers); exceed expectations (Edge browser suggesting coupons without asking)—all three levers available.",
+        "Delight checklist: does it drive business impact? Is it inclusive (Apple Memoji reactions that fired fireworks during therapy calls failed)? Does it maintain novelty or will habituation kill engagement? Validate early.",
+        "Google Meet shipped self-view minimisation and reaction emojis to reduce Zoom Fatigue; Google Chrome's inactive tab folder keeps stress low while preserving user trust. Both deep-delight, not confetti."
       ],
       "use_cases": [
-        "Uber's two-click refund process for cancelled rides is an example of removing friction and creating a delightful experience",
-        "Revolut's eSIM feature for international travel is an example of anticipating user needs and exceeding expectations"
+        "Airbnb Super Host badge (confetti on renewal) celebrates effort, drives retention, doesn't move conversion metrics but strengthens emotional connection and referrals.",
+        "Discover Weekly combines personalisation (known algorithm) with surprise (new tracks); earlier bug that included familiar songs actually boosted adoption; familiarity breeds delight, not novelty alone.",
+        "Google Meet self-view toggle: users wanted to hide their camera feed during calls, reducing cognitive load and camera anxiety. Functional relief + emotional relief = deep delight."
       ],
-      "apply_to_prep": "As a product leader, understanding how to build delightful products can help me stand out in my role, particularly in competitive markets, and is relevant to my experience at N26 where I led the team to automate 70% of EDD reviews, which improved the overall user experience",
+      "apply_to_prep": "Ade's Elucidate zero-to-one RegTech SaaS (Tier-1 bank PoC, 40% MAU uplift): audit what emotional motivators matter to compliance officers (feel in control, trust the system) and engineer those into onboarding, dashboards, and error states.",
       "framework_tags": [
-        "delight model",
-        "JTBD",
-        "emotional connection"
+        "delight-model",
+        "emotional-motivators",
+        "deep-vs-surface-delight",
+        "inclusivity",
+        "habituation-effect"
       ]
     }
   },
@@ -392,35 +422,42 @@ export const PODCAST_DIGESTS = [
   {
     "episode_number": "ep030",
     "show": "Lenny's Podcast",
-    "title": "Brian Chesky's secret mentor who scaled Airbnb (after dying 9 times & building a hotel empire)",
-    "guest": "Unknown",
+    "title": "Brian Chesky's secret mentor who scaled Airbnb after dying 9 times & building a hotel empire",
+    "guest": "Chip Conley",
     "published": "2024-06-01",
     "duration": "1.0h 19.0m",
     "topics": [
       "strategy",
       "founder",
-      "scale"
+      "scale",
+      "mentorship",
+      "intergenerational"
     ],
     "relevance_score": 5,
     "youtube_url": "https://www.youtube.com/watch?v=R5_ypwiRIyo",
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Intergenerational collaboration is key to success in tech, where older brains connect the dots and younger team members are fast and focused",
+      "headline": "Chip Conley, Airbnb's modern elder, proves that crystallised intelligence (pattern recognition, systemic thinking) and fluid intelligence (speed, focus) compound when trusted together.",
       "key_takeaways": [
-        "Older workers bring valuable experience and wisdom to tech companies",
-        "Intergenerational collaboration can lead to brilliant outcomes",
-        "Age diversity is essential for a well-rounded team"
+        "Join companies where you believe in the founder (Brian's curiosity + humility) and the mission (belonging anywhere), not just the business model. Humility to say 'I don't know' outweighs ego.",
+        "Older talent brings invisible productivity: mentoring, credibility from real-world wins (hotel mogul advising young PMs), reading regulation changes before they hit. Willingness to take 40-50% pay cut for part-time work yields outsized ROI.",
+        "Intergenerational teams work best when older brains spot blind spots (regulation risk in Airbnb not paying occupancy tax) and younger brains move fast. Respect + curiosity + energy matter more than age.",
+        "Set clear alignment upfront in meetings: 'What's the intention? What defines success?' Revisit alignment when energy shifts. Avoid PowerPoint dominance; stay flexible for founder curveballs.",
+        "Age doesn't limit tech careers if you show up with positive energy, curiosity (learn iPhone, Google Docs), willingness to be learner and teacher, and pick companies with learning-focused cultures."
       ],
       "use_cases": [
-        "Airbnb's success can be attributed to the collaboration between older and younger team members",
-        "The Modern Elder Academy provides a platform for older individuals to share their wisdom and experience"
+        "Chip toured 20 cities meeting Airbnb hosts, learning their pain (older hosts struggle with mobile-only design), then advised against mobile-only pivot—saved misalignment.",
+        "Lisa, 25-year-old HR hire with no HR background, found Chip as confidant (giver of confidence); mutual mentorship: she taught tech, he taught leadership and frameworks.",
+        "Chip reduced from full-time to 60%, dropped salary proportionally; company got institutional wisdom on regulation, host psychology, and multi-generational product thinking without full-time burn."
       ],
-      "apply_to_prep": "Ade's experience at N26, where he worked with a team of diverse ages and backgrounds, demonstrates the value of intergenerational collaboration, a skill that can be applied to Senior PM, Director, and Head-of-FinCrime-Product roles",
+      "apply_to_prep": "Ade's role as RegTech PM across Vistra, N26, Ebury: recruit and nurture older practitioners (compliance officers, former regulators) to spot regulatory blind spots before they become million-dollar problems; position intergenerational teams as your competitive advantage.",
       "framework_tags": [
-        "intergenerational collaboration",
-        "age diversity",
-        "emotional intelligence"
+        "intergenerational-collaboration",
+        "invisible-productivity",
+        "crystallized-intelligence",
+        "mentorship",
+        "trust-and-curiosity"
       ]
     }
   },
@@ -434,28 +471,35 @@ export const PODCAST_DIGESTS = [
     "topics": [
       "product",
       "strategy",
-      "pricing"
+      "pricing",
+      "AI",
+      "monetisation"
     ],
     "relevance_score": 5,
     "youtube_url": "https://www.youtube.com/watch?v=NR85H55eYkM",
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Mastering monetization and pricing strategy is crucial for AI companies to achieve profitable growth",
+      "headline": "AI founders must master pricing from day one: cost dynamics and labour-budget-sized value require outcome-based models (not underpriced SaaS playbooks) to avoid training customers to expect more for less.",
       "key_takeaways": [
-        "Founders need to dominate both market share and wallet share to build a successful business",
-        "AI pricing is different from traditional pricing due to cost dynamics and value capture",
-        "Mastering negotiations is critical to extract full value from every deal"
+        "Dominate market share AND wallet share simultaneously; single-engine strategies (growth-at-all-costs, early monetisation neglecting acquisition, or loyalty with neither) all fail. Nine strategies help balance both.",
+        "Beautifully simple pricing tells a value story (Superhuman: dollar per day for four hours back weekly, not just $30/month) and passes the articulation test: can customers explain your pricing to others?",
+        "POCs reframe: goal is co-creating business case and ROI model, not tech demo. Charge smartly (10k for business case ≠ 120k annual deal), justify via value (1M unlocked, we take 1-in-10x ROI), offer ranges (500k–1M, not single anchor).",
+        "Master negotiations via gives-and-gets (ask for value audits in exchange for concessions), value selling (create needs, affirmation loops, co-create ROI models), and tactics (show options, anchor high, taper concessions).",
+        "Use attribution (can you prove KPI impact?) and autonomy (does AI run without humans?) to pick pricing model: low/low=subscription; high/low=hybrid; low/high=usage; high/high=outcome-based (the golden quadrant, only 5% there today)."
       ],
       "use_cases": [
-        "Using a simple pricing strategy to tell a value story, such as Superhuman's $30 per month premium email experience",
-        "Implementing a land and expand strategy to design a free product that can expand into paid offerings"
+        "Intercom Fin charges per AI-resolved ticket (99 cents if autonomous, zero if human needed); customer saves agents' salaries, Intercom captures portion transparently via outcome.",
+        "Sierra (enterprise compliance): land at 100k plus 10% on incremental value discovered in POC, or 500k fixed; buyer chooses certainty vs upside-share; discovers actual value willingness.",
+        "Chargeflow (chargeback recovery): charge 25% of recovered value; autonomous, highly attributable, customer sees cash back; outcome-based model aligns incentives."
       ],
-      "apply_to_prep": "As a fincrime product manager, understanding the importance of mastering monetization and pricing strategy can be applied to my experience at N26, where I cleared a 470 PEP backlog and automated 70% of EDD reviews, demonstrating the value of effective pricing and monetization in a regulated industry",
+      "apply_to_prep": "Ade's Ebury (38% false-positive reduction, Salesforce→Fenergo 50k+ records): quantify identity-matching or AML-alert value saved in labour hours and regulatory fines averted; architect towards outcome-based pricing (% of manual effort eliminated, not seats) to justify premium positioning.",
       "framework_tags": [
-        "outcome-based pricing",
-        "value selling",
-        "negotiation strategy"
+        "outcome-based-pricing",
+        "attribution",
+        "autonomy",
+        "value-selling",
+        "market-share-plus-wallet-share"
       ]
     }
   },
