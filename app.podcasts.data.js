@@ -17,26 +17,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Speed and taste beat process: compress feature cycles from six months to one week by removing barriers to shipping, embracing research preview, and hiring engineers with strong product judgement.",
+      "headline": "The PM job at AI-native speed is clearing blockers, not aligning roadmaps: ship features in a week, brand everything research preview, and let engineers with product taste drive end-to-end.",
       "key_takeaways": [
-        "Ship features in research preview weekly, not quarterly; reduce commitment, get user feedback fast, iterate based on what breaks. Enables parallel cross-team workflows (docs/PMM/eng in single Slack room).",
-        "Define clear goals upfront because LLMs are general-purpose; specify who you build for, what problem you solve, top three use cases. Rules out ambiguous approaches and guides team decision-making.",
-        "Evaluate model capabilities through taste and evals; spend time using models, ask them to introspect, find five trusted users for feedback, build ten focused evals. Quantifies progress on hard-to-measure alignment/quality goals.",
-        "Hire engineers with product taste over generic PMs; they move faster end-to-end, reduce overhead. Engineer background helps estimate effort (hard vs easy features). Character and personality of Claude (low ego, positive, competent) drive adoption.",
-        "Ladder up from single-task reliability to multi-agent orchestration and self-improvement; as models improve, remove scaffolding (to-do lists, explicit prompts), then unlock entirely new capabilities (code review at operator confidence)."
+        "Compress cycles by removing every barrier to shipping: when LLMs are general-purpose, clear goal-setting (user, problem, use case) replaces multi-quarter roadmaps; a tight eng-docs-PMM Slack room turns round-trip to next day.",
+        "Ship in research preview as default; it signals early-stage intent to users, lowers team commitment, and enables weekly releases without creating permanent support obligations or false expectations of stability.",
+        "Product taste, not engineering depth, is the scarce skill: as code becomes cheaper, deciding what to write and what not to write separates winners; taste can emerge from any background but engineering helps estimate build cost."
       ],
       "use_cases": [
-        "Research PM (Diane): customer feedback to research team; model launch shepherding. Applied AI engineers: prototype rapid customer implementations, synthesise customer context nightly (Slack+Gmail+Drive) for next day calls.",
-        "Sales engineer builds custom deck generator (Web app + Salesforce + Gong) that adds HIPAA/compliance slides based on customer profile, reducing prep from 20-30 min to seconds. Tarek/Lydia integrated Figma MCP for brand consistency.",
-        "Product lead uses Co-Work overnight to synthesise 20-page conference talk deck: feeds in PMM draft + Twitter launch history + team Slack demos + Google Drive. Reduces manual synthesis; PM refines outline and demos, approves polish."
+        "Claude Code team's evergreen launch room: when an engineer deems a feature dog-food-ready, they post it; Sarah (docs), Alex (PMM), and Tarek jump in and ship the announcement the very next day, end-to-end.",
+        "Research preview model at Anthropic: features like multi-agent orchestration and memory management shipped publicly within days of internal validation, with explicit 'preview' branding that gave the team permission to iterate without full support burden."
       ],
-      "apply_to_prep": "Direct echo of Ade's N26 BaFin remediation: compress audit response cycles (6-month roadmaps to 1-week feature ships) by removing cross-functional blockers, shipping research previews, and empowering the team to make trade-offs in service of the mission (regulator confidence).",
+      "apply_to_prep": "Direct parallel to Ade's N26 BaFin remediation work: compressing a 6-month regulatory audit cycle to a 1-week ship cadence requires exactly this pattern, clearing cross-functional gatekeeping, empowering the team to make scope trade-offs, and branding early releases as previews so regulators see momentum rather than finished product.",
       "framework_tags": [
-        "research-preview-gating",
+        "research-preview-velocity",
         "taste-over-process",
-        "task-to-agent-ladder",
-        "mission-above-org-KPIs",
-        "evals-for-product-definition"
+        "cross-functional-launch-loop"
       ]
     }
   },
@@ -57,24 +52,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "The terminal beat the IDE: AI agents are now the primary interface for coding, and agentic design beats scaffolding, always ship for the next model, not today's.",
+      "headline": "Claude Code crossed 100% of Boris Cherny's own code in November; intentional underfunding, latent demand, and product-as-model, not product-wrapping-model, explain why it outran every IDE-based rival.",
       "key_takeaways": [
-        "100% Claude Code-authored production code is now normal; 4% of GitHub commits already AI-generated; productivity per engineer jumped 200% with agent-first workflows.",
-        "Underfund projects intentionally to force engineers toward delegation; bet on general models over fine-tuning; give teams unlimited tokens early so they discover novel applications before optimising.",
-        "Agent design works best loosely coupled to tools; let the model choose how to solve problems rather than forcing rigid orchestration; yesterday's scaffolding loses to the next model's capabilities.",
-        "Build products for the model six months ahead, not today's capabilities; expect discomfort when product-market fit is weak, but launch early (as research preview) to study safety in the wild.",
-        "Agentic AI expands to product, design, data science, and any computer-mediated work; the printing press analogy holds, encoding talent will diffuse, new skills (taste, taste in agents, system design) will emerge."
+        "Build for the model six months ahead: the terminal won not because it was the right UX but because it was the only form factor that could keep pace with model improvement; design decisions that fight the model's trajectory lose.",
+        "Underfund projects deliberately: one engineer forced to use Claude Code end-to-end discovers in a week what a five-person team would debate for a month; psychological safety plus accountability to cut losses fast is the operating principle.",
+        "Latent demand is the single most important product principle: observe what people do with the product when it is misused (data scientists running SQL in a terminal, users growing tomatoes) and build the product that makes that easy, which is how Co-Work was built in 10 days."
       ],
       "use_cases": [
-        "Memory leak debugging: instead of heap snapshots and debuggers, just ask Claude Code to figure it out; newer engineers solve it faster than experienced ones following old patterns.",
-        "Project management automation: single spreadsheet for team status; Claude Code sends Slack reminders to engineers who haven't filled weekly updates on Monday mornings.",
-        "Chrome automation for tedious work: co-work fills medical PDFs, logs into accounts, cancels subscriptions, responds to emails, all unattended while you make coffee."
+        "Memory leak triage at Anthropic: instead of a senior engineer taking heap snapshots and using special debuggers, a newer team member simply asked Claude Code to find it; it wrote its own analysis tool, identified the issue, and raised a pull request faster than the senior's manual approach.",
+        "Co-Work built in 10 days: Felix, Sam, Jenny and team saw non-technical Anthropic staff using Claude Code via a terminal to do SQL analysis and general tasks; they took Claude Code, wrapped it in a desktop app with a security VM, and shipped it as a research preview within two weeks."
       ],
-      "apply_to_prep": "Mirrors Ade's zero-to-one RegTech SaaS success at Elucidate (40% MAU uplift, £120k Tier-1 PoC) by inverting the team-size constraint: underfunding forces product taste and 6-week deployment cycles instead of waterfall; applies the same 'give the model tools and get out of the way' philosophy to product strategy (Ebury's false-positive reduction moved from rules to agent-driven classification).",
+      "apply_to_prep": "Mirrors Ade's zero-to-one build at Elucidate, where a 6-week deployment cycle and 40% MAU uplift came from the same principle: give the system (compliance scoring model) minimal scaffolding, expose it to real Tier-1 bank workflows, and let latent demand from analysts shape the product rather than building to a specification written before anyone used it.",
       "framework_tags": [
-        "agent-first product design",
-        "research preview distribution",
-        "build for models not yet shipped"
+        "latent-demand",
+        "agent-first-product-design",
+        "build-for-next-model"
       ]
     }
   },
@@ -97,26 +89,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Slack founder Stewart Butterfield reveals that utility curves, taste, and comprehension are the three pillars separating beloved products from forgettable ones.",
+      "headline": "Stewart Butterfield's utility curve insight: products gain loyal users only where the slope of value versus effort is steep; invest there and nowhere else.",
       "key_takeaways": [
-        "Map utility curves to identify where to invest: which features generate disproportionate value? Invest in the steep slope; avoid the flat tail where effort yields minimal gains.",
-        "Taste and craftsmanship define the gap between good and great; intentional design choices matter more than feature count. How Slack designed the magic link UX teaches users implicitly without documentation.",
-        "Comprehension is the silent killer; reducing friction isn't always the solution. Bad UX hides complexity that needs surfacing. Google Calendar's time zone picker is cluttered but honest about trade-offs.",
-        "Excellence requires alignment between aesthetic intention and functional delivery; both must reinforce each other or the product feels compromised.",
-        "Build products that teach through interaction, not manuals; users should intuit how to use it through careful, intentional design that respects their intelligence."
+        "Map utility curves before roadmapping: identify which capabilities produce disproportionate value gains relative to user effort, then invest only in the steep slope; the flat tail is a trap where incremental work yields near-zero returns.",
+        "Taste is learnable and non-optional: Slack's magic-link authentication was designed to teach users through the experience itself rather than documentation, because comprehension, not merely reduced friction, is what converts curious users to habitual ones.",
+        "Comprehension and friction are different problems: Google Calendar's time zone picker is cluttered but honest about the trade-off it is managing; reducing visual noise without surfacing the underlying complexity makes a product feel broken, not simpler."
       ],
       "use_cases": [
-        "Slack's frictionless magic-link authentication; user opens email, clicks link, authenticated—no password managers, no friction, magic feeling that rewards curiosity.",
-        "Lyft's transparent pricing model (vs Uber surge pricing) builds trust through honest comprehension, turning a potential pain point into competitive advantage.",
-        "Apple products: utility (does the job), taste (beautiful, intentional), comprehension (learnable without a manual)—all three reinforce trust and premium positioning."
+        "Slack magic-link login: user opens email, clicks link, is authenticated without a password manager or step-by-step instruction; the experience itself teaches trust and signals that the product respects intelligence.",
+        "Umbrella story from the transcript: lending an umbrella to a stranger is a small act of courtesy that disproportionately raises perceived product quality; Butterfield uses this to explain how edge-case moments of empathy define brand more than the core feature set."
       ],
-      "apply_to_prep": "Ade's 70% EDD review automation at N26: move beyond just shipping the feature; invest in taste and comprehension so compliance workflows feel intuitive and trustworthy rather than bureaucratic.",
+      "apply_to_prep": "Applies to Ade's FCA Authorisations work: when designing regulatory interfaces, comprehension failures (users who misread form fields or misunderstand approval states) cost weeks of correction; investing in steep-slope moments, where one clear screen prevents ten follow-up questions, is exactly the utility curve logic.",
       "framework_tags": [
         "utility-curves",
-        "taste",
-        "comprehension",
-        "craftsmanship",
-        "design-intent"
+        "comprehension-vs-friction",
+        "taste-as-learnable-craft"
       ]
     }
   },
@@ -139,26 +126,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "LinkedIn's CPO dismantles functional silos by empowering full-stack builders with AI agents, compressing months-long roadmaps into week-long ship cycles.",
+      "headline": "LinkedIn's CPO replaced the APM programme with an AI-fluency-first culture: full-stack builder pods, specialist agents fed gold examples, and performance reviews that now score how well you leverage AI.",
       "key_takeaways": [
-        "Skills required for any job change 70% by 2030; rebuild product development from first principles using cross-functional pods where engineers, designers, and PMs flex across domains.",
-        "Full stack builders focus on vision, empathy, communication, creativity, and judgment; automate everything else via trust agents, growth agents, research agents that reason over institutional knowledge.",
-        "Invest upfront in platform foundations (composable UI, server-side rendering) and customisation with tool makers; off-the-shelf agents fail on legacy codebases without this groundwork.",
-        "Top talent adopt new tools fastest; create culture that celebrates wins, provides training, shows examples of career mobility (researcher becomes growth PM), and removes permission friction.",
-        "Feed agents gold examples of success patterns, not raw knowledge bases; garbage in, garbage out. Curate knowledge corpus carefully; team engagement and feedback loops drive better outcomes."
+        "Restructure around full-stack builder pods, not functional silos: each pod owns vision, empathy, communication, creativity, and judgement; everything else (research synthesis, trust scoring, growth analysis) is delegated to specialist agents trained on curated gold examples.",
+        "Culture precedes tooling: before deploying agents, LinkedIn ran internal celebrations of AI wins, created career-mobility stories (a researcher who became a growth PM via AI), and built platform foundations (composable UI, server-side rendering) so agents had clean surface areas to operate on.",
+        "Feed agents gold examples, not raw data: the quality of the knowledge corpus determines the quality of agent output; teams that dump unfiltered Confluence pages into their context get generic outputs, not institutional intelligence."
       ],
       "use_cases": [
-        "PM synthesises 20-page conference talk deck (Twitter history, team Slack, Google Drive) using overnight AI co-worker, then refines outline and approves polish in minutes vs hours.",
-        "Sales engineer builds custom Salesforce-connected deck generator that injects HIPAA/compliance slides based on customer profile; reduces prep from 20-30 minutes to seconds.",
-        "UXR team queries growth agent to understand which customer insights unlock biggest growth opportunities without having to manually digest all past research and feedback tickets."
+        "LinkedIn's APB (Associate Product Builder) programme replaces traditional APM: new hires learn to build end-to-end with AI from day one, with AI fluency embedded in performance frameworks and promotion criteria rather than treated as a supplementary skill.",
+        "Growth agent at LinkedIn: queries synthesise customer research from years of past UXR studies and feedback tickets, surface highest-leverage growth opportunities, and return a ranked list with evidence; reduces a three-week research sprint to an afternoon."
       ],
-      "apply_to_prep": "Mirrors Ade's N26 BaFin remediation: compress regulatory audit cycles (6-month roadmaps to weekly feature ships) by removing cross-functional gatekeeping, empowering the team to ship research previews, and trusting them to trade off scope in service of regulator confidence.",
+      "apply_to_prep": "Directly maps to Ade's Vistra global CLM programme: building multi-jurisdiction pods (20+ countries, Fenergo, Napier, Enate) required exactly this model, composable platform foundations, clear team ownership, and specialist agents (compliance, data, ops) working off curated regulatory knowledge rather than raw policy documents.",
       "framework_tags": [
-        "full-stack-builder",
+        "full-stack-builder-model",
         "agent-orchestration",
-        "research-preview",
-        "platform-as-foundation",
-        "culture-of-shipping"
+        "culture-before-tooling"
       ]
     }
   },
@@ -166,7 +148,7 @@ export const PODCAST_DIGESTS = [
     "episode_number": "ep003",
     "show": "Lenny's Podcast",
     "title": "A guide to difficult conversations, building high-trust teams, and designing a life you love",
-    "guest": "Unknown",
+    "guest": "Rachel Lockett",
     "published": "2024-12-01",
     "duration": "1.0h 45.0m",
     "topics": [
@@ -178,21 +160,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Effective leaders know when to coach and when to advise, empowering their teams to solve hard problems",
+      "headline": "The biggest leadership gap in tech is knowing when to coach rather than advise: advising trains your team to bring you every problem, coaching trains them to solve their own.",
       "key_takeaways": [
-        "Great leaders understand that having all the answers can hinder team growth",
-        "Coaching is a learnable skill that unlocks brilliance in teams",
-        "Active listening and powerful questions are core skills for effective coaching"
+        "Most technical leaders over-index on advising because they were promoted for having answers; switching to coaching requires shifting into curiosity mode, asking questions that help the other person locate their own solution, reserving advice for urgent or skill-gap situations only.",
+        "Three levels of listening determine coaching quality: Level 1 (internal, distracted), Level 2 (focused, repeating back words), Level 3 (global, hearing beneath words, reading body language and context); most leaders operate at Level 2 and miss the most important signals.",
+        "Difficult conversations fail when people enter them to prove a point; the actual goal is mutual understanding, not persuasion; reframing the purpose before the conversation begins changes both tone and outcome."
       ],
       "use_cases": [
-        "A technical leader learning to coach their team to solve complex problems",
-        "A founder creating a high-trust team environment through effective communication"
+        "Lockett's 10-year client at Coinbase: started as a frontline engineering manager, spent a decade developing leadership capacity and crystallising purpose, and eventually led Base, Coinbase's Ethereum L2 global developer community; sustained coaching created compounding leadership returns.",
+        "Live coaching demonstration with Lenny: Lockett used powerful questioning (not advice) to help him surface what was actually blocking him; the session illustrates how a 10-minute shift in conversation mode produces insight that weeks of advice loops miss."
       ],
-      "apply_to_prep": "As a Senior PM or Director, understanding when to coach and when to advise is crucial, much like my experience at Vistra where I had to balance advising and coaching to successfully rollout Fenergo, Napier, and Enate across 20+ jurisdictions",
+      "apply_to_prep": "Applies directly to Ade's FCA Authorisations experience: at a regulator, authorisation decisions hinge on whether applicants understand their own control gaps or are merely parroting back what advisers told them; the same coaching-versus-advising distinction separates examiners who build trust from those who create dependency.",
       "framework_tags": [
-        "coaching",
-        "active listening",
-        "powerful questions"
+        "coaching-vs-advising",
+        "three-levels-of-listening",
+        "high-trust-team-design"
       ]
     }
   },
@@ -215,26 +197,23 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Lines-of-code metrics are obsolete for AI-era productivity; instead measure flow state, cognitive load, and feedback loops—and invest in developer experience as a business lever.",
+      "headline": "Lines-of-code metrics are now perverse in an AI-assisted world; measure code survivability, flow-state disruption, and trust in AI output instead, and treat developer experience as a product discipline.",
       "key_takeaways": [
-        "DORA metrics (deployment frequency, lead time, MTTR, change failure rate) remain useful for assessing pipeline speed and stability, but don't reveal AI's real impact on flow and cognitive load.",
-        "Developers spend more time reviewing AI-generated code than writing it; interruptions from agent feedback loops fragment flow. Redesign work blocks (45-minute slots now viable if agents context-switch burden).",
-        "SPACE framework (Satisfaction, Performance, Activity, Communication, Efficiency, Flow) covers what matters; track what your leadership cares about (market share → speed; margins → cost savings) and measure backwards.",
-        "Trust is now a critical metric: is the code hallucinating? Does it match style? Build dashboards showing code survivability (what percent of AI output ships to prod), not just volume.",
-        "Charge your DX team with product mindset: identify problems, run MVPs, test hypotheses, measure impact; celebrate wins; don't just automate processes. Most teams can move faster but face 4+ hours of deep work ceiling."
+        "DORA metrics remain valid for pipeline speed and stability (deployment frequency, lead time, MTTR, change failure rate) but miss AI's real impact on cognitive load; the J-curve effect means productivity appears to dip for 6-8 weeks after AI adoption before improving, so measure the right thing at the right time.",
+        "Introduce code survivability rate (what fraction of AI-generated code actually ships to production) and trust as first-class metrics; high volume of AI suggestions means nothing if reviewers discard 70% of output, and review time now often exceeds the time saved in writing.",
+        "Run your DX team with a product mindset: identify developer pain with discovery methods, run MVPs, measure before and after, celebrate wins; teams that treat DEVX as a service function stall, teams that treat it as a product discipline compound."
       ],
       "use_cases": [
-        "Team cleaning up flaky test suite saves time, reduces toil (engineers don't re-run tests), and surfaces cost savings via lower cloud spend; correlate to revenue impact if you can.",
-        "Org-wide process simplification (e.g., removing email approval steps, automating provisioning) recovers weeks of human hours; compute via headcount saved or capacity freed for higher-value work.",
-        "Senior engineer mentoring junior on code review is invisible productivity; if you can unblock them via AI code review + human spot-check, that's leverage most teams miss."
+        "Flaky test suite cleanup: removing 300 unreliable tests saves no direct lines of code but reduces toil, frees engineers for deep work, and lowers cloud spend; Forsgren shows how to quantify this through headcount-hours recovered and correlate to revenue impact.",
+        "45-minute deep work blocks: when AI agents handle context-switching and compilation wait time, the viable uninterrupted work block shrinks from 90 minutes to 45; teams that redesign sprint ceremonies and Slack norms around this unlock the flow-state benefits the models promise."
       ],
-      "apply_to_prep": "Ade's Vistra global CLM rollout (onboarding cycle ~45 → ~20 days): apply SPACE framework (flow, efficiency, communication) to measure whether Fenergo/Napier/Enate automation actually freed teams to improve downstream trust and regulatory confidence.",
+      "apply_to_prep": "Mirrors the measurement challenge Ade faced at Vistra: the 45-to-20-day CLM cycle reduction looked good on cycle time but SPACE reveals what actually changed (flow, communication, efficiency across 20+ jurisdictions); applying Forsgren's code survivability concept to compliance workflows would mean measuring what fraction of Fenergo-automated checks required no human correction.",
       "framework_tags": [
         "SPACE-framework",
-        "flow-state",
-        "DEVX",
-        "code-review",
-        "cognitive-load"
+        "DORA-metrics",
+        "code-survivability",
+        "DEVX-as-product",
+        "J-curve-adoption"
       ]
     }
   },
@@ -256,22 +235,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Exceptional product design and taste are non-negotiable in a world where software can be built faster; they separate winners from commodities.",
+      "headline": "When AI lowers the cost of shipping to near zero, craft and editorial taste become the only durable moat; Figma survived 16 months of regulatory limbo by staying excellent.",
       "key_takeaways": [
-        "Figma survived the failed Adobe acquisition by maintaining pace, culture and focus; leaders must communicate vision relentlessly and hold space for departure if people need it.",
-        "Design craft matters more than ever because AI lowers the cost of building; differentiation comes from editorial taste and deliberate choices, not just shipping fast.",
-        "Role boundaries blur as AI democratises building; PMs, engineers and designers need shared understanding of craft and must all develop design sensibility."
+        "Craft and quality differentiate when code is commoditised: Figma survived the Adobe acquisition collapse (16 months of regulatory limbo across UK and EU) because the product stayed excellent and the team stayed engaged; Field communicated the mission relentlessly rather than letting uncertainty fill the silence.",
+        "Keep simple things simple, make complex things possible: FigJam succeeded because Field resisted adding features that would have made it feel like Figma Lite; the discipline to preserve a product's essential character against internal pressure to extend it is itself a strategic capability.",
+        "Role blur is accelerating: 72% of Figma's design users now do some coding tasks, and 56% of engineers do some design tasks; products that force rigid role distinctions are building for a workforce that no longer exists."
       ],
       "use_cases": [
-        "When a major deal falls through, rapidly re-engage teams by clarifying next steps, celebrating what they'll build and offering guilt-free exit for those needing change.",
-        "Launching new products like FigJam by maintaining simplicity first, then adding delight; use design sprints to rapidly explore differentiation ideas.",
-        "Hiring for maker mentality, growth mindset and craft orientation; celebrate individual contributions and learning across the company through events like MakerWeek."
+        "Figma Make (AI design feature): evals written before launch defined what quality meant, not just whether the feature shipped; Field describes how eval quality predicted user adoption and how the team used eval failures to decide what to cut from scope.",
+        "Detach programme: 4% severance offered to anyone who needed a change after the Adobe deal collapsed; Field framed it not as a layoff but as genuine permission to leave with dignity; fewer than expected took it, and the transparency itself preserved trust with those who stayed."
       ],
-      "apply_to_prep": "Echoes Ade's own regulatory-product journey: both require relentless clarity, managing distributed teams globally, and maintaining quality standards even under pressure from complexity.",
+      "apply_to_prep": "Applies to Ade's Ebury identity and financial crime work: when Ebury reduced false positives by 38%, the craft of the experience (how analysts received alerts, what context was shown, how decisions were logged) determined whether the reduction in volume was trusted or ignored; building craft into compliance UX is exactly the moat Dylan Field describes.",
       "framework_tags": [
-        "craft",
-        "taste",
-        "product differentiation"
+        "craft-as-moat",
+        "role-blur",
+        "evals-for-quality-definition"
       ]
     }
   },
@@ -293,26 +271,23 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Delight is joy plus surprise, engineered systematically: identify emotional motivators, convert them to opportunities, grade solutions by depth, then validate via inclusion and habituation.",
+      "headline": "Delight is engineerable, not accidental: segment users by emotional motivators, convert each to a product opportunity, grade solutions by depth, then pressure-test against habituation and inclusivity before shipping.",
       "key_takeaways": [
-        "Delight solves for functional AND emotional needs; joy plus surprise create the feeling. 50% low-delight (function only), 40% deep-delight (function + emotion), 10% surface-delight (emotion only) in roadmaps avoids confetti traps.",
-        "Segment users by emotional motivators (feel secure, feel seen, feel productive, avoid loneliness); these unlock pricing power and differentiation that feature lists cannot. Spotify Discover Weekly works because discovery + being understood.",
-        "Remove friction at moments of stress (Uber refund: 2 clicks); anticipate unmet needs (Revolut eSIM for travellers); exceed expectations (Edge browser suggesting coupons without asking)—all three levers available.",
-        "Delight checklist: does it drive business impact? Is it inclusive (Apple Memoji reactions that fired fireworks during therapy calls failed)? Does it maintain novelty or will habituation kill engagement? Validate early.",
-        "Google Meet shipped self-view minimisation and reaction emojis to reduce Zoom Fatigue; Google Chrome's inactive tab folder keeps stress low while preserving user trust. Both deep-delight, not confetti."
+        "Delight is joy plus surprise operating on top of functional value, not instead of it; the 50-40-10 roadmap rule (50% low-delight functional work, 40% deep delight, 10% surface delight) prevents both confetti traps and sterile utility.",
+        "Segment users by emotional motivators, not just demographics: 'feel in control', 'feel seen', 'avoid loneliness', 'feel productive' each unlock different product opportunities; Spotify Discover Weekly succeeded because it addressed both discovery and the feeling of being understood simultaneously.",
+        "Validate delight against habituation and inclusivity before shipping: Apple's Memoji fireworks reaction failed because it fired during therapy calls and grief announcements; any feature that creates joy for one user at the expense of another's context fails the delight checklist."
       ],
       "use_cases": [
-        "Airbnb Super Host badge (confetti on renewal) celebrates effort, drives retention, doesn't move conversion metrics but strengthens emotional connection and referrals.",
-        "Discover Weekly combines personalisation (known algorithm) with surprise (new tracks); earlier bug that included familiar songs actually boosted adoption; familiarity breeds delight, not novelty alone.",
-        "Google Meet self-view toggle: users wanted to hide their camera feed during calls, reducing cognitive load and camera anxiety. Functional relief + emotional relief = deep delight."
+        "Revolut eSIM for travellers: the app anticipates that a user is about to travel (flight booking detected), surfaces a roaming eSIM offer before they land and face extortionate charges; emotional motivator addressed is 'feel prepared', not 'reduce cost'.",
+        "Uber two-click refund: when a driver cancels on a user, the app immediately offers a refund on the cancellation fee with two taps; the emotional motivator is 'feel fairly treated', and solving it in under 10 seconds converts a frustration moment into a trust-building one."
       ],
-      "apply_to_prep": "Ade's Elucidate zero-to-one RegTech SaaS (Tier-1 bank PoC, 40% MAU uplift): audit what emotional motivators matter to compliance officers (feel in control, trust the system) and engineer those into onboarding, dashboards, and error states.",
+      "apply_to_prep": "Maps directly to Ade's Elucidate zero-to-one RegTech SaaS: the 40% MAU uplift came partly from removing friction, but the emotional motivators for compliance analysts are 'feel in control of risk' and 'feel trusted by senior leadership'; engineering those into dashboard states and onboarding flows, not just feature delivery, is what separates a PoC from a £120k ARR product.",
       "framework_tags": [
-        "delight-model",
+        "delight-framework",
         "emotional-motivators",
-        "deep-vs-surface-delight",
-        "inclusivity",
-        "habituation-effect"
+        "50-40-10-roadmap-rule",
+        "habituation-check",
+        "deep-vs-surface-delight"
       ]
     }
   },
@@ -333,21 +308,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Management skills are transferable to working with AI tools and agents, requiring clarity, communication, and goal definition.",
+      "headline": "The manager's hardest skill, defining what success looks like precisely enough that others can act without asking, is now the foundational skill for working with AI agents.",
       "key_takeaways": [
-        "Defining the goal and outcome is crucial for effective management and AI tooling",
-        "Clarity and communication are essential skills for managers to develop",
-        "Traditional role distinctions are dissolving, and teams can become more flexible and autonomous"
+        "Managing agents requires the same three fundamentals as managing people: a crystal-clear goal (what does success look like, not just 'make it great'), understanding each tool's strengths and weaknesses as you would a team member, and designing process for how they interact; the skills compound across both.",
+        "Data tells you what happened, not what to do: Zhuo's startup Sundial automates data analysis for companies like OpenAI, Gamma, and Character AI; the lesson is that fast-growing companies often succeed on instinct until growth stalls, at which point the absence of a diagnostic data habit becomes existential.",
+        "The willow tree metaphor: effective leadership today is sturdy-while-flexible; the rate of change is accelerating, so the manager's job is not to resist change but to create the conditions under which the team can absorb it without losing direction."
       ],
       "use_cases": [
-        "Using AI to automate data analysis and provide objective measures of success",
-        "Empowering engineers to take on more responsibilities and make decisions without relying on traditional role distinctions"
+        "Julie Zhuo not hiring PMs at Sundial: with a tiny team and AI agents, she routes product decisions through engineers with strong taste; she argues that in small AI-native teams the overhead of a traditional PM role exceeds its value unless the PM is willing to operate at the intersection of data, design, and code.",
+        "Org flattening at Google and Meta: Zhuo observed that as AI handles coordination and synthesis work, the primary value of middle management becomes change management rather than information routing; leaders who cannot articulate a clear outcome and cascade it will be replaced before those who can code."
       ],
-      "apply_to_prep": "As a fincrime product manager, Ade can apply the principles of clarity, communication, and goal definition to his work, particularly in the context of N26's BaFin remediation and automation of EDD reviews, where clear objectives and outcomes are critical to success.",
+      "apply_to_prep": "Resonates with Ade's MEMA Consultants founder role: running three live RegTech products with a lean team requires exactly this model of managing AI as a team member, being precise about what success looks like for each product, diagnosing with data rather than instinct, and staying flexible on method while being rigid on outcome.",
       "framework_tags": [
-        "north-star metric",
-        "OKRs",
-        "outcome roadmap"
+        "goal-clarity-for-agents",
+        "diagnose-with-data-treat-with-design",
+        "sturdy-while-flexible"
       ]
     }
   },
@@ -367,23 +342,22 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Product management is not disappearing; it's evolving to focus on deep customer insight, sharp problem selection and editorial taste as coding becomes easier.",
+      "headline": "The PM role survives AI disruption only when PMs choose sharp problems, ones where a 10x improvement creates immediate demand, rather than optimising features on products that should not exist.",
       "key_takeaways": [
-        "The 'shipyard team' (PM, design, engineering, research, data, product marketing) works best as a flat, collaborative unit where boundaries blur and ownership is distributed.",
-        "PMs must solve for sharp problems, ones so painful that solving them 10X better creates immediate demand; this is learnable through customer immersion and rigorous hypothesis testing.",
-        "AI democratises building, so the bar for PMs rises: they must curate ideas ruthlessly, make bold calls and defend taste rather than just managing consensus.",
-        "Ethics and responsibility matter more; PM builders have power to shape behaviour at scale and must ask 'should we?' not just 'can we build it?'."
+        "Sharp problems are identified through customer immersion, not interviews: Oji built a home automation system using Home Assistant, quantised local LLMs, an MCP server, and Whisper transcription; his ability to evaluate Typeform's AI pivot came from living the product's domain, not from reading NPS reports.",
+        "Products are organisms with a shipyard team of six capabilities (PM, design, engineering, research, data, product marketing); the six capabilities always exist in every product team whether or not they are named or staffed; the PM's job is ensuring all six are exercised, not owning them.",
+        "AI at core versus AI at edge is the strategy question: Typeform rebuilt its product with AI at the core, expanding from form creation into pre-sales qualification and meeting preparation; this changed the competitive set entirely, which is only visible if you start from a sharp problem, not a roadmap."
       ],
       "use_cases": [
-        "Bringing support, sales and customer-facing teams into product design reviews because they see edge cases and real user pain that pure data misses.",
-        "Using AI to accelerate hypothesis testing but validating through ethnographic research (observing users) rather than just reading interview transcripts.",
-        "Building local models and fine-tuning them for your specific domain instead of relying solely on large general models that may hallucinate."
+        "Typeform AI rebuild: moved from a static form product into an AI-native conversational data collection tool, pulling the product into pre-sales workflows and automating follow-up analysis; the sharp problem was 'data collection is slow and unresponsive', not 'forms need more question types'.",
+        "eVals for LLM products: Oji describes building evaluation harnesses for AI features before writing the feature itself; this mirrors test-driven development but for product quality, forcing the team to define what good looks like before the model is ever called."
       ],
-      "apply_to_prep": "Reflects Ade's RegTech background: both require understanding the customer's world deeply, identifying high-leverage compliance pain points and building products that scale across jurisdictions.",
+      "apply_to_prep": "Mirrors Ade's Vistra global CLM programme: the 45-to-20-day cycle compression across 20+ jurisdictions required identifying the sharp problem (EDD review delays created regulatory exposure, not just slow onboarding) and building the shipyard team across Fenergo, Napier, and Enate with explicit roles for data, ops, and compliance research.",
       "framework_tags": [
-        "sharp problems",
-        "shipyard model",
-        "ethics"
+        "sharp-problems",
+        "shipyard-team",
+        "AI-at-core-vs-AI-at-edge",
+        "evals-first"
       ]
     }
   },
@@ -404,21 +378,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "ChatGPT is predicted to be the next big growth channel, offering a huge opportunity for companies to get on it before it becomes saturated",
+      "headline": "Every distribution platform follows the same four-step arc: open moat, then closed extraction; the escape velocity window on AI platforms is open now and will not stay open.",
       "key_takeaways": [
-        "Building a great product is necessary but not sufficient for success, with distribution being a key differentiator",
-        "New distribution platforms emerge, giving startups an opportunity to gain escape velocity before incumbents can copy",
-        "The four-step cycle of new distribution platforms includes conditions being met, a moat being established, a platform opening, and a platform closing for control and monetization"
+        "New distribution platforms create temporary moats before incumbents close them: conditions met, moat establishes, platform opens to partners, platform closes for extraction; Zynga on Facebook, Cursor beating GitHub Copilot in 9 months, and early ChatGPT plugin positioning all follow this arc.",
+        "Organic channels are structurally declining: SEO is being eroded by AI-generated summaries, social reach has compressed, and paid acquisition costs have risen; teams that relied on these channels without building platform-native distribution are now facing a prisoner's dilemma about whether to adopt AI distribution before competitors do.",
+        "Escape velocity requires product-market fit plus distribution fit simultaneously: a product that is merely good enough to grow on an emerging platform achieves escape velocity before an objectively better product that arrives six months later; timing the distribution window correctly matters as much as building a great product."
       ],
       "use_cases": [
-        "Companies like Zingha grew massively on Facebook, then became huge companies",
-        "Cursor overtook GitHub Copilot's market share in just nine months, demonstrating the potential for rapid growth on new platforms"
+        "Cursor versus GitHub Copilot: Cursor gained market share in nine months despite GitHub Copilot's substantial head start and Microsoft's distribution advantages; Balfour uses this to illustrate that a new platform (the agentic coding assistant category) can overturn incumbent distribution advantages before the platform matures.",
+        "Casey Winters' framing: a technology shift without a distribution shift leaves new capabilities stranded inside old acquisition models; Balfour argues ChatGPT is a distribution shift as much as a technology shift, and the companies building integration first will capture the moat period."
       ],
-      "apply_to_prep": "As a product manager with experience in regulated environments, such as N26 and Vistra, I can apply this understanding of new distribution platforms to identify opportunities for growth and disruption in the fincrime and regtech spaces",
+      "apply_to_prep": "Applies to Ade's MEMA Consultants portfolio: three live RegTech products competing in a market where compliance platform consolidation is accelerating; the four-step distribution cycle suggests that the window to embed MEMA products inside emerging AI compliance platforms (before they close their APIs to third parties) is open now and will not remain so.",
       "framework_tags": [
-        "distribution strategy",
-        "growth channels",
-        "escape velocity"
+        "four-step-distribution-cycle",
+        "escape-velocity",
+        "platform-moat-timing"
       ]
     }
   },
@@ -439,21 +413,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Product teams must align their work with business critical outcomes to avoid layoffs and drive impact",
+      "headline": "The CEO stress test: if you would not fully fund your own team, you are on the low-impact spiral; connect team goals directly to business-critical outcomes, not product metrics.",
       "key_takeaways": [
-        "Aligning work to business critical outcomes is crucial for product teams to be evaluated and invested in by the business",
-        "Product managers should think like CEOs and consider the existential market-level success of the business",
-        "Teams should stress test their thinking by asking if they would fully fund their own team if they were the CEO"
+        "The CEO stress test exposes misalignment: would you, as CEO, fully fund your own team given what you ship and what it produces for the business? If the honest answer is no, you are in the low-impact PM death spiral, building good product that is decoupled from existential business outcomes.",
+        "Three degrees of separation is too many: if reaching your team goal requires the company to hit its goal, which requires the market to respond, your team's contribution is invisible when things go wrong; team goals should be at most one step from direct company goals.",
+        "Daniel Ek's Spotify layoff message identified 'working around the work', the planning meetings, stakeholder-management rituals, and alignment sessions that substitute for output; LeMay argues this is what happens when teams lack a clear line to business-critical outcomes and fill the vacuum with process."
       ],
       "use_cases": [
-        "A product team at a music review site like Pitchfork can drive business impact by focusing on features that increase user engagement and revenue",
-        "A team can use the question 'if you were the CEO, would you fully fund your own team' to provoke a discussion on their impact and value to the business"
+        "Pitchfork product team: LeMay's own background in music journalism gave him the insight that a product team at a media company whose goal is 'increase engagement' without connecting it to subscription revenue or advertiser retention is always one restructure away from dissolution.",
+        "Individual action regardless of org structure: LeMay's advice is that a team can apply this framework without a company-wide mandate; mapping your current goals directly to a business-critical outcome is a one-person exercise that immediately clarifies whether your current work would survive a CEO audit."
       ],
-      "apply_to_prep": "As a fincrime product manager, I can apply this idea to my work at N26, where I cleared a 470 PEP backlog and automated 70% of EDD reviews, by ensuring that my team's work is aligned with business critical outcomes and driving impact",
+      "apply_to_prep": "Directly applicable to Ade's N26 BaFin remediation: the 470-PEP backlog clearance and 12 audit point closures were unambiguously business-critical outcomes, not product metrics one degree removed from revenue; framing that work through LeMay's lens demonstrates that Ade's product instinct has always been to operate at the existential layer of the business, not the engagement layer.",
       "framework_tags": [
-        "impact first",
-        "OKRs",
-        "business critical outcomes"
+        "CEO-stress-test",
+        "business-critical-outcomes",
+        "low-impact-PM-spiral"
       ]
     }
   },
@@ -476,26 +450,22 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Chip Conley, Airbnb's modern elder, proves that crystallised intelligence (pattern recognition, systemic thinking) and fluid intelligence (speed, focus) compound when trusted together.",
+      "headline": "Crystallised intelligence, pattern recognition earned across decades, is worth more than fluid intelligence when scaling into a regulated world; Conley spotted Airbnb's occupancy tax liability before it became a crisis.",
       "key_takeaways": [
-        "Join companies where you believe in the founder (Brian's curiosity + humility) and the mission (belonging anywhere), not just the business model. Humility to say 'I don't know' outweighs ego.",
-        "Older talent brings invisible productivity: mentoring, credibility from real-world wins (hotel mogul advising young PMs), reading regulation changes before they hit. Willingness to take 40-50% pay cut for part-time work yields outsized ROI.",
-        "Intergenerational teams work best when older brains spot blind spots (regulation risk in Airbnb not paying occupancy tax) and younger brains move fast. Respect + curiosity + energy matter more than age.",
-        "Set clear alignment upfront in meetings: 'What's the intention? What defines success?' Revisit alignment when energy shifts. Avoid PowerPoint dominance; stay flexible for founder curveballs.",
-        "Age doesn't limit tech careers if you show up with positive energy, curiosity (learn iPhone, Google Docs), willingness to be learner and teacher, and pick companies with learning-focused cultures."
+        "Crystallised intelligence compounds with experience: Conley predicted Airbnb's occupancy tax liability before it became a crisis, not because he was smarter but because he had watched the hotel industry navigate the same regulatory arc for decades; older practitioners in regulated industries carry this pattern-recognition value invisibly.",
+        "Mutual mentorship is the operating model for intergenerational teams: Conley taught leadership, stakeholder management, and regulatory foresight; 25-year-olds taught him iPhone, Google Docs, and startup culture; neither could fully succeed alone, and the exchange required genuine curiosity rather than tolerance.",
+        "Invisible productivity compounds across organisations: mentoring, credibility transfer, and regulatory anticipation do not appear in sprint velocity or OKR dashboards but prevent multi-million-dollar course corrections; the business case for experienced hires is often invisible until the cost of not having them is visible."
       ],
       "use_cases": [
-        "Chip toured 20 cities meeting Airbnb hosts, learning their pain (older hosts struggle with mobile-only design), then advised against mobile-only pivot—saved misalignment.",
-        "Lisa, 25-year-old HR hire with no HR background, found Chip as confidant (giver of confidence); mutual mentorship: she taught tech, he taught leadership and frameworks.",
-        "Chip reduced from full-time to 60%, dropped salary proportionally; company got institutional wisdom on regulation, host psychology, and multi-generational product thinking without full-time burn."
+        "Airbnb world tour (20 cities): Conley spent months meeting hosts personally, learning that older hosts struggled with mobile-only design, and advised against a mobile-only product pivot; direct customer immersion at scale prevented a product decision that would have alienated a high-value host segment.",
+        "Lisa as confidant: a 25-year-old HR hire with no formal HR background found Conley as her 'giver of confidence'; he provided frameworks and pattern recognition, she provided him with institutional context and technical fluency; the model generalises to any senior-junior pairing where mutual learning is explicit."
       ],
-      "apply_to_prep": "Ade's role as RegTech PM across Vistra, N26, Ebury: recruit and nurture older practitioners (compliance officers, former regulators) to spot regulatory blind spots before they become million-dollar problems; position intergenerational teams as your competitive advantage.",
+      "apply_to_prep": "Directly mirrors Ade's FCA Authorisations Division experience: the value of crystallised intelligence in a regulatory setting is precisely the ability to read whether an applicant's control framework is genuinely robust or superficially compliant; the FCA examiner who has seen 200 applications recognises the pattern in minutes, exactly the invisible productivity Conley provided Airbnb at 52.",
       "framework_tags": [
-        "intergenerational-collaboration",
+        "crystallised-vs-fluid-intelligence",
         "invisible-productivity",
-        "crystallized-intelligence",
-        "mentorship",
-        "trust-and-curiosity"
+        "intergenerational-collaboration",
+        "mutual-mentorship"
       ]
     }
   },
@@ -518,25 +488,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "AI founders must master pricing from day one: cost dynamics and labour-budget-sized value require outcome-based models (not underpriced SaaS playbooks) to avoid training customers to expect more for less.",
+      "headline": "Only 5% of AI companies use outcome-based pricing, yet it is the only model that captures value at the scale AI creates; the rest leave it on the table.",
       "key_takeaways": [
-        "Dominate market share AND wallet share simultaneously; single-engine strategies (growth-at-all-costs, early monetisation neglecting acquisition, or loyalty with neither) all fail. Nine strategies help balance both.",
-        "Beautifully simple pricing tells a value story (Superhuman: dollar per day for four hours back weekly, not just $30/month) and passes the articulation test: can customers explain your pricing to others?",
-        "POCs reframe: goal is co-creating business case and ROI model, not tech demo. Charge smartly (10k for business case ≠ 120k annual deal), justify via value (1M unlocked, we take 1-in-10x ROI), offer ranges (500k–1M, not single anchor).",
-        "Master negotiations via gives-and-gets (ask for value audits in exchange for concessions), value selling (create needs, affirmation loops, co-create ROI models), and tactics (show options, anchor high, taper concessions).",
-        "Use attribution (can you prove KPI impact?) and autonomy (does AI run without humans?) to pick pricing model: low/low=subscription; high/low=hybrid; low/high=usage; high/high=outcome-based (the golden quadrant, only 5% there today)."
+        "Pursue market share and wallet share simultaneously from day one: single-engine strategies all fail eventually, growth-at-all-costs trains customers to expect underpricing, early-monetisation-neglecting-acquisition limits scale, loyalty-without-growth stalls; the nine-strategy matrix Ramanujam outlines shows how to balance both engines by product stage.",
+        "The attribution-autonomy 2x2 determines the correct pricing model: low attribution and low autonomy points to subscription; high attribution and high autonomy unlocks outcome-based (the golden quadrant); only 5% of AI companies are there today despite most having the technical capability because they have not done the commercial work to prove attribution.",
+        "POC design is the first pricing conversation: framing a proof of concept as business-case co-creation rather than technology demonstration changes the room; charge a modest fee (10k) for the business case itself, frame ROI as a range (500k to 1 million unlocked), and offer the annual contract as a 1-in-10 ROI share; buyers who engage with this framing become value-aligned customers."
       ],
       "use_cases": [
-        "Intercom Fin charges per AI-resolved ticket (99 cents if autonomous, zero if human needed); customer saves agents' salaries, Intercom captures portion transparently via outcome.",
-        "Sierra (enterprise compliance): land at 100k plus 10% on incremental value discovered in POC, or 500k fixed; buyer chooses certainty vs upside-share; discovers actual value willingness.",
-        "Chargeflow (chargeback recovery): charge 25% of recovered value; autonomous, highly attributable, customer sees cash back; outcome-based model aligns incentives."
+        "Intercom Fin: charges 99 cents per AI-resolved support ticket, zero if a human is needed; the customer sees agent salary savings directly and Intercom captures a transparent fraction; attributable, autonomous, outcome-aligned.",
+        "Chargeflow: charges 25% of recovered chargeback value; every dollar recovered is attributable and the automation is near-complete; outcome-based pricing aligns incentives so cleanly that sales cycles shorten because the customer has no reason to negotiate when value is self-evident."
       ],
-      "apply_to_prep": "Ade's Ebury (38% false-positive reduction, Salesforce→Fenergo 50k+ records): quantify identity-matching or AML-alert value saved in labour hours and regulatory fines averted; architect towards outcome-based pricing (% of manual effort eliminated, not seats) to justify premium positioning.",
+      "apply_to_prep": "Maps precisely to Ade's Ebury work: the 38% false-positive reduction and Salesforce-to-Fenergo migration of 50k+ records created attributable, autonomous compliance outcomes; quantifying the value saved in analyst hours and regulatory fines averted, then pricing the product on a fraction of that saving, is exactly the commercial architecture Ramanujam recommends.",
       "framework_tags": [
+        "attribution-autonomy-2x2",
         "outcome-based-pricing",
-        "attribution",
-        "autonomy",
-        "value-selling",
+        "POC-as-business-case",
         "market-share-plus-wallet-share"
       ]
     }
@@ -558,22 +524,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "The best product strategy in an AI-native era is designing experiences where models improve continuously rather than racing to deploy bigger models.",
+      "headline": "When 90% of your code is AI-generated and pull request volume blows out your merge queue, the constraint shifts from engineering output to product judgement and infrastructure architecture.",
       "key_takeaways": [
-        "Product development at Anthropic centres on making AI feel reliable and trustworthy; focus on incremental model improvements over raw capability chasing.",
-        "Multiple generational companies will be built in AI, but success depends on understanding what you want to become versus what others are becoming.",
-        "AI models gain new capabilities unexpectedly; recent breakthroughs in reasoning changed Krieger's assumptions about what models can accomplish independently."
+        "AI code generation breaks the assumptions behind software infrastructure: Anthropic had to re-architect its merge queue entirely because Claude Code generated so many pull requests (over 70% of all PRs by the time of recording) that the existing system could not process them; throughput problems that took months to hit now hit in weeks.",
+        "Multiple generational companies will be built in AI simultaneously: Krieger rejects the framing that ChatGPT is 'winning' as category-defining; the question is not who leads the consumer mindshare race today but what each company wants to become versus what it currently is, and which companies have clarity on that distinction.",
+        "Model capability surprises happen in both directions: Krieger arrived at Anthropic believing models could not hold genuine independent opinions, and reversed that view within a month of working closely with frontier models; the practical implication is that product roadmaps built on assumptions about current model limits will be invalidated faster than their authors expect."
       ],
       "use_cases": [
-        "Building Claude products where the interface and user experience matter as much as model capability; iterating with user feedback shapes what gets built.",
-        "Deciding when to release new model capabilities based on safety, reliability and user trust rather than just technical availability.",
-        "Positioning Anthropic for durability in a field moving at breakneck speed by focusing on values and user outcomes, not just racing competitors."
+        "Claude Code team as most AI-native team at Anthropic: they use Claude Code to build Claude Code in a self-improving loop; the infrastructure pressure this created (merge queue re-architecture) illustrates that AI-native development creates second-order bottlenecks in tooling and process that teams must anticipate.",
+        "AI 2027 document and product strategy open simultaneously: Krieger describes reading the AI 2027 speculative document alongside Anthropic's product strategy and experiencing the disorienting realisation that the scenarios described might apply to his own work; this is the CPO signal that planning horizons must now incorporate capability trajectory, not just market trajectory."
       ],
-      "apply_to_prep": "Connects to Ade's regulated-product background: Anthropic's careful approach to AI safety and reliability mirrors the compliance rigour needed in FinCrime PM, where rushing features can cause regulatory exposure.",
+      "apply_to_prep": "Connects to Ade's Elucidate zero-to-one work: building a RegTech SaaS product that Tier-1 banks trust (£120k ARR PoC, 40% MAU uplift) required exactly the product judgement Krieger describes as the new scarce resource; as model capability surpasses rule-based compliance screening, the PM who understands where trust and safety concerns will arise before they appear has the same advantage Anthropic's CPO describes.",
       "framework_tags": [
-        "product strategy",
-        "trust model",
-        "AI safety"
+        "AI-native-infrastructure-pressure",
+        "product-judgement-as-scarce-resource",
+        "capability-trajectory-planning"
       ]
     }
   },
@@ -594,22 +559,22 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Prototyping with AI is now table stakes for product development; NLX (natural language as interface) is the new UX paradigm requiring deliberate design.",
+      "headline": "NLX is the new UX layer and most teams are designing it by accident; deliberate prompt, plan, and show-work design separates products that feel magical from those that feel broken.",
       "key_takeaways": [
-        "Demos beat memos: prototype ideas quickly and share live work instead of lengthy documents; this tightens feedback loops and accelerates decision-making.",
-        "NLX requires explicit design of prompts, plans and 'showing work'; conversational interfaces are not less designed than GUIs, just differently designed.",
-        "Agents are autonomous software that can delegate complex multi-step tasks; they operate on three dimensions: autonomy, complexity and natural interaction."
+        "NLX (Natural Language eXperience) is a first-class design discipline: prompts, plans, and showing-work states require intentional design just as GUIs do; the Google Now failure (right idea, wrong timing and absent NLX design) shows that a capability without a designed experience produces adoption failure even when the underlying technology is correct.",
+        "Solve mode precedes scale mode: Frontier teams inside enterprises prototype without metrics, fixed scope, or compliance gates for a defined period; premature measurement kills solve mode; the right signal that solve mode is complete is when users start asking 'how do we get more people using this' rather than 'does this even work'.",
+        "Live one year in the future deliberately: Chennapragada's team at Microsoft uses AI tools as if it is 2025 when it is 2024, which creates product intuitions that lead to better decisions before competitors have the same constraints; this is not vision-setting but operational discipline."
       ],
       "use_cases": [
-        "Building Frontier teams inside enterprises to prototype cutting-edge AI workflows before rolling to the broader organisation, reducing adoption friction.",
-        "Using AI research agents to synthesise stakeholder perspectives and craft persuasion strategies; letting AI surface synapses you didn't know existed.",
-        "Designing for 'solve mode' first (rapid exploration, appetite for chaos) before 'scale mode'; premature metrics and fixed scope kill promising ideas."
+        "GitHub Copilot enterprise adoption: Aparna describes how the Frontier programme embedded Copilot in internal Microsoft engineering teams before external launch; the lessons learned (which tasks developers trusted AI for, which they did not, and what the failure modes looked like) shaped the enterprise product more than any external research.",
+        "Jean-Claude Van Damme B2B splits metaphor: Chennapragada uses this to describe the unique challenge of Microsoft's position, simultaneously serving enterprise buyers and developers with radically different expectations; the metaphor implies that being credible in both planes requires a fundamentally different product motion, not just dual messaging."
       ],
-      "apply_to_prep": "Aligns with Ade's product strategy strengths: Microsoft's 'living one year in the future' mirrors how leading RegTech PMs pre-emptively model regulations before they're written.",
+      "apply_to_prep": "Connects directly to Ade's Vistra global CLM programme: living one year in the future in a regulatory context means designing for AML and KYC obligations that are not yet in force but are clearly signalled by FATF guidance and EU AMLA timelines; the 20-jurisdiction Fenergo-Napier-Enate architecture was exactly this kind of pre-emptive regulatory design, not reactive remediation.",
       "framework_tags": [
-        "prototyping",
-        "NLX",
-        "solve vs scale"
+        "NLX-design",
+        "solve-mode-vs-scale-mode",
+        "live-one-year-ahead",
+        "Frontier-programme"
       ]
     }
   },
@@ -630,20 +595,21 @@ export const PODCAST_DIGESTS = [
     "spotify_url": "",
     "apple_url": "",
     "summary": {
-      "headline": "Mayur Kamat shares unconventional product lessons from Binance, N26, and Google",
+      "headline": "Mayur Kamat built Binance from zero to $400 billion in five years with 2,000 people; the operating principle was hypothesis-to-data speed, not size of team or planning sophistication.",
       "key_takeaways": [
-        "Don't take on projects that are too long-term, as they can be hard to control",
-        "Build experimentation to make product management scientific",
-        "Focus on how fast you can go from hypothesis to data"
+        "Build experimentation as scientific discipline from the start: at Binance, CZ ran 11 PMs on a daily leadership call seven days a week with a 24-hour decision ceiling; this cadence made every decision a testable hypothesis rather than a political negotiation, which is why Binance scaled faster than any exchange before it.",
+        "KYC at scale is a product problem, not just a compliance problem: Kamat built a 500-cell country-jurisdiction spreadsheet to map every KYC requirement across 200 countries; no user was left behind, which means the product team owned the compliance architecture end-to-end rather than delegating it to legal and waiting.",
+        "Compounding learning beats compounding compensation: Kamat's career advice is to choose roles where you identify your superpower early, decide the CPO versus IC track deliberately, and always optimise for learning velocity at the margin over immediate pay; the N26 CPO role at a BaFin-regulated bank followed this logic, not a pay-maximisation logic."
       ],
       "use_cases": [
-        "Binance's extreme ownership culture led to rapid problem-solving",
-        "N26's focus on experimentation and data-driven decision making"
+        "Google Gmail war-room on day one: when Gmail launched, Kamat was in a room scaling server infrastructure by 1,000x in real time; the lesson is that product success creates infrastructure crises within hours and the PM who understands the system beneath their product avoids the fire drills that kill momentum.",
+        "Google Hangouts failure: Kamat identifies the lesson as not having built experimentation discipline into the team culture; Hangouts had great engineering but no hypothesis-to-data loop, which meant product decisions relied on intuition at scale, and intuition does not survive scaling."
       ],
-      "apply_to_prep": "Ade can apply Mayur's advice on focusing on strengths and finding companies that are growing fast to his own career development, particularly in his experience at N26 where he cleared a 470 PEP backlog and automated 70% of EDD reviews",
+      "apply_to_prep": "Directly mirrors Ade's N26 BaFin work: the hypothesis-to-data speed that Kamat describes as Binance's advantage is the same operating principle behind clearing a 470-PEP backlog (each EDD case as a testable workflow hypothesis) and automating 70% of EDD reviews (the experiment that proved the automation hypothesis was reliable enough for BaFin audit points).",
       "framework_tags": [
-        "experimentation",
-        "data-driven decision making"
+        "hypothesis-to-data-speed",
+        "experimentation-as-discipline",
+        "KYC-as-product-problem"
       ]
     }
   }
