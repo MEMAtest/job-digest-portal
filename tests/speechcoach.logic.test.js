@@ -214,6 +214,13 @@ describe("buildSessionPayload", () => {
       transcriptionSource: "audio_pending",
       transcriptPending: true,
       audioCaptured: true,
+      captureDiagnostics: {
+        audioBytes: 2048,
+        audioChunkCount: 2,
+        recorderMimeType: "audio/webm",
+        recorderStopTimedOut: false,
+        transcriptChars: 0,
+      },
     });
 
     expect(payload).toMatchObject({
@@ -228,6 +235,11 @@ describe("buildSessionPayload", () => {
       totalFillers: 0,
       fpm: 0,
       wpm: 0,
+      captureDiagnostics: {
+        audioBytes: 2048,
+        audioChunkCount: 2,
+        recorderMimeType: "audio/webm",
+      },
       speechReview: null,
     });
   });

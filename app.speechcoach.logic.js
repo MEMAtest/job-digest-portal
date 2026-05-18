@@ -307,6 +307,7 @@ export const buildSessionPayload = ({
   transcriptionSource = "web_speech",
   transcriptPending = false,
   audioCaptured = false,
+  captureDiagnostics = null,
 } = {}) => {
   const pending = Boolean(transcriptPending);
   const cleanFillerCounts = { ...emptyCounts(), ...(fillerCounts || {}) };
@@ -353,6 +354,7 @@ export const buildSessionPayload = ({
     transcriptionSource: pending ? "audio_pending" : transcriptionSource,
     transcriptPending: pending,
     audioCaptured: Boolean(audioCaptured || audioRef),
+    captureDiagnostics,
     createdAtIso: now,
     device,
     interrupted: Boolean(interrupted),

@@ -27,6 +27,8 @@ const CATEGORY_LABELS = {
 };
 const MAX_SESSION_SECONDS = 120;
 const MIN_SAVE_SECONDS = 5;
+const RECORDER_CHUNK_INTERVAL_MS = 1000;
+const RECORDER_STOP_TIMEOUT_MS = 2500;
 const SPEECH_DB_NAME = "speech-coach-store";
 const QUEUE_STORE = "queuedSessions";
 const CUSTOM_QUESTIONS_KEY = "speechCoach.customQuestions.v1";
@@ -64,6 +66,8 @@ const coach = {
   stream: null,
   mediaRecorder: null,
   recorderChunks: [],
+  recorderStopTimedOut: false,
+  recorderError: "",
   recognition: null,
   recognitionActive: false,
   recognitionRestarts: 0,
@@ -655,6 +659,8 @@ const resetLiveState = ({ keepQuestion = false } = {}) => {
   coach.totalFillers = 0;
   coach.duration = 0;
   coach.audioBlob = null;
+  coach.recorderStopTimedOut = false;
+  coach.recorderError = "";
   if (coach.audioUrl) URL.revokeObjectURL(coach.audioUrl);
   coach.audioUrl = "";
   coach.lastSession = null;
@@ -886,10 +892,21 @@ const startCapture = async () => {
     if (mimeType) recorderOptions.mimeType = mimeType;
     const recorder = new MediaRecorder(coach.stream, recorderOptions);
     coach.recorderChunks = [];
+    coach.recorderStopTimedOut = false;
+    coach.recorderError = "";
     recorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) coach.recorderChunks.push(event.data);
     };
-    recorder.start();
+    recorder.onerror = (event) => {
+      const message = event?.error?.message || event?.error?.name || "MediaRecorder error";
+      coach.recorderError = message;
+      console.warn("Speech Coach recorder error", message);
+    };
+    try {
+      recorder.start(RECORDER_CHUNK_INTERVAL_MS);
+    } catch (error) {
+      recorder.start();
+    }
     coach.mediaRecorder = recorder;
     coach.stopRequested = false;
     coach.recognitionRestarts = 0;
@@ -958,16 +975,53 @@ const stopMediaRecorder = () =>
   new Promise((resolve) => {
     const recorder = coach.mediaRecorder;
     if (!recorder || recorder.state === "inactive") {
-      resolve();
+      resolve({ timedOut: false });
       return;
     }
-    recorder.onstop = () => resolve();
+
+    let settled = false;
+    const finish = (timedOut = false) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      if (timedOut) coach.recorderStopTimedOut = true;
+      resolve({ timedOut });
+    };
+
+    const timeoutId = setTimeout(() => finish(true), RECORDER_STOP_TIMEOUT_MS);
+    recorder.onstop = () => finish(false);
+    recorder.onerror = (event) => {
+      const message = event?.error?.message || event?.error?.name || "MediaRecorder stop error";
+      coach.recorderError = message;
+      console.warn("Speech Coach recorder stop error", message);
+      finish(false);
+    };
+
+    try {
+      recorder.requestData?.();
+    } catch (error) {
+      // Some mobile browsers throw if requestData lands too close to stop().
+    }
+
     try {
       recorder.stop();
     } catch (error) {
-      resolve();
+      finish(false);
     }
   });
+
+const buildCaptureDiagnostics = ({ audioBlob = null, recorderType = "", reason = "manual", transcript = "" } = {}) => ({
+  audioBytes: Number(audioBlob?.size || 0),
+  audioChunkCount: coach.recorderChunks.length,
+  recorderMimeType: recorderType || "",
+  recorderStopTimedOut: Boolean(coach.recorderStopTimedOut),
+  recorderError: coach.recorderError || "",
+  recognitionRestarts: Number(coach.recognitionRestarts || 0),
+  speechRecognitionSupported: supportsSpeechRecognition(),
+  mediaRecorderSupported: supportsMediaRecorder(),
+  transcriptChars: String(transcript || "").length,
+  stopReason: reason,
+});
 
 const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) => {
   if (!isRecording() && coach.status !== "saving") return;
@@ -982,7 +1036,7 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
   coach.timerId = null;
   coach.maxStopId = null;
   stopRecognition();
-  await stopMediaRecorder();
+  const recorderStopResult = await stopMediaRecorder();
   if (coach.stream) coach.stream.getTracks().forEach((track) => track.stop());
   coach.stream = null;
 
@@ -997,6 +1051,10 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
   const transcript = getTranscriptText();
   const hasAudioCapture = Boolean(audioBlob?.size);
   const transcriptPending = !transcript && hasAudioCapture;
+  const captureDiagnostics = buildCaptureDiagnostics({ audioBlob, recorderType, reason, transcript });
+  if (recorderStopResult?.timedOut) {
+    coach.warning = "Recorder stop was slow on this device. Any captured audio was still saved.";
+  }
   if (duration < MIN_SAVE_SECONDS || (!transcript && !hasAudioCapture)) {
     coach.status = "idle";
     coach.info = duration < MIN_SAVE_SECONDS
@@ -1021,6 +1079,7 @@ const stopRecording = async ({ interrupted = false, reason = "manual" } = {}) =>
     transcriptionSource: transcriptPending ? "audio_pending" : "web_speech",
     transcriptPending,
     audioCaptured: hasAudioCapture,
+    captureDiagnostics,
   });
   coach.lastSession = session;
   renderSpeechCoach();

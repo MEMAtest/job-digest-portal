@@ -68,6 +68,22 @@ const sanitizeReview = (review = null) => {
   };
 };
 
+const sanitizeCaptureDiagnostics = (diagnostics = null) => {
+  if (!diagnostics || typeof diagnostics !== "object") return null;
+  return {
+    audioBytes: Math.max(0, numberValue(diagnostics.audioBytes, 0)),
+    audioChunkCount: Math.max(0, numberValue(diagnostics.audioChunkCount, 0)),
+    recorderMimeType: stringValue(diagnostics.recorderMimeType, 120),
+    recorderStopTimedOut: Boolean(diagnostics.recorderStopTimedOut),
+    recorderError: stringValue(diagnostics.recorderError, 500),
+    recognitionRestarts: Math.max(0, numberValue(diagnostics.recognitionRestarts, 0)),
+    speechRecognitionSupported: Boolean(diagnostics.speechRecognitionSupported),
+    mediaRecorderSupported: Boolean(diagnostics.mediaRecorderSupported),
+    transcriptChars: Math.max(0, numberValue(diagnostics.transcriptChars, 0)),
+    stopReason: stringValue(diagnostics.stopReason, 80),
+  };
+};
+
 const sanitizeAiReview = (review = null) => {
   if (!review || typeof review !== "object") return null;
   const cleanList = (items, maxItems = 6, maxChars = 500) =>
@@ -137,6 +153,7 @@ const sanitizeSession = (raw = {}) => {
     transcriptionSource: raw.transcriptionSource || "web_speech",
     transcriptPending: Boolean(raw.transcriptPending) && !stringValue(raw.transcript, 50000).trim(),
     audioCaptured: Boolean(raw.audioCaptured || raw.audioRef),
+    captureDiagnostics: sanitizeCaptureDiagnostics(raw.captureDiagnostics),
     rescored: Boolean(raw.rescored),
     rescoredAt: raw.rescoredAt || "",
     duration: Math.max(0, numberValue(raw.duration, 0)),
@@ -178,6 +195,7 @@ const serializeSession = (id, data = {}) => ({
   transcriptionSource: data.transcriptionSource || "web_speech",
   transcriptPending: Boolean(data.transcriptPending),
   audioCaptured: Boolean(data.audioCaptured || data.audioRef),
+  captureDiagnostics: data.captureDiagnostics || null,
   rescored: Boolean(data.rescored),
   rescoredAt: data.rescoredAt || "",
   duration: numberValue(data.duration, 0),
