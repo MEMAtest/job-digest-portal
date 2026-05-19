@@ -111,7 +111,7 @@ def process(limit: int = MAX_PER_FIRE) -> int:
                 continue
 
         print(f"[ingest] {ep}: transcribing {audio.name} ({title})", file=sys.stderr)
-        result = transcribe(audio)
+        result = transcribe(audio, youtube_url=entry.get("youtube_url"))
         if not result or not result.get("text"):
             print(f"  failed", file=sys.stderr)
             continue
