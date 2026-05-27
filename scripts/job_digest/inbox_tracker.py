@@ -128,6 +128,68 @@ AMBIGUOUS_KEYWORDS = [
     "candidate",
 ]
 
+# Hard noise denylist — survey / feedback / referral / digest emails that
+# look application-related but are not actual events. These force `noise`
+# regardless of other signals.
+NOISE_SUBJECT_PATTERNS = [
+    "how did we do",
+    "rate your interview",
+    "rate your experience",
+    "your feedback on",
+    "share your feedback",
+    "we'd love your feedback",
+    "tell us about your interview",
+    "candidate experience survey",
+    "interview feedback survey",
+    "post-interview survey",
+    "survey",
+    "referral",
+    "job alert",
+    "jobs for you",
+    "new jobs that match",
+    "weekly digest",
+    "daily digest",
+    "career insights",
+    "unsubscribe",
+]
+
+NOISE_SENDER_PATTERNS = [
+    "feedback@",
+    "surveys@",
+    "noreply-feedback@",
+    "notifications@linkedin.com",  # job alerts, not application mail
+    "jobs-noreply@linkedin.com",
+    "talent-insights@",
+]
+
+# Known company-name aliases — collapse variants to a canonical key for
+# reconciliation. Both sides are pre-normalised (lowercase, no suffixes).
+COMPANY_ALIASES: Dict[str, str] = {
+    "jpmorgan": "jpmorgan chase",
+    "jp morgan": "jpmorgan chase",
+    "chase": "jpmorgan chase",
+    "jpmc": "jpmorgan chase",
+    "j p morgan": "jpmorgan chase",
+    "rbccm": "rbc",
+    "rbc capital markets": "rbc",
+    "rbc capital markets london": "rbc",
+    "royal bank of canada": "rbc",
+    "natwest": "natwest group",
+    "checkout": "checkout.com",
+    "wise payments": "wise",
+    "wise plc": "wise",
+}
+
+# Senders whose mail is recruiter outreach masquerading as interview language.
+# Demote interview_invite to lower confidence unless body has hard signals.
+RECRUITER_SENDER_HINTS = [
+    "recruiter",
+    "talent acquisition",
+    "talent partner",
+    "recruiting",
+    "sourcer",
+]
+
 
 # ---------- Data shapes ----------
 
@@ -147,6 +209,7 @@ class Event:
     matched_job_id: str = ""
     match_status: str = "no_match"   # matched | ambiguous | no_match | new_doc
     candidate_doc_ids: List[str] = field(default_factory=list)
+    body_snippet: str = ""      # first 400 chars of plaintext body (debug)
 
 
 @dataclass
@@ -372,10 +435,25 @@ def _ats_family_from_domain(domain: str) -> str:
     return ""
 
 
-def _classify_by_rules(subject: str, body: str) -> Tuple[str, float]:
+def _is_noise(subject: str, sender: str) -> bool:
+    """Hard denylist for surveys, job alerts, digests etc."""
+    s = (subject or "").lower()
+    snd = (sender or "").lower()
+    if any(p in s for p in NOISE_SUBJECT_PATTERNS):
+        return True
+    if any(p in snd for p in NOISE_SENDER_PATTERNS):
+        return True
+    return False
+
+
+def _classify_by_rules(subject: str, body: str, sender: str = "") -> Tuple[str, float]:
     """Rules-only classification. Returns (event_type, confidence)."""
     s = (subject or "").lower()
-    b = (body or "").lower()[:4000]
+    b = (body or "").lower()[:6000]
+
+    # Hard noise filter — overrides everything else
+    if _is_noise(subject, sender):
+        return "noise", 0.0
 
     def hit(phrases, text):
         return any(p in text for p in phrases)
@@ -392,35 +470,55 @@ def _classify_by_rules(subject: str, body: str) -> Tuple[str, float]:
         "not selected for the role",
         "filled the position",
         "filled this role",
+        "we will not be progressing",
+        "after careful consideration",
+        "wish you the best in your future",
+        "wish you success in your job search",
     ]
-    if hit(rejection_signals, b) or hit(["unfortunately", "regret to inform", "not moving forward"], s):
+    if hit(rejection_signals, b) or hit(["unfortunately", "regret to inform", "not moving forward", "update on your application"], s):
         return "rejection", 0.85
 
-    # Interview / next-step signals
-    interview_strong = [
-        "schedule a time", "schedule a call", "calendly", "would you be available",
-        "invite you to interview", "phone screen", "screening call", "next stage",
-        "we'd love to chat", "would love to chat", "video call",
-    ]
-    if hit(["interview"], s) or hit(interview_strong, b):
-        return "interview_invite", 0.9
-
-    # Application confirmation signals
+    # Application confirmation signals — check BEFORE interview since
+    # confirmation emails often contain "next steps" phrasing in the body
+    # ("we'll be in touch about next steps") which would trip the interview
+    # classifier otherwise.
     application_subject_strong = [
         "thank you for applying", "thanks for applying", "thank you for your application",
         "thanks for your application", "application received", "application submitted",
         "we received your application", "we have received your application",
         "your application has been received", "your application was sent",
-        "application confirmation",
+        "application confirmation", "we've received your application",
+        "successfully applied",
     ]
     application_body_strong = [
         "thank you for applying", "thank you for your application",
         "we have received your application", "we received your application",
         "your application has been received", "successfully submitted",
-        "your application was sent",
+        "your application was sent", "we've received your application",
     ]
     if hit(application_subject_strong, s) or hit(application_body_strong, b):
         return "application_confirmation", 0.92
+
+    # Interview / next-step signals — require STRONG body signal to fire,
+    # not just "interview" anywhere in subject (which could be an interview
+    # PREP email, calendar reminder for a survey, etc.)
+    interview_strong_body = [
+        "schedule a time", "schedule a call", "calendly.com", "would you be available",
+        "invite you to interview", "phone screen", "screening call", "next stage",
+        "we'd love to chat", "would love to chat", "video call",
+        "first stage interview", "second stage interview", "final stage",
+        "available to meet", "available for a call", "available for a chat",
+        "interview invitation",
+    ]
+    interview_strong_subject = [
+        "interview invitation", "invitation to interview", "interview confirmed",
+        "interview scheduled", "interview with",
+    ]
+    if hit(interview_strong_subject, s) or hit(interview_strong_body, b):
+        # If sender clearly recruiter outreach without ATS hints, downgrade
+        if any(p in sender.lower() for p in RECRUITER_SENDER_HINTS) and "interview" not in s:
+            return "noise", 0.0
+        return "interview_invite", 0.9
 
     return "noise", 0.0
 
@@ -444,55 +542,131 @@ def _extract_job_url(body: str) -> str:
     return ""
 
 
+_STOP_WORDS = {
+    "has", "have", "was", "is", "for", "at", "with", "your", "the", "an", "a",
+    "to", "received", "received.", "submitted", "submitted.", "successful",
+    "confirmed", "review", "and", "or", "of", "on", "we", "you", "are",
+    "been", "team", "regarding", "update", "application", "thank", "thanks",
+}
+
+
+def _clean_token_tail(text: str) -> str:
+    """Trim trailing stop-words / punctuation from a candidate company string."""
+    cleaned = re.sub(r"\s+", " ", (text or "")).strip(" -—|:;.,!?")
+    # Drop trailing stop-words ("Hawk has been received" -> "Hawk")
+    parts = cleaned.split(" ")
+    while parts and parts[-1].lower().strip(".,;:!?") in _STOP_WORDS:
+        parts.pop()
+    return " ".join(parts).strip(" -—|:;.,!?")
+
+
 def _extract_company_role(subject: str, body: str, sender: str) -> Tuple[str, str]:
-    """Cheap company/role extraction from subject and body. Best-effort only."""
+    """Best-effort company + role extraction from subject, body, sender."""
     s = subject or ""
     company = ""
     role = ""
 
-    # Subject patterns: "Your application to Acme for Senior PM"
-    m = re.search(r"(?:application (?:to|for|with)|applying (?:to|with)) ([A-Z][\w &'.\-]{1,60})", s, re.IGNORECASE)
+    # 1) Strong subject patterns — bounded, NOT greedy.
+    # "Your application for <Role> at <Company>" / "...has been received"
+    m = re.search(
+        r"application (?:for|to)\s+(.+?)\s+at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+        s, re.IGNORECASE,
+    )
     if m:
-        company = m.group(1).strip()
+        role = role or m.group(1).strip()
+        company = company or m.group(2).strip()
 
-    # "Your application for <Role> at <Company>"
-    m2 = re.search(r"application (?:for|to)\s+(.+?)\s+at\s+(.+?)(?:\s+(?:has|was|is)|[:\-—|]|$)", s, re.IGNORECASE)
-    if m2:
-        role = role or m2.group(1).strip()
-        company = company or m2.group(2).strip()
+    # "<Role> at <Company> — has been received" style
+    if not company:
+        m2 = re.search(
+            r"^([A-Z][^|:—\-]{2,80})\s+at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            s,
+        )
+        if m2:
+            role = role or m2.group(1).strip()
+            company = m2.group(2).strip()
 
-    # "<Role> at <Company>"
-    m3 = re.search(r"^(.+?)\s+at\s+(.+?)$", s)
-    if m3 and not role:
-        role = m3.group(1).strip()
-        company = company or m3.group(2).strip()
+    # "Your application to <Company> ..." — company is single proper-noun phrase
+    if not company:
+        m3 = re.search(
+            r"(?:application (?:to|with)|applying (?:to|with))\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            s, re.IGNORECASE,
+        )
+        if m3:
+            company = m3.group(1).strip()
 
-    # LinkedIn distinct pattern: "Your application was sent to <Company>"
-    m4 = re.search(r"your application was sent to\s+(.+?)(?:[:\-—|]|$)", s, re.IGNORECASE)
-    if m4:
-        company = m4.group(1).strip()
+    # LinkedIn: "Your application was sent to <Company>"
+    if not company:
+        m4 = re.search(r"your application was sent to\s+(.+?)(?:[:\-—|]|$)", s, re.IGNORECASE)
+        if m4:
+            company = m4.group(1).strip()
 
-    # Body fallback: "Position: <Role>" / "Role: <Role>"
-    if not role and body:
-        m5 = re.search(r"\b(?:Position|Role|Job title)\s*[:\-]\s*([^\n\r]{2,120})", body, re.IGNORECASE)
+    # "Update on your application for <Role>" / "Update on your application" (rejection)
+    if not role:
+        m5 = re.search(r"application for\s+(.+?)(?:\s+at\s+|[:\-—|]|$)", s, re.IGNORECASE)
         if m5:
             role = m5.group(1).strip()
-    if not company and body:
-        m6 = re.search(r"\b(?:Company|Employer|Organization)\s*[:\-]\s*([^\n\r]{2,80})", body, re.IGNORECASE)
-        if m6:
-            company = m6.group(1).strip()
 
-    # Sender-domain hint for company when nothing else worked
+    # 2) Body fallback for role — many ATS bodies have structured fields
+    if not role and body:
+        b = body[:4000]
+        for pattern in (
+            r"\b(?:Position|Role|Job title|Job)\s*[:\-]\s*([^\n\r<]{3,120})",
+            r"\bapplied (?:for|to) the\s+([^\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
+            r"\bapplication (?:for|to)\s+the\s+([^\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
+            r"\bthank you for applying (?:to|for) the\s+([^\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
+            r"\byour application (?:for|to) (?:the )?([^\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening|at)",
+            r"<title>([^<]{3,120})</title>",  # last-resort: HTML <title>
+        ):
+            m6 = re.search(pattern, b, re.IGNORECASE)
+            if m6:
+                role = m6.group(1).strip()
+                break
+
+    # 3) Body fallback for company — structured fields or "at <Company>"
+    if not company and body:
+        b = body[:4000]
+        for pattern in (
+            r"\b(?:Company|Employer|Organization|Organisation)\s*[:\-]\s*([^\n\r<]{2,80})",
+            r"applied (?:for|to) [^.<\n]{3,120} at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"position at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"role at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"team at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"opportunity at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+        ):
+            m7 = re.search(pattern, b)
+            if m7:
+                company = m7.group(1).strip()
+                break
+
+    # 4) ATS sender-domain hint as last resort. Greenhouse/Lever encode
+    # tenant in subdomain (e.g. boards-mail.greenhouse.io / wise.greenhouse.io).
     if not company:
         domain = _sender_domain(sender)
-        if domain and not any(ats in domain for ats in ATS_SENDER_DOMAINS):
-            base = domain.split(".")[0]
-            if base not in {"mail", "no-reply", "noreply", "donotreply"}:
-                company = base.title()
+        if domain:
+            for ats in ("greenhouse.io", "lever.co", "ashbyhq.com", "smartrecruiters.com",
+                        "workable.com", "myworkdayjobs.com", "recruitee.com",
+                        "teamtailor.com", "personio.com", "personio.de"):
+                if domain.endswith(ats):
+                    sub = domain[: -(len(ats) + 1)]
+                    # boards-mail / talent / careers etc. are not company names
+                    candidates = [p for p in sub.split(".") if p and p not in {
+                        "boards", "boards-mail", "talent", "careers", "jobs",
+                        "hire", "apply", "no-reply", "noreply", "mail",
+                    }]
+                    if candidates:
+                        company = candidates[-1].replace("-", " ").title()
+                        break
+            # generic corporate domain fallback (e.g. careers@monzo.com)
+            if not company and not any(ats in domain for ats in ATS_SENDER_DOMAINS):
+                base = domain.split(".")[0]
+                if base not in {"mail", "no-reply", "noreply", "donotreply",
+                                "do-not-reply", "do_not_reply", "info", "hello"}:
+                    company = base.title()
 
-    # Trim noisy trailing punctuation
-    role = re.sub(r"\s+", " ", role).strip(" -—|:;.")[:120]
-    company = re.sub(r"\s+", " ", company).strip(" -—|:;.")[:80]
+    # 5) Cleanup — drop trailing stop-words and length-cap
+    company = _clean_token_tail(company)[:80]
+    role = _clean_token_tail(role)[:120]
     return company, role
 
 
@@ -531,10 +705,22 @@ def _llm_classify(subject: str, body: str, sender: str) -> Optional[Dict[str, ob
         return None
 
 
-def _should_call_llm(rule_type: str, rule_conf: float, subject: str, body: str) -> bool:
+def _should_call_llm(
+    rule_type: str,
+    rule_conf: float,
+    subject: str,
+    body: str,
+    company: str,
+    role: str,
+) -> bool:
     """Decide if LLM fallback should run. Aim for high recall, low spam."""
+    # If rules are confident but parser failed to extract company/role for
+    # a high-value event, call the LLM so we can populate those fields.
+    needs_extraction = rule_type in {"application_confirmation", "rejection"} and (not company or not role)
+    if needs_extraction:
+        return True
     if rule_type != "noise" and rule_conf >= 0.9:
-        return False  # rules already confident
+        return False
     s = (subject or "").lower()
     b = (body or "").lower()[:2000]
     if any(k in s or k in b for k in AMBIGUOUS_KEYWORDS):
@@ -559,9 +745,9 @@ def _jaccard(a: set, b: set) -> float:
 
 def _norm_company(c: str) -> str:
     s = (c or "").lower()
-    s = re.sub(r"\b(ltd|limited|inc|llc|plc|gmbh|ag|bv|nv|sa|sas|group|holdings|holding)\b", "", s)
+    s = re.sub(r"\b(ltd|limited|inc|llc|plc|gmbh|ag|bv|nv|sa|sas|group|holdings|holding|the)\b", "", s)
     s = re.sub(r"[^a-z0-9]+", " ", s).strip()
-    return s
+    return COMPANY_ALIASES.get(s, s)
 
 
 def _load_jobs_index(client) -> List[Dict[str, object]]:
@@ -864,19 +1050,25 @@ def run_inbox_tracker(
                 continue
 
             body = _fetch_body_text(imap, uid)
-            rule_type, rule_conf = _classify_by_rules(subject, body)
+            rule_type, rule_conf = _classify_by_rules(subject, body, sender)
             company, role = _extract_company_role(subject, body, sender)
             job_url = _extract_job_url(body)
             ev_type = rule_type
             ev_conf = rule_conf
             detection_source = "rules"
 
-            if _should_call_llm(rule_type, rule_conf, subject, body):
+            if _should_call_llm(rule_type, rule_conf, subject, body, company, role):
                 llm = _llm_classify(subject, body, sender)
                 if llm:
-                    detection_source = "llm"
-                    ev_type = llm["event_type"]
-                    ev_conf = max(rule_conf, float(llm["confidence"]))
+                    # If rules already produced a confident type, keep it but
+                    # use LLM only for company/role enrichment. Otherwise let
+                    # LLM drive the classification too.
+                    if rule_type in {"application_confirmation", "rejection", "interview_invite"} and rule_conf >= 0.9:
+                        detection_source = "rules+llm"
+                    else:
+                        detection_source = "llm"
+                        ev_type = llm["event_type"]
+                        ev_conf = max(rule_conf, float(llm["confidence"]))
                     if llm.get("company") and not company:
                         company = llm["company"]
                     if llm.get("role") and not role:
@@ -899,6 +1091,7 @@ def run_inbox_tracker(
                 sender=sender,
                 subject_redacted=_redact_subject(subject),
                 detection_source=detection_source,
+                body_snippet=(body or "")[:400].replace("\r", " ").replace("\n", " "),
             ))
     finally:
         try:
