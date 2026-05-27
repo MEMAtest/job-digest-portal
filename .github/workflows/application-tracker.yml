@@ -58,8 +58,11 @@ jobs:
           FIREBASE_COLLECTION: ${{ secrets.FIREBASE_COLLECTION }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           JOB_DIGEST_OPENROUTER_MODEL: ${{ secrets.JOB_DIGEST_OPENROUTER_MODEL }}
+          # config.py mkdirs JOB_DIGEST_BASE_DIR on import; override the
+          # hardcoded local-machine default so it works on the runner.
+          JOB_DIGEST_BASE_DIR: ${{ github.workspace }}/digest-data
         run: |
-          mkdir -p artefacts
+          mkdir -p artefacts digest-data/digests
           FLAGS="--since ${{ github.event.inputs.since }} --out artefacts/applications.json --max-messages ${{ github.event.inputs.max_messages }}"
           if [ "${{ github.event.inputs.commit_writes }}" = "true" ]; then
             FLAGS="$FLAGS --commit-writes"
