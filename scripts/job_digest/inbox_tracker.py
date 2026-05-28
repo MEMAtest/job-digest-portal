@@ -902,7 +902,7 @@ def _jaccard(a: set, b: set) -> float:
 
 def _norm_company(c: str) -> str:
     s = (c or "").lower()
-    s = re.sub(r"\b(ltd|limited|inc|llc|plc|gmbh|ag|bv|nv|sa|sas|group|holdings|holding|the)\b", "", s)
+    s = re.sub(r"\b(ltd|limited|inc|llc|plc|gmbh|ag|bv|nv|sa|sas|group|holdings|holding|global|international|the)\b", "", s)
     s = re.sub(r"[^a-z0-9]+", " ", s).strip()
     return COMPANY_ALIASES.get(s, s)
 
