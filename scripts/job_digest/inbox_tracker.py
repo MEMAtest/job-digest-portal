@@ -511,6 +511,10 @@ def _classify_by_rules(subject: str, body: str, sender: str = "") -> Tuple[str, 
         "after careful consideration",
         "wish you the best in your future",
         "wish you success in your job search",
+        "has not been progressed",
+        "not been progressed",
+        "application has not been successful",
+        "will not be progressing your application",
     ]
     if hit(rejection_signals, b) or hit(["unfortunately", "regret to inform", "not moving forward", "update on your application"], s):
         return "rejection", 0.85
@@ -588,8 +592,14 @@ _STOP_WORDS = {
 
 
 def _clean_token_tail(text: str) -> str:
-    """Trim trailing stop-words / punctuation from a candidate company string."""
+    """Trim trailing stop-words / punctuation from a candidate company string.
+
+    Also split on sentence boundaries ("Lendable. Unfortunately" -> "Lendable")
+    while preserving inside-token periods like "Checkout.com".
+    """
     cleaned = re.sub(r"\s+", " ", (text or "")).strip(" -—|:;.,!?")
+    # Split on ". <Capital>" (sentence boundary) — keep first chunk only
+    cleaned = re.split(r"\.\s+(?=[A-Z])", cleaned)[0]
     # Drop trailing stop-words ("Hawk has been received" -> "Hawk")
     parts = cleaned.split(" ")
     while parts and parts[-1].lower().strip(".,;:!?") in _STOP_WORDS:
@@ -618,6 +628,21 @@ def _extract_company_role(subject: str, body: str, sender: str) -> Tuple[str, st
     # 0b) Strip "join " when subject is "Thank you for your application to join X"
     s_clean = re.sub(r"\bto\s+join\s+", "to ", s, flags=re.IGNORECASE)
     s = s_clean
+
+    # 0c) "Interview for <Role> job at <Company>" (Workable reminder) and
+    # "Interview with <Company>" / "Reminder: Your Upcoming Interview with <Company>"
+    m_jat = re.search(r"(?:interview|reminder)[^|]{0,40}for\s+(.+?)\s+(?:job|role|position)\s+at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})", s, re.IGNORECASE)
+    if m_jat:
+        role = role or m_jat.group(1).strip()
+        company = company or m_jat.group(2).strip()
+    if not company:
+        m_with = re.search(r"interview\s+with\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})", s, re.IGNORECASE)
+        if m_with:
+            company = m_with.group(1).strip()
+    if not company:
+        m_rem = re.search(r"reminder[: ]+your upcoming interview with\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})", s, re.IGNORECASE)
+        if m_rem:
+            company = m_rem.group(1).strip()
 
     # 1) Strong subject patterns — bounded, NOT greedy.
     # "Your application for <Role> at <Company>" / "...has been received"
@@ -660,20 +685,31 @@ def _extract_company_role(subject: str, body: str, sender: str) -> Tuple[str, st
         if m5:
             role = m5.group(1).strip()
 
-    # 2) Body fallback for role — many ATS bodies have structured fields
+    # 2) Body fallback for role — many ATS bodies have structured fields.
+    # Stop role extraction at sentence boundaries and HTML/link junk; reject
+    # results that are clearly sentence fragments ("we have good development
+    # support from the other te...").
     if not role and body:
         b = body[:4000]
         for pattern in (
-            r"\b(?:Position|Role|Job title|Job)\s*[:\-]\s*([^\n\r<]{3,120})",
-            r"\bapplied (?:for|to) the\s+([^\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
-            r"\bapplication (?:for|to)\s+the\s+([^\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
-            r"\bthank you for applying (?:to|for) the\s+([^\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
-            r"\byour application (?:for|to) (?:the )?([^\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening|at)",
+            r"\b(?:Position|Role|Job title|Job)\s*[:\-]\s*([^.\n\r<]{3,120})",
+            r"\bapplied (?:for|to) the\s+([^.\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
+            r"\bapplication (?:for|to)\s+the\s+([^.\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
+            r"\bthank you for applying (?:to|for) the\s+([^.\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
+            r"\byour application (?:for|to) (?:the )?([^.\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening|at)",
+            r"\bfor the\s+([A-Z][^.\n\r<]{3,120}?)\s+(?:position|role|opportunity|opening)",
             r"<title>([^<]{3,120})</title>",  # last-resort: HTML <title>
         ):
             m6 = re.search(pattern, b, re.IGNORECASE)
             if m6:
-                role = m6.group(1).strip()
+                candidate = m6.group(1).strip()
+                # Reject candidates that look like sentence fragments
+                # (start with a lowercase word, or contain typical filler)
+                first_word = candidate.split(" ", 1)[0]
+                if (first_word[:1].islower() and first_word.lower() not in {"senior", "junior", "lead", "head"}) or \
+                        any(b in candidate.lower() for b in (" we ", " they ", " our ", " from the ", " support from")):
+                    continue
+                role = candidate
                 break
 
     # 3) Body fallback for company — structured fields or "at <Company>"
@@ -733,11 +769,20 @@ def _extract_company_role(subject: str, body: str, sender: str) -> Tuple[str, st
                     if candidates:
                         company = candidates[-1].replace("-", " ").title()
                         break
+            # Workable's inbound.workablemail.com is generic transport — never
+            # use "inbound" as a company name; the real company is in the body.
+            if domain.endswith("workablemail.com") or "inbound" in domain.split(".")[:1]:
+                # Try one more body pattern: "at <Company>" near the end
+                if body:
+                    m_at = re.search(r"\bat\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,3})\b", body[:2000])
+                    if m_at:
+                        company = m_at.group(1).strip()
             # generic corporate domain fallback (e.g. careers@monzo.com)
             if not company and not any(ats in domain for ats in ATS_SENDER_DOMAINS):
                 base = domain.split(".")[0]
                 if base not in {"mail", "no-reply", "noreply", "donotreply",
-                                "do-not-reply", "do_not_reply", "info", "hello"}:
+                                "do-not-reply", "do_not_reply", "info", "hello",
+                                "inbound", "outbound", "system", "notifications"}:
                     company = base.title()
 
     # 5) Cleanup — drop trailing stop-words and length-cap
@@ -1215,11 +1260,47 @@ def run_inbox_tracker(
     return result
 
 
+# Canonical display names for aliased firms — used in tracker output so the
+# user sees "JPMorgan Chase" not "Jpmorgan" or "Chase".
+CANONICAL_DISPLAY = {
+    "jpmorgan chase": "JPMorgan Chase",
+    "rbc": "RBC",
+    "natwest group": "NatWest Group",
+    "checkout.com": "Checkout.com",
+    "wise": "Wise",
+}
+
+
+def _canonical_display(company: str) -> str:
+    """Return the preferred display string for a company, applying aliases."""
+    if not company:
+        return ""
+    norm = _norm_company(company)
+    return CANONICAL_DISPLAY.get(norm, company)
+
+
+def _merge_into(target: Dict[str, object], src: Dict[str, object]) -> None:
+    """Merge src group into target group, taking earliest dates."""
+    target["event_count"] = int(target["event_count"]) + int(src["event_count"])
+    target["evidence_msg_ids"].extend(src.get("evidence_msg_ids", []))  # type: ignore
+    for k in ("applied_date", "responded_date", "interview_offered_date", "rejected_date"):
+        nv = str(src.get(k) or "")
+        cv = str(target.get(k) or "")
+        if nv and (not cv or nv < cv):
+            target[k] = nv
+    if not target.get("matched_job_id") and src.get("matched_job_id"):
+        target["matched_job_id"] = src["matched_job_id"]
+
+
 def _build_tracker(events: List[Event]) -> List[Dict[str, object]]:
     """Roll up events into one row per (firm, role) for the user-facing tracker.
 
-    Columns: firm, role, applied_date, responded, interview_offered_date,
-    rejected_date, current_status, event_count, matched_job_id.
+    Two passes:
+      1. Group by (firm_norm, role_lower).
+      2. For each firm with a single role-having group + N no-role groups,
+         merge the no-role groups into the role-having group (same campaign).
+         When multiple role-having groups exist, keep no-role groups separate
+         so the user can disambiguate manually.
     """
     groups: Dict[Tuple[str, str], Dict[str, object]] = {}
     for ev in events:
@@ -1227,10 +1308,9 @@ def _build_tracker(events: List[Event]) -> List[Dict[str, object]]:
             continue
         firm_key = _norm_company(ev.company) or "(unknown)"
         role_key = (ev.role or "").lower().strip()
-        # If role is empty, all unknown-role events for a firm collapse into one row
         key = (firm_key, role_key)
         g = groups.setdefault(key, {
-            "firm": ev.company or "(unknown)",
+            "firm": _canonical_display(ev.company) or "(unknown)",
             "role": ev.role or "(role not parsed)",
             "applied_date": "",
             "responded_date": "",
@@ -1243,12 +1323,12 @@ def _build_tracker(events: List[Event]) -> List[Dict[str, object]]:
         })
         g["event_count"] = int(g["event_count"]) + 1
         g["evidence_msg_ids"].append(ev.message_id)  # type: ignore
-        # Prefer richer company/role text once we have it
-        if ev.company and len(ev.company) > len(str(g["firm"])):
-            g["firm"] = ev.company
+        # Prefer richer/canonical display for firm
+        new_display = _canonical_display(ev.company)
+        if new_display and (g["firm"] == "(unknown)" or len(new_display) >= len(str(g["firm"]))):
+            g["firm"] = new_display
         if ev.role and (g["role"] == "(role not parsed)" or len(ev.role) > len(str(g["role"]))):
             g["role"] = ev.role
-        # Earliest event per type wins for date columns
         date = ev.received_at[:10]
         if ev.event_type == "application_confirmation" and (not g["applied_date"] or date < str(g["applied_date"])):
             g["applied_date"] = date
@@ -1256,15 +1336,75 @@ def _build_tracker(events: List[Event]) -> List[Dict[str, object]]:
             g["interview_offered_date"] = date
         if ev.event_type == "rejection" and (not g["rejected_date"] or date < str(g["rejected_date"])):
             g["rejected_date"] = date
-        # Any event after applied_date is "responded"
         if ev.event_type != "application_confirmation":
             if not g["responded_date"] or date < str(g["responded_date"]):
                 g["responded_date"] = date
         if ev.matched_job_id and not g["matched_job_id"]:
             g["matched_job_id"] = ev.matched_job_id
 
+    # Pass 2: merge no-role groups into role-having group for the same firm
+    # when there is exactly one role-having group OR exactly one no-role group
+    # collapses cleanly into the dominant role-having group.
+    by_firm: Dict[str, List[Tuple[str, Dict[str, object]]]] = {}
+    for (firm_norm, role_lower), g in groups.items():
+        by_firm.setdefault(firm_norm, []).append((role_lower, g))
+
+    merged: List[Dict[str, object]] = []
+    for firm_norm, items in by_firm.items():
+        role_having = [(rl, g) for rl, g in items if rl]
+        no_role = [(rl, g) for rl, g in items if not rl]
+        if not no_role:
+            merged.extend(g for _, g in role_having)
+            continue
+        if not role_having:
+            # All no-role for this firm — emit as-is
+            merged.extend(g for _, g in no_role)
+            continue
+        if len(role_having) == 1:
+            # Single role campaign — all no-role events fold in
+            target = role_having[0][1]
+            for _, nr in no_role:
+                _merge_into(target, nr)
+            merged.append(target)
+        else:
+            # Multiple distinct roles for same firm. Fold no-role events
+            # into the role-having group whose date range is closest in time.
+            for _, nr in no_role:
+                nr_dates = [d for d in (nr["applied_date"], nr["responded_date"],
+                                          nr["interview_offered_date"], nr["rejected_date"]) if d]
+                if not nr_dates:
+                    merged.append(nr)
+                    continue
+                nr_pivot = min(nr_dates)
+                best = None
+                best_dist = 10 ** 9
+                for _, rh in role_having:
+                    rh_dates = [d for d in (rh["applied_date"], rh["responded_date"],
+                                              rh["interview_offered_date"], rh["rejected_date"]) if d]
+                    if not rh_dates:
+                        continue
+                    from datetime import date as _date
+                    try:
+                        rh_min = min(_date.fromisoformat(d) for d in rh_dates)
+                        rh_max = max(_date.fromisoformat(d) for d in rh_dates)
+                        nr_d = _date.fromisoformat(nr_pivot)
+                        if rh_min <= nr_d <= rh_max:
+                            dist = 0
+                        else:
+                            dist = min(abs((nr_d - rh_min).days), abs((nr_d - rh_max).days))
+                    except Exception:
+                        dist = 10 ** 9
+                    if dist < best_dist:
+                        best_dist = dist
+                        best = rh
+                if best is not None and best_dist <= 60:
+                    _merge_into(best, nr)
+                else:
+                    merged.append(nr)
+            merged.extend(g for _, g in role_having)
+
     # Derive current_status — terminal states win
-    for g in groups.values():
+    for g in merged:
         if g["rejected_date"]:
             g["current_status"] = "rejected"
         elif g["interview_offered_date"]:
@@ -1274,7 +1414,6 @@ def _build_tracker(events: List[Event]) -> List[Dict[str, object]]:
         else:
             g["current_status"] = "unknown"
 
-    # Sort: most-recent activity first (max of all dates)
     def _latest(g: Dict[str, object]) -> str:
         return max(
             str(g.get("applied_date") or ""),
@@ -1282,9 +1421,8 @@ def _build_tracker(events: List[Event]) -> List[Dict[str, object]]:
             str(g.get("rejected_date") or ""),
             str(g.get("responded_date") or ""),
         )
-    rows = list(groups.values())
-    rows.sort(key=_latest, reverse=True)
-    return rows
+    merged.sort(key=_latest, reverse=True)
+    return merged
 
 
 def _write_artefact(path: str, result: RunResult) -> None:
