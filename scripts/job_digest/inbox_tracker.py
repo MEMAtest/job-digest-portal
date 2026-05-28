@@ -341,6 +341,41 @@ def _fetch_headers(imap: imaplib.IMAP4_SSL, uids: List[bytes]) -> Dict[bytes, Di
     return out
 
 
+def _strip_html(html: str) -> str:
+    """Strip HTML to plain text, removing style/script/head content first.
+
+    The previous implementation kept inlined <style> CSS in the output, which
+    poisoned the first few hundred chars of bodies from Workday-style ATS
+    senders (Barclays, NatWest) and broke role extraction.
+    """
+    if not html:
+        return ""
+    h = html
+    # Drop style, script, head — these never carry user-visible content
+    for tag in ("style", "script", "head"):
+        h = re.sub(rf"<{tag}\b[^>]*>.*?</{tag}>", " ", h, flags=re.IGNORECASE | re.DOTALL)
+    # Drop HTML comments (often contain CSS or tracking pixels)
+    h = re.sub(r"<!--.*?-->", " ", h, flags=re.DOTALL)
+    # Replace <br>, <p>, </p>, </tr>, </td> with newlines so paragraphs survive
+    h = re.sub(r"<(br|/p|/tr|/td|/li|/h\d)[^>]*>", "\n", h, flags=re.IGNORECASE)
+    # Strip the rest of the tags
+    h = re.sub(r"<[^>]+>", " ", h)
+    # HTML entity decode (cheap)
+    h = (h.replace("&nbsp;", " ")
+           .replace("&amp;", "&")
+           .replace("&#39;", "'")
+           .replace("&rsquo;", "'")
+           .replace("&lsquo;", "'")
+           .replace("&ldquo;", '"')
+           .replace("&rdquo;", '"')
+           .replace("&mdash;", "—")
+           .replace("&ndash;", "–"))
+    # Collapse whitespace, but keep newlines for paragraph boundaries
+    h = re.sub(r"[ \t]+", " ", h)
+    h = re.sub(r"\n[ \t]*\n+", "\n\n", h)
+    return h.strip()
+
+
 def _fetch_body_text(imap: imaplib.IMAP4_SSL, uid: bytes) -> str:
     """Fetch plain-text body for one UID. Falls back to stripping HTML."""
     typ, data = imap.uid("FETCH", uid, "(BODY.PEEK[])")
@@ -385,13 +420,15 @@ def _fetch_body_text(imap: imaplib.IMAP4_SSL, uid: bytes) -> str:
                             text = decoded_text
                 except Exception:
                     pass
-            if text:
+            # Prefer text/plain when it has real content; otherwise strip HTML
+            if text and len(text.strip()) > 40:
                 return text[:20000]
             if html:
-                # very simple HTML strip — keeps URLs intact
-                stripped = re.sub(r"<[^>]+>", " ", html)
-                stripped = re.sub(r"\s+", " ", stripped)
-                return stripped[:20000]
+                stripped = _strip_html(html)
+                if stripped:
+                    return stripped[:20000]
+            if text:
+                return text[:20000]
     return ""
 
 
@@ -566,6 +603,22 @@ def _extract_company_role(subject: str, body: str, sender: str) -> Tuple[str, st
     company = ""
     role = ""
 
+    # 0) JobServe agency confirmations have empty bodies; the subject carries a
+    # job code like "JS117867" or "JSPRODUCT ANALYST". Role text after JS- /
+    # JS<digits> is the recoverable signal. Company stays "JobServe (recruiter)".
+    if "jobserve.com" in (sender or "").lower() and "application confirmation" in s.lower():
+        m_js = re.search(r"\bJS[-_ ]?([A-Z0-9 \-]+)$", s)
+        if m_js:
+            candidate = m_js.group(1).strip(" -_")
+            # If it's pure digits it's just a job-ID; leave role empty
+            if not candidate.isdigit():
+                role = candidate.title()
+        return "JobServe (recruiter)", role
+
+    # 0b) Strip "join " when subject is "Thank you for your application to join X"
+    s_clean = re.sub(r"\bto\s+join\s+", "to ", s, flags=re.IGNORECASE)
+    s = s_clean
+
     # 1) Strong subject patterns — bounded, NOT greedy.
     # "Your application for <Role> at <Company>" / "...has been received"
     m = re.search(
@@ -639,20 +692,43 @@ def _extract_company_role(subject: str, body: str, sender: str) -> Tuple[str, st
                 company = m7.group(1).strip()
                 break
 
+    # 3b) Greenhouse/Workday body fallback: "applying for/to <Company>" / "interest in <Company>"
+    if not company and body:
+        b = body[:6000]
+        for pattern in (
+            r"interest in\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"appreciate your interest in\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"applying (?:to|for) (?:the |a |an )?[\w &'.\-]{0,80}?(?:role|position|opportunity|opening|job)\s+(?:at|with)\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"applied (?:to|for)\s+(?:the |a |an )?[\w &'.\-]{0,80}?(?:role|position|opportunity|opening|job)\s+(?:at|with)\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"applying (?:to|for)\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"Dear[\w \-,]{1,40}Thank you for applying to\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            r"Thank you for applying to\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+        ):
+            m_b = re.search(pattern, b)
+            if m_b:
+                candidate = m_b.group(1).strip()
+                # Reject obvious noise tokens
+                if candidate.lower() not in {"the", "our", "us", "this", "your"}:
+                    company = candidate
+                    break
+
     # 4) ATS sender-domain hint as last resort. Greenhouse/Lever encode
     # tenant in subdomain (e.g. boards-mail.greenhouse.io / wise.greenhouse.io).
     if not company:
         domain = _sender_domain(sender)
         if domain:
-            for ats in ("greenhouse.io", "lever.co", "ashbyhq.com", "smartrecruiters.com",
-                        "workable.com", "myworkdayjobs.com", "recruitee.com",
-                        "teamtailor.com", "personio.com", "personio.de"):
+            for ats in ("greenhouse-mail.io", "greenhouse.io", "lever.co",
+                        "ashbyhq.com", "smartrecruiters.com",
+                        "workable.com", "myworkdayjobs.com", "myworkday.com",
+                        "recruitee.com", "teamtailor.com", "personio.com",
+                        "personio.de"):
                 if domain.endswith(ats):
                     sub = domain[: -(len(ats) + 1)]
-                    # boards-mail / talent / careers etc. are not company names
+                    # boards-mail / talent / careers / region-codes etc. are not company names
                     candidates = [p for p in sub.split(".") if p and p not in {
                         "boards", "boards-mail", "talent", "careers", "jobs",
                         "hire", "apply", "no-reply", "noreply", "mail",
+                        "eu", "us", "uk", "emea", "amer", "apac",  # region codes
                     }]
                     if candidates:
                         company = candidates[-1].replace("-", " ").title()
@@ -1069,12 +1145,22 @@ def run_inbox_tracker(
                         detection_source = "llm"
                         ev_type = llm["event_type"]
                         ev_conf = max(rule_conf, float(llm["confidence"]))
-                    if llm.get("company") and not company:
-                        company = llm["company"]
-                    if llm.get("role") and not role:
-                        role = llm["role"]
+                    llm_company = llm.get("company", "").strip()
+                    llm_role = llm.get("role", "").strip()
+                    # Reject LLM dupes (Hawk/Hawk problem) and "the company"
+                    # type non-answers.
+                    if llm_company and llm_role and llm_company.lower() == llm_role.lower():
+                        llm_role = ""
+                    if llm_company and not company:
+                        company = llm_company
+                    if llm_role and not role and llm_role.lower() != (company or "").lower():
+                        role = llm_role
                     # Tiny courtesy delay so we don't slam the LLM
                     time.sleep(0.15)
+
+            # Final guard: company should never equal role
+            if company and role and company.lower() == role.lower():
+                role = ""
 
             if ev_type == "noise":
                 continue
@@ -1129,8 +1215,81 @@ def run_inbox_tracker(
     return result
 
 
+def _build_tracker(events: List[Event]) -> List[Dict[str, object]]:
+    """Roll up events into one row per (firm, role) for the user-facing tracker.
+
+    Columns: firm, role, applied_date, responded, interview_offered_date,
+    rejected_date, current_status, event_count, matched_job_id.
+    """
+    groups: Dict[Tuple[str, str], Dict[str, object]] = {}
+    for ev in events:
+        if ev.event_type == "noise":
+            continue
+        firm_key = _norm_company(ev.company) or "(unknown)"
+        role_key = (ev.role or "").lower().strip()
+        # If role is empty, all unknown-role events for a firm collapse into one row
+        key = (firm_key, role_key)
+        g = groups.setdefault(key, {
+            "firm": ev.company or "(unknown)",
+            "role": ev.role or "(role not parsed)",
+            "applied_date": "",
+            "responded_date": "",
+            "interview_offered_date": "",
+            "rejected_date": "",
+            "current_status": "",
+            "event_count": 0,
+            "matched_job_id": "",
+            "evidence_msg_ids": [],
+        })
+        g["event_count"] = int(g["event_count"]) + 1
+        g["evidence_msg_ids"].append(ev.message_id)  # type: ignore
+        # Prefer richer company/role text once we have it
+        if ev.company and len(ev.company) > len(str(g["firm"])):
+            g["firm"] = ev.company
+        if ev.role and (g["role"] == "(role not parsed)" or len(ev.role) > len(str(g["role"]))):
+            g["role"] = ev.role
+        # Earliest event per type wins for date columns
+        date = ev.received_at[:10]
+        if ev.event_type == "application_confirmation" and (not g["applied_date"] or date < str(g["applied_date"])):
+            g["applied_date"] = date
+        if ev.event_type == "interview_invite" and (not g["interview_offered_date"] or date < str(g["interview_offered_date"])):
+            g["interview_offered_date"] = date
+        if ev.event_type == "rejection" and (not g["rejected_date"] or date < str(g["rejected_date"])):
+            g["rejected_date"] = date
+        # Any event after applied_date is "responded"
+        if ev.event_type != "application_confirmation":
+            if not g["responded_date"] or date < str(g["responded_date"]):
+                g["responded_date"] = date
+        if ev.matched_job_id and not g["matched_job_id"]:
+            g["matched_job_id"] = ev.matched_job_id
+
+    # Derive current_status — terminal states win
+    for g in groups.values():
+        if g["rejected_date"]:
+            g["current_status"] = "rejected"
+        elif g["interview_offered_date"]:
+            g["current_status"] = "interview"
+        elif g["applied_date"]:
+            g["current_status"] = "applied"
+        else:
+            g["current_status"] = "unknown"
+
+    # Sort: most-recent activity first (max of all dates)
+    def _latest(g: Dict[str, object]) -> str:
+        return max(
+            str(g.get("applied_date") or ""),
+            str(g.get("interview_offered_date") or ""),
+            str(g.get("rejected_date") or ""),
+            str(g.get("responded_date") or ""),
+        )
+    rows = list(groups.values())
+    rows.sort(key=_latest, reverse=True)
+    return rows
+
+
 def _write_artefact(path: str, result: RunResult) -> None:
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    tracker = _build_tracker(result.events)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump({
             "started_at": result.started_at,
@@ -1139,6 +1298,7 @@ def _write_artefact(path: str, result: RunResult) -> None:
             "candidates_fetched": result.candidates_fetched,
             "firestore_writes": result.firestore_writes,
             "notes": result.notes,
+            "tracker": tracker,
             "events": [asdict(ev) for ev in result.events],
         }, fh, indent=2)
 
@@ -1167,6 +1327,20 @@ def _print_summary(result: RunResult, dry_run: bool) -> None:
     lines += ["", "## Events by reconciliation match"]
     for k, v in sorted(by_match.items(), key=lambda kv: -kv[1]):
         lines.append(f"- {k}: {v}")
+
+    # Grouped tracker view — the chart-ready schema
+    tracker = _build_tracker(result.events)
+    lines += ["", f"## Tracker ({len(tracker)} firm × role rows)", "",
+              "| Firm | Role | Applied | Responded | Interview | Rejected | Status | Events |",
+              "|---|---|---|---|---|---|---|---|"]
+    for row in tracker:
+        lines.append(
+            f"| {str(row['firm'])[:32]} | {str(row['role'])[:48]} | "
+            f"{row.get('applied_date') or '—'} | {row.get('responded_date') or '—'} | "
+            f"{row.get('interview_offered_date') or '—'} | "
+            f"{row.get('rejected_date') or '—'} | {row['current_status']} | "
+            f"{row['event_count']} |"
+        )
 
     lines += ["", "## Recent events (most recent first)", "",
               "| Received | Type | Confidence | Company | Role | Match | Source |",
