@@ -635,6 +635,22 @@ def _extract_company_role(subject: str, body: str, sender: str) -> Tuple[str, st
     s_clean = re.sub(r"\bto\s+join\s+", "to ", s, flags=re.IGNORECASE)
     s = s_clean
 
+    # 0b2) PrecisePlace / Precise Placements agency emails: the firm is in the
+    # body via "<Role> with <Company>" / "for <Company>". Reattribute.
+    sender_lower = (sender or "").lower()
+    if "preciseplace" in sender_lower or "precise placements" in (body or "").lower()[:1500]:
+        b1 = (body or "")[:3000]
+        m_pp = re.search(
+            r"(?:role|position|opportunity|opening)\s+(?:of|with|at)\s+(?:the\s+)?(?:[\w '&.\-]{1,80}?\s+)?(?:with|at|for)\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            b1,
+        )
+        if m_pp:
+            company = m_pp.group(1).strip()
+        if not company:
+            m_with = re.search(r"\bwith\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,3})\s+(?:Global|Group|Limited|Ltd|UK)?", b1)
+            if m_with:
+                company = m_with.group(1).strip()
+
     # 0c) "Interview for <Role> job at <Company>" (Workable reminder) and
     # "Interview with <Company>" / "Reminder: Your Upcoming Interview with <Company>"
     m_jat = re.search(r"(?:interview|reminder)[^|]{0,40}for\s+(.+?)\s+(?:job|role|position)\s+at\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})", s, re.IGNORECASE)
@@ -945,10 +961,12 @@ def _reconcile_jobserve_by_date(event: Event, jobs_index: List[Dict[str, object]
     if len(same_day) == 1:
         event.matched_job_id = str(same_day[0]["id"])
         event.match_status = "matched"
-        # Upgrade firm + role display
+        # Always upgrade firm + role display to the canonical Firestore values
+        # when the date-match resolves uniquely — the JobServe parser output
+        # is just a JS-code fragment, never the real role.
         if same_day[0].get("company"):
             event.company = str(same_day[0]["company"])
-        if same_day[0].get("role") and (not event.role or event.role.lower().startswith("ts")):
+        if same_day[0].get("role"):
             event.role = str(same_day[0]["role"])
         return True
     if len(same_day) > 1:
@@ -1349,6 +1367,27 @@ def _canonical_display(company: str) -> str:
     return CANONICAL_DISPLAY.get(norm, company)
 
 
+def _canonical_role(role: str) -> str:
+    """Return a normalised role key for grouping.
+
+    Collapses Round-N suffixes, requisition IDs, and parenthetical sub-team
+    qualifiers so the same underlying role doesn't split into multiple rows
+    just because the email subject varied.
+    """
+    r = (role or "").lower().strip()
+    if not r:
+        return ""
+    # Drop trailing "Round N" (and preceding em/en/hyphen / req-id)
+    r = re.sub(r"\s*[-–—]?\s*\d{4,}\s+round\s+\d+\s*$", "", r)
+    r = re.sub(r"\s*round\s+\d+\s*$", "", r)
+    # Drop trailing requisition IDs ("- 210719366" / "– 210719366")
+    r = re.sub(r"\s*[-–—]\s*\d{4,}\s*$", "", r)
+    # Drop parenthetical sub-team qualifiers — e.g. "Product Manager (Central Operations)"
+    r = re.sub(r"\s*\([^)]*\)\s*$", "", r)
+    r = re.sub(r"\s+", " ", r).strip()
+    return r
+
+
 def _merge_into(target: Dict[str, object], src: Dict[str, object]) -> None:
     """Merge src group into target group, taking earliest dates."""
     target["event_count"] = int(target["event_count"]) + int(src["event_count"])
@@ -1377,7 +1416,7 @@ def _build_tracker(events: List[Event]) -> List[Dict[str, object]]:
         if ev.event_type == "noise":
             continue
         firm_key = _norm_company(ev.company) or "(unknown)"
-        role_key = (ev.role or "").lower().strip()
+        role_key = _canonical_role(ev.role)
         key = (firm_key, role_key)
         g = groups.setdefault(key, {
             "firm": _canonical_display(ev.company) or "(unknown)",
