@@ -892,7 +892,8 @@ def _norm_company(c: str) -> str:
 
 
 def _load_jobs_index(client) -> List[Dict[str, object]]:
-    """Pull a minimal index of {id, company, role, link, application_status} from Firestore."""
+    """Pull a minimal index from Firestore: {id, company, role, link,
+    application_status, application_date}."""
     rows: List[Dict[str, object]] = []
     if client is None:
         return rows
@@ -905,6 +906,7 @@ def _load_jobs_index(client) -> List[Dict[str, object]]:
                 "role": d.get("role") or "",
                 "link": d.get("link") or "",
                 "application_status": (d.get("application_status") or "").lower(),
+                "application_date": d.get("application_date") or "",
             })
     except Exception as exc:
         print(f"Job index load failed: {exc}", file=sys.stderr)
