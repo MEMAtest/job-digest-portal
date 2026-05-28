@@ -526,16 +526,22 @@ def _classify_by_rules(subject: str, body: str, sender: str = "") -> Tuple[str, 
     application_subject_strong = [
         "thank you for applying", "thanks for applying", "thank you for your application",
         "thanks for your application", "application received", "application submitted",
-        "we received your application", "we have received your application",
+        "we received your application", "have received your application",
         "your application has been received", "your application was sent",
         "application confirmation", "we've received your application",
         "successfully applied",
+        # SuccessFactors agency-pass template: "Candidate details provided by an Agency"
+        "candidate details provided by an agency",
     ]
     application_body_strong = [
         "thank you for applying", "thank you for your application",
         "we have received your application", "we received your application",
         "your application has been received", "successfully submitted",
         "your application was sent", "we've received your application",
+        # Agency-pass language used by SuccessFactors / Workday on behalf-of mails
+        "your details have been passed to us",
+        "details have been passed to us by",
+        "in application for the position of",
     ]
     if hit(application_subject_strong, s) or hit(application_body_strong, b):
         return "application_confirmation", 0.92
@@ -684,6 +690,20 @@ def _extract_company_role(subject: str, body: str, sender: str) -> Tuple[str, st
         m5 = re.search(r"application for\s+(.+?)(?:\s+at\s+|[:\-—|]|$)", s, re.IGNORECASE)
         if m5:
             role = m5.group(1).strip()
+
+    # 1c) Agency-pass via SuccessFactors / Workday:
+    #     "in application for the position of <Role> with <Company>"
+    if not role or not company:
+        b = body[:4000] if body else ""
+        m_pos = re.search(
+            r"in application for the position of\s+(.+?)\s+with\s+([A-Z][\w&'.\-]+(?:\s+[A-Z][\w&'.\-]+){0,4})",
+            b, re.IGNORECASE,
+        )
+        if m_pos:
+            if not role:
+                role = m_pos.group(1).strip()
+            if not company:
+                company = m_pos.group(2).strip()
 
     # 2) Body fallback for role — many ATS bodies have structured fields.
     # Stop role extraction at sentence boundaries and HTML/link junk; reject
@@ -891,9 +911,57 @@ def _load_jobs_index(client) -> List[Dict[str, object]]:
     return rows
 
 
+def _reconcile_jobserve_by_date(event: Event, jobs_index: List[Dict[str, object]]) -> bool:
+    """JobServe confirmations have empty bodies — the actual hiring firm is in
+    the JobServe portal, not the email. Recover by matching against Firestore
+    `applied` docs with application_date within ±1 day of the event.
+
+    Returns True if a match was set on the event.
+    """
+    if "jobserve" not in (event.sender or "").lower():
+        return False
+    if event.event_type != "application_confirmation":
+        return False
+    try:
+        ev_date_iso = event.received_at[:10]
+        ev_date = datetime.fromisoformat(ev_date_iso).date()
+    except Exception:
+        return False
+    same_day: List[Dict[str, object]] = []
+    for row in jobs_index:
+        if (row.get("application_status") or "").lower() != "applied":
+            continue
+        app_iso = str(row.get("application_date") or "")[:10]
+        if not app_iso:
+            continue
+        try:
+            app_date = datetime.fromisoformat(app_iso).date()
+        except Exception:
+            continue
+        if abs((app_date - ev_date).days) <= 1:
+            same_day.append(row)
+    if len(same_day) == 1:
+        event.matched_job_id = str(same_day[0]["id"])
+        event.match_status = "matched"
+        # Upgrade firm + role display
+        if same_day[0].get("company"):
+            event.company = str(same_day[0]["company"])
+        if same_day[0].get("role") and (not event.role or event.role.lower().startswith("ts")):
+            event.role = str(same_day[0]["role"])
+        return True
+    if len(same_day) > 1:
+        event.candidate_doc_ids = [str(r["id"]) for r in same_day[:5]]
+        event.match_status = "ambiguous"
+    return False
+
+
 def _reconcile(event: Event, jobs_index: List[Dict[str, object]]) -> None:
     """Set matched_job_id / match_status / candidate_doc_ids on the event in place."""
     if not jobs_index:
+        return
+
+    # 0) JobServe agency confirmations — empty body, recover via date proximity
+    if _reconcile_jobserve_by_date(event, jobs_index):
         return
 
     # 1) Link / job-id match — deterministic
