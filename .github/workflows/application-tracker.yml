@@ -1,6 +1,11 @@
 name: Application Tracker (Inbox Mining)
 
 on:
+  schedule:
+    # Daily at 06:00 UTC (07:00 BST). Picks up the previous 24h of inbox
+    # activity, writes to Firestore, and emails a change notification if
+    # anything new landed.
+    - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
       since:
@@ -8,7 +13,7 @@ on:
         type: string
         default: '2025-11-27'
       commit_writes:
-        description: 'Write to Firestore (true = update jobs + insert events). Default is dry-run.'
+        description: 'Write to Firestore (true = update jobs + insert events). On scheduled runs the default is true.'
         type: boolean
         default: false
       max_messages:
@@ -53,6 +58,7 @@ jobs:
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
           TO_EMAIL: ${{ secrets.TO_EMAIL }}
           FIREBASE_SERVICE_ACCOUNT_PATH: secrets/firebase.json
           FIREBASE_COLLECTION: ${{ secrets.FIREBASE_COLLECTION }}
@@ -61,14 +67,30 @@ jobs:
           # config.py mkdirs JOB_DIGEST_BASE_DIR on import; override the
           # hardcoded local-machine default so it works on the runner.
           JOB_DIGEST_BASE_DIR: ${{ github.workspace }}/digest-data
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_SINCE: ${{ github.event.inputs.since }}
+          INPUT_COMMIT_WRITES: ${{ github.event.inputs.commit_writes }}
+          INPUT_MAX_MESSAGES: ${{ github.event.inputs.max_messages }}
         run: |
           mkdir -p artefacts digest-data/digests
-          FLAGS="--since ${{ github.event.inputs.since }} --out artefacts/applications.json --max-messages ${{ github.event.inputs.max_messages }}"
-          if [ "${{ github.event.inputs.commit_writes }}" = "true" ]; then
+          # Scheduled runs use a rolling 3-day window and default commit_writes=true.
+          # Manual dispatch uses the inputs as provided.
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            SINCE=$(date -u -d '3 days ago' +%Y-%m-%d)
+            COMMIT="true"
+            MAX="0"
+          else
+            SINCE="${INPUT_SINCE:-2025-11-27}"
+            COMMIT="${INPUT_COMMIT_WRITES:-false}"
+            MAX="${INPUT_MAX_MESSAGES:-0}"
+          fi
+          FLAGS="--since $SINCE --out artefacts/applications.json --max-messages $MAX"
+          if [ "$COMMIT" = "true" ]; then
             FLAGS="$FLAGS --commit-writes"
           else
             FLAGS="$FLAGS --dry-run"
           fi
+          echo "Resolved flags: $FLAGS (event=$EVENT_NAME)"
           python scripts/run_inbox_tracker.py $FLAGS
 
       - name: Upload artefact
