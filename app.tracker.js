@@ -6,14 +6,17 @@
 // views: funnel chart, pipeline list, rejection breakdown, 30-day activity
 // + industry benchmarks. No chart library — all bars are pure CSS.
 
+import * as core from "./app.core.js";
 import {
-  db,
   collection,
   query,
   orderBy,
   getDocs,
   limit,
-  collectionName,
+  initializeApp,
+  getFirestore,
+  initializeFirestore,
+  setDb,
 } from "./app.core.js";
 
 const COHORT_START = "2026-03-01";
@@ -118,17 +121,47 @@ const ensureStyles = () => {
   document.head.appendChild(style);
 };
 
+// Detect Safari (matches app.bootstrap.js logic) so we use the polling
+// transport that the rest of the portal uses on Safari.
+const isSafariBrowser = () => {
+  const ua = navigator.userAgent || "";
+  return /safari/i.test(ua) && !/chrome|crios|android|edge|edg/i.test(ua);
+};
+
+function ensureFirestore() {
+  // Bootstrap may have already initialised this. Read the live binding.
+  if (core.db) return core.db;
+  if (!window.FIREBASE_CONFIG) {
+    throw new Error("Missing Firebase config (config.js). Refresh the page or check your network.");
+  }
+  const app = initializeApp(window.FIREBASE_CONFIG);
+  const firestore = isSafariBrowser()
+    ? initializeFirestore(app, { experimentalForceLongPolling: true, useFetchStreams: false })
+    : getFirestore(app);
+  setDb(firestore);
+  return firestore;
+}
+
 async function fetchData() {
-  if (!db) throw new Error("Firestore not connected — try refreshing the page.");
+  const fs = ensureFirestore();
+  const colName = core.collectionName || "jobs";
   const jobsSnap = await getDocs(
-    query(collection(db, collectionName), orderBy("updated_at", "desc"), limit(2000))
+    query(collection(fs, colName), orderBy("updated_at", "desc"), limit(2000))
   );
   const jobs = jobsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  const evSnap = await getDocs(
-    query(collection(db, "application_events"), orderBy("received_at", "desc"), limit(500))
-  );
-  const events = evSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  let events = [];
+  try {
+    const evSnap = await getDocs(
+      query(collection(fs, "application_events"), orderBy("received_at", "desc"), limit(500))
+    );
+    events = evSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    // application_events read may fail if the Firestore rules haven't been
+    // deployed for this collection. Surface the issue without breaking the
+    // rest of the tracker.
+    console.warn("[tracker] application_events read failed:", err);
+  }
 
   return { jobs, events };
 }
