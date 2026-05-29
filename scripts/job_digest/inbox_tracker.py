@@ -210,6 +210,21 @@ class Event:
     match_status: str = "no_match"   # matched | ambiguous | no_match | new_doc
     candidate_doc_ids: List[str] = field(default_factory=list)
     body_snippet: str = ""      # first 400 chars of plaintext body (debug)
+    interview_stage: str = ""   # 1st_screen | 2nd_case | final_panel | ""
+
+
+@dataclass
+class ChangeRecord:
+    """One change worth notifying the user about: a new event or status flip."""
+    kind: str          # "new_event" | "status_change" | "new_job"
+    company: str
+    role: str
+    event_type: str
+    new_status: str
+    interview_stage: str
+    received_at: str
+    sender: str
+    doc_id: str
 
 
 @dataclass
@@ -221,6 +236,7 @@ class RunResult:
     events: List[Event]
     notes: List[str]
     firestore_writes: Dict[str, int]
+    changes: List[ChangeRecord] = field(default_factory=list)
 
 
 # ---------- IMAP helpers ----------
@@ -469,6 +485,46 @@ def _ats_family_from_domain(domain: str) -> str:
     ]:
         if key in d:
             return label
+    return ""
+
+
+def _classify_interview_stage(subject: str, body: str) -> str:
+    """Categorise an interview event into a stage label.
+
+    Returns one of: "1st_screen", "2nd_case", "final_panel", or "" if unknown.
+    Conservative: only labels when the text uses unambiguous stage language.
+    """
+    s = (subject or "").lower()
+    b = (body or "").lower()[:4000]
+    text = s + " || " + b
+
+    final_signals = [
+        "final stage", "final round", "panel interview", "panel discussion",
+        "executive interview", "exec interview", "leadership panel",
+        "hiring panel", "final interview", "round 4", "round 5",
+        "executive director", "managing director interview",
+    ]
+    if any(p in text for p in final_signals):
+        return "final_panel"
+
+    case_signals = [
+        "case study", "case interview", "take-home", "take home",
+        "second stage", "second round", "2nd stage", "2nd round",
+        "technical interview", "technical round", "tech interview",
+        "round 2", "presentation", "deep dive",
+    ]
+    if any(p in text for p in case_signals):
+        return "2nd_case"
+
+    first_signals = [
+        "phone screen", "screening call", "introductory call", "intro call",
+        "first stage", "1st stage", "first round", "1st round",
+        "kick off call", "kick-off call", "discovery call",
+        "initial call", "initial conversation",
+    ]
+    if any(p in text for p in first_signals):
+        return "1st_screen"
+
     return ""
 
 
@@ -1046,7 +1102,8 @@ def _reconcile(event: Event, jobs_index: List[Dict[str, object]]) -> None:
 _TERMINAL_STATUSES = {"applied", "interview", "offer", "rejected"}
 
 
-def _write_events(client, events: List[Event], dry_run: bool) -> int:
+def _write_events(client, events: List[Event], dry_run: bool, changes: List[ChangeRecord]) -> int:
+    """Write events to Firestore; append new-event ChangeRecords to `changes`."""
     if dry_run or client is None:
         return 0
     written = 0
@@ -1054,19 +1111,45 @@ def _write_events(client, events: List[Event], dry_run: bool) -> int:
         if ev.event_type == "noise":
             continue
         doc_id = hashlib.sha256(ev.message_id.encode("utf-8")).hexdigest()[:24]
+        ref = client.collection("application_events").document(doc_id)
         try:
-            client.collection("application_events").document(doc_id).set(
-                asdict(ev) | {"updated_at": datetime.now(timezone.utc).isoformat()},
-                merge=True,
-            )
+            existed = ref.get().exists
+        except Exception:
+            existed = False
+        try:
+            ref.set(asdict(ev) | {"updated_at": datetime.now(timezone.utc).isoformat()}, merge=True)
             written += 1
+            if not existed:
+                changes.append(ChangeRecord(
+                    kind="new_event",
+                    company=ev.company or "(unknown)",
+                    role=ev.role or "(role not parsed)",
+                    event_type=ev.event_type,
+                    new_status="",
+                    interview_stage=ev.interview_stage or "",
+                    received_at=ev.received_at,
+                    sender=ev.sender,
+                    doc_id=doc_id,
+                ))
         except Exception as exc:
             print(f"event write failed for {doc_id}: {exc}", file=sys.stderr)
     return written
 
 
-def _update_job_statuses(client, events: List[Event], jobs_index: List[Dict[str, object]], dry_run: bool) -> int:
-    """Advance application_status on matched jobs. Never downgrade."""
+_STATUS_RANK = {
+    "": 0, "saved": 1, "shortlist": 2, "shortlisted": 2, "ready_to_apply": 3,
+    "applied": 4, "interview": 5, "shortlist_interview": 5, "offer": 6,
+    "rejected": 6, "dismiss": 0, "dismissed": 0,
+}
+
+
+def _update_job_statuses(client, events: List[Event], jobs_index: List[Dict[str, object]],
+                          dry_run: bool, changes: List[ChangeRecord]) -> int:
+    """Advance application_status on matched jobs. Never downgrade.
+
+    Also propagates interview_stage onto interview_stage_reached when the
+    parser detected a stage from the email body.
+    """
     if dry_run or client is None:
         return 0
     by_id = {row["id"]: row for row in jobs_index}
@@ -1078,7 +1161,6 @@ def _update_job_statuses(client, events: List[Event], jobs_index: List[Dict[str,
             continue
         row = by_id.get(ev.matched_job_id) or {}
         current = (row.get("application_status") or "").lower()
-        # Don't downgrade past terminal statuses
         target = {
             "application_confirmation": "applied",
             "interview_invite": "interview",
@@ -1086,81 +1168,293 @@ def _update_job_statuses(client, events: List[Event], jobs_index: List[Dict[str,
         }.get(ev.event_type)
         if not target:
             continue
-        # status hierarchy: saved < shortlisted < ready_to_apply < applied < interview < offer/rejected
-        rank = {"": 0, "saved": 1, "shortlist": 2, "shortlisted": 2, "ready_to_apply": 3,
-                "applied": 4, "interview": 5, "shortlist_interview": 5, "offer": 6, "rejected": 6, "dismiss": 0, "dismissed": 0}
-        if rank.get(current, 0) >= rank.get(target, 0):
+        status_advances = _STATUS_RANK.get(current, 0) < _STATUS_RANK.get(target, 0)
+        stage_to_set = ""
+        if ev.event_type == "interview_invite" and ev.interview_stage:
+            existing_stage = (row.get("interview_stage_reached") or "")
+            if not existing_stage:
+                stage_to_set = ev.interview_stage
+        if not status_advances and not stage_to_set:
             continue
-        update = {
-            "application_status": target,
+        update: Dict[str, object] = {
             "auto_detected": True,
-            "last_event_type": ev.event_type,
-            "last_event_at": ev.received_at,
-            "evidence_msg_ids": [ev.message_id],
-            "detection_confidence": ev.confidence,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
-        if target == "applied":
-            # match the YYYY-MM-DDT00:00:00.000Z format used by the dashboard
-            try:
-                day = ev.received_at[:10]
-                update["application_date"] = f"{day}T00:00:00.000Z"
-            except Exception:
-                pass
+        if status_advances:
+            update.update({
+                "application_status": target,
+                "last_event_type": ev.event_type,
+                "last_event_at": ev.received_at,
+                "evidence_msg_ids": [ev.message_id],
+                "detection_confidence": ev.confidence,
+            })
+            if target == "applied":
+                try:
+                    day = ev.received_at[:10]
+                    update["application_date"] = f"{day}T00:00:00.000Z"
+                except Exception:
+                    pass
+        if stage_to_set:
+            update["interview_stage_reached"] = stage_to_set
         try:
             client.collection(config.FIREBASE_COLLECTION).document(ev.matched_job_id).set(update, merge=True)
             updates += 1
+            if status_advances:
+                changes.append(ChangeRecord(
+                    kind="status_change",
+                    company=row.get("company") or ev.company,
+                    role=row.get("role") or ev.role,
+                    event_type=ev.event_type,
+                    new_status=target,
+                    interview_stage=stage_to_set or "",
+                    received_at=ev.received_at,
+                    sender=ev.sender,
+                    doc_id=ev.matched_job_id,
+                ))
         except Exception as exc:
             print(f"job update failed for {ev.matched_job_id}: {exc}", file=sys.stderr)
     return updates
 
 
-def _write_unmatched_inserts(client, events: List[Event], dry_run: bool) -> int:
-    """For confirmed application events that didn't match any existing job, insert a new doc."""
+def _write_unmatched_inserts(client, events: List[Event], dry_run: bool,
+                              changes: List[ChangeRecord]) -> int:
+    """For unmatched events, insert/upsert a new job doc per (firm, role) group.
+
+    Uses the FULL event sequence for that group to determine the final
+    application_status (highest-ranked) — so a Walkers application followed
+    by a rejection in the same scan window inserts as "rejected", not "applied".
+    """
     if dry_run or client is None:
         return 0
     inserts = 0
+    # Group unmatched events by canonical (firm, role)
+    groups: Dict[Tuple[str, str], List[Event]] = {}
     for ev in events:
-        if ev.event_type != "application_confirmation":
+        if ev.event_type == "noise":
             continue
         if ev.match_status != "no_match":
             continue
         if not ev.company:
-            continue  # skip truly unknown ones
-        seed = (ev.job_url or f"{ev.company}-{ev.role}-{ev.message_id}").encode("utf-8")
-        doc_id = hashlib.sha256(seed).hexdigest()[:24]
+            continue
+        firm_key = _norm_company(ev.company) or "(unknown)"
+        role_key = _canonical_role(ev.role)
+        groups.setdefault((firm_key, role_key), []).append(ev)
+
+    for (firm_key, role_key), evs in groups.items():
+        # Pick representative event with most info; prefer application_confirmation
+        # for applied_date, then advance status via highest-rank event.
+        app_event = next((e for e in evs if e.event_type == "application_confirmation"), None)
+        rep = app_event or evs[0]
+        target_status = "applied"
+        last_event = rep
+        for e in evs:
+            t = {
+                "application_confirmation": "applied",
+                "interview_invite": "interview",
+                "rejection": "rejected",
+            }.get(e.event_type)
+            if t and _STATUS_RANK.get(t, 0) > _STATUS_RANK.get(target_status, 0):
+                target_status = t
+            if not last_event or e.received_at > (last_event.received_at or ""):
+                last_event = e
+
+        # Stable doc id by firm/role (so re-runs hit same doc)
+        seed_str = rep.job_url or f"{firm_key}-{role_key}-inbox_scan"
+        doc_id = hashlib.sha256(seed_str.encode("utf-8")).hexdigest()[:24]
+
         now_iso = datetime.now(timezone.utc).isoformat()
         try:
-            day = ev.received_at[:10]
+            day = (app_event or rep).received_at[:10]
             app_date = f"{day}T00:00:00.000Z"
         except Exception:
             app_date = now_iso
+
+        ref = client.collection(config.FIREBASE_COLLECTION).document(doc_id)
+        try:
+            existed = ref.get().exists
+        except Exception:
+            existed = False
+
+        # Pick interview stage from the latest interview event in the group
+        latest_interview_stage = ""
+        latest_interview_at = ""
+        for e in evs:
+            if e.event_type == "interview_invite" and e.interview_stage:
+                if e.received_at > latest_interview_at:
+                    latest_interview_stage = e.interview_stage
+                    latest_interview_at = e.received_at
+
         payload = {
-            "role": ev.role or "(role not parsed)",
-            "company": ev.company,
+            "role": rep.role or "(role not parsed)",
+            "company": rep.company,
             "location": "",
-            "link": ev.job_url,
+            "link": rep.job_url,
             "source": "inbox_scan",
-            "application_status": "applied",
+            "application_status": target_status,
             "application_date": app_date,
             "auto_detected": True,
-            "evidence_msg_ids": [ev.message_id],
-            "detection_confidence": ev.confidence,
-            "last_event_type": ev.event_type,
-            "last_event_at": ev.received_at,
-            "created_at": now_iso,
+            "evidence_msg_ids": [e.message_id for e in evs],
+            "detection_confidence": rep.confidence,
+            "last_event_type": last_event.event_type,
+            "last_event_at": last_event.received_at,
             "updated_at": now_iso,
             "last_seen_at": now_iso,
         }
+        if not existed:
+            payload["created_at"] = now_iso
+        if latest_interview_stage:
+            payload["interview_stage_reached"] = latest_interview_stage
         try:
-            client.collection(config.FIREBASE_COLLECTION).document(doc_id).set(payload, merge=True)
+            ref.set(payload, merge=True)
             inserts += 1
+            if not existed:
+                changes.append(ChangeRecord(
+                    kind="new_job",
+                    company=rep.company,
+                    role=rep.role or "(role not parsed)",
+                    event_type=last_event.event_type,
+                    new_status=target_status,
+                    interview_stage=latest_interview_stage,
+                    received_at=last_event.received_at,
+                    sender=rep.sender,
+                    doc_id=doc_id,
+                ))
         except Exception as exc:
             print(f"unmatched insert failed for {doc_id}: {exc}", file=sys.stderr)
     return inserts
 
 
 # ---------- Main pipeline ----------
+
+def _format_change_email(changes: List[ChangeRecord]) -> Tuple[str, str, str]:
+    """Return (subject, plain_text_body, html_body) for the notification email."""
+    by_kind: Dict[str, List[ChangeRecord]] = {}
+    for c in changes:
+        by_kind.setdefault(c.kind, []).append(c)
+
+    # Subject: lead with the most consequential change
+    rejections = [c for c in changes if c.event_type == "rejection"]
+    interviews = [c for c in changes if c.event_type == "interview_invite"]
+    apps = [c for c in changes if c.event_type == "application_confirmation"]
+    leading = ""
+    if rejections:
+        leading = f"Rejection: {rejections[0].company}"
+    elif interviews:
+        leading = f"Interview: {interviews[0].company}"
+    elif apps:
+        leading = f"Application confirmed: {apps[0].company}"
+    else:
+        leading = f"{len(changes)} changes"
+    subject = f"[Job Tracker] {leading}" + (f" (+{len(changes)-1} more)" if len(changes) > 1 else "")
+
+    def stage_label(s: str) -> str:
+        return {
+            "1st_screen": "1st stage / screen",
+            "2nd_case": "2nd stage / case",
+            "final_panel": "final / panel",
+        }.get(s, "")
+
+    lines = ["Job-search tracker update:", ""]
+    for kind_label, kind_key in (("New status changes", "status_change"),
+                                  ("New applications surfaced", "new_job"),
+                                  ("New inbox events", "new_event")):
+        items = by_kind.get(kind_key) or []
+        if not items:
+            continue
+        lines.append(f"== {kind_label} ({len(items)}) ==")
+        for c in items:
+            event_label = c.event_type.replace("_", " ")
+            stage = stage_label(c.interview_stage)
+            stage_suffix = f" [{stage}]" if stage else ""
+            status_part = f" -> {c.new_status}" if c.new_status else ""
+            lines.append(f"  - {c.received_at[:10]} | {c.company} / {c.role[:60]}")
+            lines.append(f"      {event_label}{status_part}{stage_suffix}")
+        lines.append("")
+    lines.append("View the live picture: https://job-digest-portal.netlify.app/  (Tracker tab)")
+    text_body = "\n".join(lines)
+
+    html_rows = []
+    for c in changes:
+        stage = stage_label(c.interview_stage)
+        stage_suffix = f" <span style='color:#92400e'>[{stage}]</span>" if stage else ""
+        color = {
+            "rejection": "#991b1b",
+            "interview_invite": "#92400e",
+            "application_confirmation": "#075985",
+        }.get(c.event_type, "#374151")
+        html_rows.append(
+            f"<tr>"
+            f"<td style='padding:6px 10px;color:#475569;font-size:12px'>{c.received_at[:10]}</td>"
+            f"<td style='padding:6px 10px;font-weight:600'>{(c.company or '—')[:40]}</td>"
+            f"<td style='padding:6px 10px'>{(c.role or '—')[:60]}</td>"
+            f"<td style='padding:6px 10px;color:{color};font-weight:600'>{c.event_type.replace('_',' ')}{stage_suffix}</td>"
+            f"<td style='padding:6px 10px'>{c.new_status or '—'}</td>"
+            f"</tr>"
+        )
+    html_body = (
+        "<div style='font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;"
+        "max-width:680px;margin:0 auto;padding:20px;color:#0f172a'>"
+        f"<h2 style='margin:0 0 12px;color:#0f172a;font-size:18px'>{subject}</h2>"
+        "<p style='margin:0 0 16px;color:#475569;font-size:14px'>Auto-detected from your inbox by the job-search tracker.</p>"
+        "<table style='border-collapse:collapse;width:100%;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden'>"
+        "<thead><tr style='background:#f8fafc'>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;color:#475569'>Date</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;color:#475569'>Firm</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;color:#475569'>Role</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;color:#475569'>Event</th>"
+        "<th style='padding:8px 10px;text-align:left;font-size:12px;color:#475569'>New status</th>"
+        "</tr></thead><tbody>" + "".join(html_rows) + "</tbody></table>"
+        "<p style='margin:16px 0 0;color:#475569;font-size:13px'>"
+        "<a href='https://job-digest-portal.netlify.app/' style='color:#0ea5e9'>View Tracker tab</a> for the full funnel.</p>"
+        "</div>"
+    )
+    return subject, text_body, html_body
+
+
+def _send_change_notification(changes: List[ChangeRecord]) -> bool:
+    """Send a dedicated email summarising tracker changes. Returns True on send.
+
+    Uses IMAP APPEND to the personal inbox (same path as digest delivery) so
+    the email lands in INBOX without needing SMTP relay.
+    """
+    if not changes:
+        return False
+    if not config.SMTP_USER or not config.SMTP_PASS:
+        print("Notification skipped: SMTP_USER/PASS not set", file=sys.stderr)
+        return False
+    if not config.TO_EMAIL:
+        print("Notification skipped: TO_EMAIL not set", file=sys.stderr)
+        return False
+
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.utils import make_msgid, formatdate
+
+    subject, text_body, html_body = _format_change_email(changes)
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = config.FROM_EMAIL or config.SMTP_USER
+    msg["To"] = config.TO_EMAIL
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain="job-tracker.local")
+    msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        with imaplib.IMAP4_SSL("imap.gmail.com") as imap:
+            imap.login(config.SMTP_USER, config.SMTP_PASS)
+            status, response = imap.append("INBOX", None, None, msg.as_bytes())
+            ok = status == "OK"
+            try:
+                imap.logout()
+            except Exception:
+                pass
+            print(f"notification email APPEND status={status} response={response}", file=sys.stderr)
+            return ok
+    except Exception as exc:
+        print(f"notification email IMAP APPEND failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return False
+
 
 def _parse_received_iso(date_header: str) -> str:
     try:
@@ -1298,6 +1592,12 @@ def run_inbox_tracker(
             if ev_type == "noise":
                 continue
 
+            # Classify interview stage when applicable — used to set
+            # interview_stage_reached on the matched job doc downstream.
+            interview_stage = ""
+            if ev_type == "interview_invite":
+                interview_stage = _classify_interview_stage(subject, body)
+
             events.append(Event(
                 message_id=msg_id,
                 received_at=_parse_received_iso(hdrs.get("date", "")),
@@ -1311,6 +1611,7 @@ def run_inbox_tracker(
                 subject_redacted=_redact_subject(subject),
                 detection_source=detection_source,
                 body_snippet=(body or "")[:400].replace("\r", " ").replace("\n", " "),
+                interview_stage=interview_stage,
             ))
     finally:
         try:
@@ -1325,9 +1626,17 @@ def run_inbox_tracker(
     for ev in events:
         _reconcile(ev, jobs_index)
 
-    fs_events = _write_events(client, events, dry_run)
-    fs_updates = _update_job_statuses(client, events, jobs_index, dry_run)
-    fs_inserts = _write_unmatched_inserts(client, events, dry_run)
+    changes: List[ChangeRecord] = []
+    fs_events = _write_events(client, events, dry_run, changes)
+    fs_updates = _update_job_statuses(client, events, jobs_index, dry_run, changes)
+    fs_inserts = _write_unmatched_inserts(client, events, dry_run, changes)
+
+    if changes and not dry_run:
+        try:
+            sent = _send_change_notification(changes)
+            notes.append(f"change-notification email: sent={sent} (changes={len(changes)})")
+        except Exception as exc:
+            notes.append(f"change-notification failed: {type(exc).__name__}: {exc}")
 
     finished = datetime.now(timezone.utc).isoformat()
     result = RunResult(
@@ -1337,6 +1646,7 @@ def run_inbox_tracker(
         candidates_fetched=len(headers),
         events=events,
         notes=notes,
+        changes=changes,
         firestore_writes={
             "events": fs_events,
             "job_updates": fs_updates,
@@ -1546,6 +1856,7 @@ def _write_artefact(path: str, result: RunResult) -> None:
             "firestore_writes": result.firestore_writes,
             "notes": result.notes,
             "tracker": tracker,
+            "changes": [asdict(c) for c in (result.changes or [])],
             "events": [asdict(ev) for ev in result.events],
         }, fh, indent=2)
 
