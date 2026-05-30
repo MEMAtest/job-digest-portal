@@ -64,59 +64,72 @@ const ensureStyles = () => {
   const style = document.createElement("style");
   style.id = "tracker-tab-styles";
   style.textContent = `
-    .tracker-content { display: flex; flex-direction: column; gap: 24px; }
-    .tracker-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; }
+    .tracker-content { display: flex; flex-direction: column; gap: 24px; max-width: 100%; }
+    .tracker-section { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; max-width: 100%; box-sizing: border-box; overflow: hidden; }
     .tracker-section h3 { margin: 0 0 12px; font-size: 1.05rem; font-weight: 600; color: #0f172a; }
     .tracker-section p.tracker-meta { margin: 0 0 14px; color: #475569; font-size: 0.9rem; }
     .tracker-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
-    .tracker-stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; }
+    .tracker-stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; min-width: 0; }
     .tracker-stat__label { color: #64748b; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
-    .tracker-stat__value { font-size: 1.6rem; font-weight: 700; color: #0f172a; margin-top: 4px; }
-    .tracker-stat__sub { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
-    .tracker-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+    .tracker-stat__value { font-size: 1.6rem; font-weight: 700; color: #0f172a; margin-top: 4px; word-break: break-word; }
+    .tracker-stat__sub { font-size: 0.78rem; color: #64748b; margin-top: 2px; word-break: break-word; }
+    .tracker-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
     .tracker-badge--good { background: #dcfce7; color: #166534; }
     .tracker-badge--ok { background: #dbeafe; color: #1e40af; }
     .tracker-badge--warn { background: #fef3c7; color: #92400e; }
     .tracker-badge--bad { background: #fee2e2; color: #991b1b; }
     .tracker-badge--mute { background: #e5e7eb; color: #374151; }
     .tracker-funnel { display: flex; flex-direction: column; gap: 10px; }
-    .tracker-funnel__row { display: grid; grid-template-columns: 180px 1fr 90px; gap: 12px; align-items: center; }
-    .tracker-funnel__label { color: #334155; font-size: 0.9rem; }
-    .tracker-funnel__bar { background: #f1f5f9; border-radius: 6px; overflow: hidden; height: 26px; position: relative; }
+    .tracker-funnel__row { display: grid; grid-template-columns: minmax(120px, 180px) 1fr minmax(80px, 100px); gap: 12px; align-items: center; }
+    .tracker-funnel__label { color: #334155; font-size: 0.9rem; word-break: break-word; }
+    .tracker-funnel__bar { background: #f1f5f9; border-radius: 6px; overflow: hidden; height: 26px; position: relative; min-width: 0; }
     .tracker-funnel__fill { background: linear-gradient(90deg, #0ea5e9, #38bdf8); height: 100%; min-width: 4px; }
     .tracker-funnel__fill--reject { background: linear-gradient(90deg, #ef4444, #f87171); }
     .tracker-funnel__fill--success { background: linear-gradient(90deg, #16a34a, #22c55e); }
-    .tracker-funnel__count { text-align: right; color: #0f172a; font-weight: 600; }
-    .tracker-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    .tracker-table th, .tracker-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    .tracker-funnel__count { text-align: right; color: #0f172a; font-weight: 600; white-space: nowrap; }
+    .tracker-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tracker-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; table-layout: fixed; }
+    .tracker-table th, .tracker-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; word-break: break-word; overflow-wrap: break-word; }
     .tracker-table th { color: #475569; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; background: #f8fafc; }
     .tracker-table tr:hover td { background: #f8fafc; }
-    .tracker-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+    .tracker-table col.col-stage { width: 110px; }
+    .tracker-table col.col-firm  { width: 22%; }
+    .tracker-table col.col-role  { width: 38%; }
+    .tracker-table col.col-date  { width: 110px; }
+    .tracker-table col.col-reached { width: 18%; }
+    .tracker-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
     .tracker-pill--applied { background: #e0f2fe; color: #075985; }
     .tracker-pill--interview { background: #fef3c7; color: #92400e; }
     .tracker-pill--offer { background: #dcfce7; color: #14532d; }
     .tracker-pill--rejected { background: #fee2e2; color: #991b1b; }
-    .tracker-spark { display: grid; grid-template-columns: repeat(30, 1fr); gap: 2px; align-items: end; height: 80px; }
-    .tracker-spark__bar { background: #cbd5e1; border-radius: 2px 2px 0 0; min-height: 2px; position: relative; }
+    .tracker-spark { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 2px; align-items: end; height: 80px; }
+    .tracker-spark__bar { background: #cbd5e1; border-radius: 2px 2px 0 0; min-height: 2px; position: relative; min-width: 0; }
     .tracker-spark__bar--hot { background: #0ea5e9; }
     .tracker-spark__bar--rej { background: #ef4444; }
     .tracker-spark__date { font-size: 0.65rem; color: #94a3b8; }
     .tracker-spark-wrap { display: flex; flex-direction: column; gap: 4px; }
-    .tracker-spark-legend { display: flex; gap: 14px; font-size: 0.78rem; color: #475569; }
+    .tracker-spark-legend { display: flex; gap: 14px; font-size: 0.78rem; color: #475569; flex-wrap: wrap; }
     .tracker-spark-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
     .tracker-spark-legend .leg-hot::before { background: #0ea5e9; }
     .tracker-spark-legend .leg-rej::before { background: #ef4444; }
     .tracker-spark-legend .leg-mute::before { background: #cbd5e1; }
-    .tracker-bench-row { display: grid; grid-template-columns: 200px 80px 1fr 110px; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+    .tracker-bench-row { display: grid; grid-template-columns: minmax(140px, 220px) 80px 1fr minmax(90px, 130px); gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
     .tracker-bench-row:last-child { border-bottom: 0; }
-    .tracker-bench__metric { color: #334155; font-size: 0.9rem; }
+    .tracker-bench__metric { color: #334155; font-size: 0.9rem; word-break: break-word; }
     .tracker-bench__your { font-weight: 700; color: #0f172a; }
-    .tracker-bench__bm { color: #64748b; font-size: 0.85rem; }
+    .tracker-bench__bm { color: #64748b; font-size: 0.85rem; word-break: break-word; }
     .tracker-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .tracker-controls input[type="date"] { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.85rem; }
     .tracker-controls button { padding: 6px 12px; border: 1px solid #0ea5e9; background: #0ea5e9; color: #fff; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
     .tracker-controls button.secondary { background: #fff; color: #0ea5e9; }
     .tracker-empty { color: #64748b; padding: 16px; text-align: center; font-size: 0.9rem; }
+    @media (max-width: 720px) {
+      .tracker-section { padding: 14px; }
+      .tracker-funnel__row { grid-template-columns: 1fr; }
+      .tracker-funnel__count { text-align: left; }
+      .tracker-bench-row { grid-template-columns: 1fr; }
+      .tracker-bench__your { font-size: 1.2rem; }
+    }
   `;
   document.head.appendChild(style);
 };
@@ -378,10 +391,18 @@ function renderPipeline(stats) {
   }
 
   return `
-    <table class="tracker-table">
-      <thead><tr><th>Stage</th><th>Firm</th><th>Role</th><th>Date</th></tr></thead>
-      <tbody>${rows.join("")}</tbody>
-    </table>
+    <div class="tracker-table-wrap">
+      <table class="tracker-table">
+        <colgroup>
+          <col class="col-stage" />
+          <col class="col-firm" />
+          <col class="col-role" />
+          <col class="col-date" />
+        </colgroup>
+        <thead><tr><th>Stage</th><th>Firm</th><th>Role</th><th>Date</th></tr></thead>
+        <tbody>${rows.join("")}</tbody>
+      </table>
+    </div>
   `;
 }
 
@@ -403,6 +424,13 @@ function renderRejections(stats) {
     stageCounts[bucket] = (stageCounts[bucket] || 0) + 1;
   }
 
+  const formatStage = (raw) =>
+    ({
+      "1st_screen": "after 1st stage / screen",
+      "2nd_case": "after 2nd stage / case",
+      "final_panel": "after final / panel",
+    }[raw] || raw || "—");
+
   const renderList = (list, kind) =>
     list.length
       ? list
@@ -413,7 +441,7 @@ function renderRejections(stats) {
           <td><span class="tracker-pill tracker-pill--rejected">${kind}</span></td>
           <td>${escapeHtml(j.company || "—")}</td>
           <td>${escapeHtml(j.role || "—")}</td>
-          <td>${escapeHtml(j.interview_stage_reached || "—")}</td>
+          <td>${escapeHtml(formatStage(j.interview_stage_reached))}</td>
           <td>${fmtDate(j.last_event_at) || fmtDate(j.application_date)}</td>
         </tr>`
           )
@@ -438,13 +466,22 @@ function renderRejections(stats) {
       </div>
       ${stageRows}
     </div>
-    <table class="tracker-table" style="margin-top:16px">
-      <thead><tr><th>Stage</th><th>Firm</th><th>Role</th><th>Reached</th><th>When</th></tr></thead>
-      <tbody>
-        ${renderList(piAll, "post-interview")}
-        ${renderList(cvAll, "CV stage")}
-      </tbody>
-    </table>
+    <div class="tracker-table-wrap" style="margin-top:16px">
+      <table class="tracker-table">
+        <colgroup>
+          <col class="col-stage" />
+          <col class="col-firm" />
+          <col class="col-role" />
+          <col class="col-reached" />
+          <col class="col-date" />
+        </colgroup>
+        <thead><tr><th>Stage</th><th>Firm</th><th>Role</th><th>Reached</th><th>When</th></tr></thead>
+        <tbody>
+          ${renderList(piAll, "post-interview")}
+          ${renderList(cvAll, "CV stage")}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
