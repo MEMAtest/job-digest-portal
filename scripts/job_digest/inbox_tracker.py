@@ -1307,6 +1307,25 @@ def _write_unmatched_inserts(client, events: List[Event], dry_run: bool,
         try:
             ref.set(payload, merge=True)
             inserts += 1
+            # Backfill matched_job_id on the contributing events so the
+            # Tracker tab can recognise them as belonging to this doc.
+            # Without this, an inserted Walkers-style doc has events with
+            # matched_job_id="" and the tab's hadInterview() check fails.
+            for ev in evs:
+                ev.matched_job_id = doc_id
+                ev.match_status = "matched"
+                evt_doc_id = hashlib.sha256(ev.message_id.encode("utf-8")).hexdigest()[:24]
+                try:
+                    client.collection("application_events").document(evt_doc_id).set(
+                        {
+                            "matched_job_id": doc_id,
+                            "match_status": "matched",
+                            "updated_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                        merge=True,
+                    )
+                except Exception:
+                    pass
             if not existed:
                 changes.append(ChangeRecord(
                     kind="new_job",
