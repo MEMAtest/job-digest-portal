@@ -1175,7 +1175,19 @@ def _update_job_statuses(client, events: List[Event], jobs_index: List[Dict[str,
             existing_stage = (row.get("interview_stage_reached") or "")
             if not existing_stage:
                 stage_to_set = ev.interview_stage
-        if not status_advances and not stage_to_set:
+        # The application-confirmation email is authoritative for when the
+        # application was actually sent. Correct a missing or too-late stored
+        # application_date down to the real email date — even when the status
+        # doesn't advance (e.g. doc already 'applied', or a later rejection
+        # already moved it on). Never push the date forward: an earlier stored
+        # date may be the true first-apply.
+        date_correction = ""
+        if ev.event_type == "application_confirmation":
+            ev_day = ev.received_at[:10]
+            stored_day = str(row.get("application_date") or "")[:10]
+            if ev_day and (not stored_day or ev_day < stored_day):
+                date_correction = f"{ev_day}T00:00:00.000Z"
+        if not status_advances and not stage_to_set and not date_correction:
             continue
         update: Dict[str, object] = {
             "auto_detected": True,
@@ -1195,6 +1207,8 @@ def _update_job_statuses(client, events: List[Event], jobs_index: List[Dict[str,
                     update["application_date"] = f"{day}T00:00:00.000Z"
                 except Exception:
                     pass
+        if date_correction:
+            update["application_date"] = date_correction
         if stage_to_set:
             update["interview_stage_reached"] = stage_to_set
         try:
