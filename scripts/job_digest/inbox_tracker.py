@@ -34,6 +34,7 @@ from .llm import generate_openrouter_text, parse_gemini_payload
 ATS_SENDER_DOMAINS = [
     "linkedin.com",
     "greenhouse.io",
+    "greenhouse-mail.io",   # Greenhouse's actual sending domain (eu.greenhouse-mail.io)
     "lever.co",
     "myworkdayjobs.com",
     "workday.com",
@@ -1563,10 +1564,21 @@ def run_inbox_tracker(
             msg_id = hdrs.get("message_id") or f"uid:{uid.decode()}"
             domain = _sender_domain(sender)
 
-            # Cheap pre-check: must look like applications mail in some way
+            # Cheap pre-check: must look like applications mail in some way.
+            # NB: keep this at least as wide as _build_search_batches — every
+            # message here already matched the ATS-sender OR subject-hint
+            # search, so a subject-hint match (e.g. "thank you for applying",
+            # "thank you for your interest") must pass too. Gating only on
+            # (ATS-domain OR ambiguous-keyword) silently dropped clean
+            # application/rejection mail whose subject carried none of the
+            # ambiguous keywords (Sonata One Greenhouse rejection, 2026-06).
+            subj_lower = subject.lower()
             looks_relevant = (
                 any(d in domain for d in ATS_SENDER_DOMAINS)
-                or any(p in subject.lower() for p in AMBIGUOUS_KEYWORDS)
+                or any(p in subj_lower for p in AMBIGUOUS_KEYWORDS)
+                or any(h in subj_lower for h in (
+                    SUBJECT_APPLICATION_HINTS + SUBJECT_INTERVIEW_HINTS + SUBJECT_REJECTION_HINTS
+                ))
             )
             if not looks_relevant:
                 continue
