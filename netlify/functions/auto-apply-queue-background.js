@@ -294,6 +294,86 @@ exports.handler = async (event) => {
     // Manual POST triggers bypass the enabled toggle; scheduled runs respect it
     const body = event.body ? (() => { try { return JSON.parse(event.body); } catch { return {}; } })() : {};
     const isManual = event.httpMethod === "POST" || body.manual === true;
+
+    // --- Pack pre-warming (Part C) ---
+    // Build application packs ahead of time for fresh, high-fit, supported-ATS,
+    // low-applicant roles so one-click "Apply now" is instant. No GO/NO-GO email,
+    // no auto_apply_status changes — this only prepares materials. Runs in
+    // parallel (bounded) and skips roles already tailored to avoid wasted spend.
+    if (body.mode === "prewarm") {
+      const minFit = Number(process.env.PREWARM_MIN_FIT || 78);
+      const maxJobs = Number(process.env.PREWARM_MAX_JOBS || 5);
+      const concurrency = Math.max(1, Number(process.env.PREWARM_CONCURRENCY || 2));
+      const maxHours = Number(process.env.HOT_LANE_MAX_HOURS || 4);
+      const maxApplicants = Number(process.env.HOT_LANE_MAX_APPLICANTS || 25);
+
+      const hoursSince = (job) => {
+        const raw = job.posted_date || "";
+        if (raw) {
+          const t = Date.parse(String(raw).replace(" ", "T"));
+          if (!Number.isNaN(t)) return (Date.now() - t) / 3600000;
+        }
+        const text = String(job.posted || job.posted_raw || "").toLowerCase();
+        if (!text) return null;
+        if (/\bnew\b|just now|today|minute|\bmins?\b/.test(text)) return 0.5;
+        if (text.includes("yesterday")) return 24;
+        const m = text.match(/(\d+)/);
+        if (!m) return null;
+        const n = parseInt(m[1], 10);
+        if (text.includes("hour")) return n;
+        if (text.includes("day")) return n * 24;
+        if (text.includes("week")) return n * 168;
+        return null;
+      };
+      const parseApplicants = (v) => {
+        const m = String(v || "").match(/\d[\d,]*/);
+        return m ? parseInt(m[0].replace(/,/g, ""), 10) : null;
+      };
+
+      const warmSnap = await db.collection("jobs").where("fit_score", ">=", minFit).get();
+      const toWarm = warmSnap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .filter((job) => {
+          if (!SUPPORTED_ATS.has(job.ats_family)) return false;
+          const appStatus = (job.application_status || "").toLowerCase();
+          if (["applied", "rejected", "dismissed"].includes(appStatus)) return false;
+          if (job.is_closed === true) return false;
+          if (job.tailored_cv_sections && Object.keys(job.tailored_cv_sections).length) return false;
+          const h = hoursSince(job);
+          if (h === null || h > maxHours) return false;
+          const n = parseApplicants(job.applicant_count);
+          if (n !== null && n > maxApplicants) return false;
+          return true;
+        })
+        .sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0))
+        .slice(0, maxJobs);
+
+      console.log(`auto-apply-queue[prewarm]: ${toWarm.length} role(s) to warm`);
+      const warmOne = async (job) => {
+        await generatePackForJob(db, job);
+        await db.collection("jobs").doc(job.id).update({ application_pack_prewarmed: true }).catch(() => {});
+        return job.id;
+      };
+      const results = [];
+      for (let i = 0; i < toWarm.length; i += concurrency) {
+        const batch = toWarm.slice(i, i + concurrency);
+        const settled = await Promise.allSettled(batch.map(warmOne));
+        settled.forEach((s, k) => {
+          if (s.status === "fulfilled") {
+            results.push({ jobId: s.value, status: "prewarmed" });
+          } else {
+            const msg = s.reason && s.reason.message ? s.reason.message : String(s.reason);
+            console.error(`auto-apply-queue[prewarm]: failed for ${batch[k].id}:`, msg);
+            results.push({ jobId: batch[k].id, status: "error", error: msg });
+          }
+        });
+      }
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ mode: "prewarm", warmed: results.filter((r) => r.status === "prewarmed").length, results }),
+      };
+    }
+
     if (!prefs.enabled && !isManual) {
       console.log("auto-apply-queue: disabled");
       return { statusCode: 200, body: JSON.stringify({ skipped: "disabled" }) };

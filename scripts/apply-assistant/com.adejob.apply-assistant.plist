@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS LaunchAgent to keep the local Apply Assistant server (port 4319) always
+  running, so one-click "Apply now" works whenever your Mac is on — no manual
+  `npm run apply-assistant` needed.
+
+  Install (replace the two placeholders first — see scripts/apply-assistant/README.md):
+    __NODE_PATH__  -> output of:  which node
+    __REPO_PATH__  -> absolute path to this repo (output of: pwd in the repo root)
+
+    cp scripts/apply-assistant/com.adejob.apply-assistant.plist ~/Library/LaunchAgents/
+    # edit the copy to fill in the placeholders, then:
+    launchctl load ~/Library/LaunchAgents/com.adejob.apply-assistant.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.adejob.apply-assistant</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE_PATH__</string>
+    <string>__REPO_PATH__/scripts/apply-assistant/server.mjs</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>__REPO_PATH__</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/tmp/apply-assistant.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/apply-assistant.err.log</string>
+</dict>
+</plist>

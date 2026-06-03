@@ -102,6 +102,45 @@ RUN_STATE_PATH = Path(
 FORCE_RUN = os.getenv("JOB_DIGEST_FORCE_RUN", "false").lower() == "true"
 SUMMARY_MAX_CHARS = int(os.getenv("JOB_DIGEST_SUMMARY_MAX_CHARS", "1600"))
 
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+# --- Freshness + scarcity ranking (Part A) ---
+# Fit stays dominant; these additive boosts let fresh, low-applicant high-fit
+# roles float to the top. Missing signals never penalise (boost = 0).
+FRESHNESS_RANKING_ENABLED = _env_bool("JOB_DIGEST_FRESHNESS_RANKING_ENABLED", True)
+FRESHNESS_MAX_BOOST = int(os.getenv("JOB_DIGEST_FRESHNESS_MAX_BOOST", "18"))
+FRESH_BOOST_2H = int(os.getenv("JOB_DIGEST_FRESH_BOOST_2H", "12"))
+FRESH_BOOST_4H = int(os.getenv("JOB_DIGEST_FRESH_BOOST_4H", "8"))
+FRESH_BOOST_12H = int(os.getenv("JOB_DIGEST_FRESH_BOOST_12H", "4"))
+FRESH_BOOST_24H = int(os.getenv("JOB_DIGEST_FRESH_BOOST_24H", "2"))
+SCARCITY_BOOST_LOW = int(os.getenv("JOB_DIGEST_SCARCITY_BOOST_LOW", "8"))    # <= 10 applicants
+SCARCITY_BOOST_MED = int(os.getenv("JOB_DIGEST_SCARCITY_BOOST_MED", "5"))    # <= 25
+SCARCITY_BOOST_HIGH = int(os.getenv("JOB_DIGEST_SCARCITY_BOOST_HIGH", "2"))  # <= 50
+
+# --- "Apply now" hot lane (Part B) ---
+HOT_LANE_MAX_HOURS = float(os.getenv("JOB_DIGEST_HOT_LANE_MAX_HOURS", "4"))
+HOT_LANE_MIN_FIT = int(os.getenv("JOB_DIGEST_HOT_LANE_MIN_FIT", "78"))
+HOT_LANE_MAX_APPLICANTS = int(os.getenv("JOB_DIGEST_HOT_LANE_MAX_APPLICANTS", "25"))
+HOT_LANE_SUPPORTED_ATS_ONLY = _env_bool("JOB_DIGEST_HOT_LANE_SUPPORTED_ATS_ONLY", True)
+HOT_LANE_MAX_ROLES = int(os.getenv("JOB_DIGEST_HOT_LANE_MAX_ROLES", "5"))
+HOT_LANE_SUPPORTED_ATS = {"greenhouse", "lever", "ashby", "workable"}
+
+# --- Fast detection hot-scan + Telegram (Part F) ---
+HOT_SCAN_ENABLED = _env_bool("JOB_DIGEST_HOT_SCAN_ENABLED", True)
+HOT_SCAN_MIN_FIT = int(os.getenv("JOB_DIGEST_HOT_SCAN_MIN_FIT", str(HOT_LANE_MIN_FIT)))
+HOT_ALERTED_CACHE_PATH = Path(
+    os.getenv("JOB_DIGEST_HOT_ALERTED_CACHE", str(DIGEST_DIR / "hot_alerted.json"))
+)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+SITE_URL = os.getenv("SITE_URL", "").rstrip("/")
+
 EMAIL_ENABLED = os.getenv("JOB_DIGEST_EMAIL_ENABLED", "true").lower() == "true"
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

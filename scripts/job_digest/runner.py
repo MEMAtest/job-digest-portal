@@ -85,6 +85,7 @@ from .utils import (
     canonicalize_company_name,
     canonicalize_posted_fields,
     canonical_job_link,
+    compute_priority_score,
     due_run_slot,
     filter_new_records,
     is_target_firm,
@@ -95,6 +96,7 @@ from .utils import (
     prune_seen_cache,
     save_run_state,
     save_seen_cache,
+    select_hot_lane,
     select_top_pick,
     should_keep_role_company,
 )
@@ -1745,6 +1747,88 @@ except Exception:  # noqa: BLE001
     ZoneInfo = None
 
 
+def run_hot_scan() -> int:
+    """Fast detection (Part F): ATS-only scan that Telegram-alerts fresh,
+    high-fit, supported-ATS roles not previously alerted.
+
+    No LLM, no LinkedIn, no job boards, no digest email — each run finishes in
+    seconds. Safe to call on a tight cron or from an always-on poller (Tier 2:
+    `while True: run_hot_scan(); sleep(90)`). Returns the number of new alerts.
+    """
+    if not config.HOT_SCAN_ENABLED:
+        print("hot-scan disabled (JOB_DIGEST_HOT_SCAN_ENABLED=false)")
+        return 0
+
+    from .notify_telegram import is_configured, send_alert
+
+    session = requests.Session()
+    session.headers.update({"User-Agent": config.USER_AGENT})
+    reset_source_diagnostics()
+    reset_source_runtime_events()
+
+    records: list[JobRecord] = []
+    records.extend(run_source_stage("greenhouse", lambda: collect_greenhouse_records(session)))
+    records.extend(run_source_stage("lever", lambda: collect_lever_records(session)))
+    records.extend(run_source_stage("ashby", lambda: collect_ashby_records(session)))
+    records.extend(run_source_stage("workable", lambda: collect_workable_records(session)))
+
+    records = dedupe_records(records)
+    for record in records:
+        compute_priority_score(record)
+
+    candidates = select_hot_lane(records, min_fit=config.HOT_SCAN_MIN_FIT, limit=None)
+    print(f"hot-scan: {len(records)} ATS records, {len(candidates)} fresh high-fit candidates")
+    if not candidates:
+        return 0
+
+    # Upsert so the portal's #apply-now deep link resolves to a real doc.
+    try:
+        write_records_to_firestore(candidates)
+    except Exception as exc:  # noqa: BLE001
+        print(f"hot-scan firestore upsert failed: {type(exc).__name__}: {exc}")
+
+    client = init_firestore_client()
+    # File cache keeps local runs (no Firestore) non-spammy; the durable guard
+    # in CI is the Firestore `hot_alerted_at` flag (the file doesn't persist there).
+    file_cache = prune_seen_cache(load_seen_cache(config.HOT_ALERTED_CACHE_PATH), config.SEEN_CACHE_DAYS)
+    now_iso = now_utc().isoformat()
+    alerts = 0
+
+    for rec in filter_new_records(candidates, file_cache):
+        doc_id = record_document_id(rec)
+        already_alerted = False
+        if client is not None:
+            try:
+                snap = client.collection(config.FIREBASE_COLLECTION).document(doc_id).get()
+                already_alerted = snap.exists and bool((snap.to_dict() or {}).get("hot_alerted_at"))
+            except Exception:
+                already_alerted = False
+        if already_alerted:
+            if rec.link:
+                file_cache[rec.link] = now_iso
+            continue
+
+        if not is_configured():
+            print(f"hot-scan: would alert {rec.company} / {rec.role} (fit {rec.fit_score}) — Telegram not configured")
+        elif send_alert(rec):
+            alerts += 1
+            print(f"hot-scan alert sent: {rec.company} / {rec.role} (fit {rec.fit_score})")
+
+        if rec.link:
+            file_cache[rec.link] = now_iso
+        if client is not None:
+            try:
+                client.collection(config.FIREBASE_COLLECTION).document(doc_id).set(
+                    {"hot_alerted_at": now_iso}, merge=True
+                )
+            except Exception:
+                pass
+
+    save_seen_cache(config.HOT_ALERTED_CACHE_PATH, file_cache)
+    print(f"hot-scan: {alerts} new alert(s) sent")
+    return alerts
+
+
 def main(
     *,
     skip_enrichment: bool = False,
@@ -1839,6 +1923,12 @@ def main(
         records = [record for record in records if int(record.fit_score or 0) >= config.EMAIL_BORDERLINE_MIN_SCORE]
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
     records = ensure_record_richness(records)
+    # Freshness + scarcity ranking (Part A): stamp priority_score and re-order so
+    # fresh, low-applicant high-fit roles float up. Bucket split below stays on
+    # raw fit_score, so "Maybe" classification is unchanged — only order shifts.
+    for record in records:
+        compute_priority_score(record)
+    records = sorted(records, key=lambda record: record.priority_score, reverse=True)
     main_records = [record for record in records if int(record.fit_score or 0) > config.EMAIL_BORDERLINE_MAX_SCORE]
     borderline_candidates = [
         record
@@ -1934,7 +2024,8 @@ def main(
     if top_pick and top_pick not in top_records:
         top_records = [top_pick] + top_records
         top_records = top_records[: max(config.MAX_EMAIL_ROLES, config.MIN_EMAIL_ROLES)]
-    html_body = build_email_html(top_records + borderline_records, config.WINDOW_HOURS)
+    hot_lane = select_hot_lane(top_records + borderline_records)
+    html_body = build_email_html(top_records + borderline_records, config.WINDOW_HOURS, hot_lane=hot_lane)
     delivery_summary_html = (
         "<div style='background:#ECFDF5; border:1px solid #BBF7D0; padding:10px; "
         "border-radius:8px; margin-bottom:14px; font-size:14px; color:#064E3B;'>"
@@ -2104,9 +2195,16 @@ def cli() -> None:
         action="store_true",
         help="Skip slow optional job boards for scheduled email delivery",
     )
+    parser.add_argument(
+        "--hot-scan",
+        action="store_true",
+        help="Fast detection: scan ATS feeds only and Telegram-alert fresh high-fit roles (no LLM/email)",
+    )
     args = parser.parse_args()
 
-    if args.smoke_test:
+    if args.hot_scan:
+        run_hot_scan()
+    elif args.smoke_test:
         run_smoke_test()
     elif args.backfill_diagnose:
         diagnose_backfill()

@@ -9,8 +9,9 @@ from typing import List
 
 from . import boards
 from . import config
+from .firestore import record_document_id
 from .models import JobRecord
-from .utils import select_top_pick
+from .utils import parse_applicant_count, select_top_pick
 
 
 def build_sources_summary(*, compact: bool = False) -> str:
@@ -63,8 +64,16 @@ def build_sources_summary(*, compact: bool = False) -> str:
     return summary
 
 
-def build_email_html(records: List[JobRecord], window_hours: int) -> str:
+def _apply_link(rec: JobRecord) -> str:
+    """One-click deep link into the portal, falling back to the raw job link."""
+    if config.SITE_URL:
+        return f"{config.SITE_URL}/index.html#apply-now={record_document_id(rec)}"
+    return rec.link or ""
+
+
+def build_email_html(records: List[JobRecord], window_hours: int, hot_lane: List[JobRecord] | None = None) -> str:
     header = f"Daily Job Digest · Last {window_hours} hours"
+    hot_lane = hot_lane or []
     if not records:
         return (
             "<div style='font-family:Arial, sans-serif; max-width:900px; margin:0 auto;'>"
@@ -115,6 +124,34 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
             f"{escape(compact_text(top_pick.why_fit, 190))}</div>"
             f"<div style='margin-top:8px; color:#333;'><strong>Action:</strong> "
             f"{escape(action_line(top_pick))}</div>"
+            "</div>"
+        )
+
+    hot_lane_section = ""
+    if hot_lane:
+        digest_time = datetime.now().strftime("%H:%M")
+        cards = []
+        for rec in hot_lane:
+            n = parse_applicant_count(rec.applicant_count)
+            applicants = f"{n} applicants" if n is not None else "few applicants"
+            link = _apply_link(rec)
+            cards.append(
+                "<div style='background:#fff; border:1px solid #FFD5C2; border-radius:8px; padding:10px 12px; margin-bottom:8px;'>"
+                f"<div style='font-size:15px; font-weight:bold; color:#9A3412;'>{escape(rec.role)}</div>"
+                f"<div style='color:#555; font-size:13px; margin-top:2px;'>{escape(rec.company)} · {escape(rec.location)}</div>"
+                f"<div style='color:#777; font-size:12px; margin-top:4px;'>Fit {rec.fit_score}% · {escape(applicants)} · posted {display_posted(rec.posted)}</div>"
+                f"<a href='{link}' style='display:inline-block; margin-top:8px; background:#EA580C; color:#fff; "
+                "text-decoration:none; font-weight:bold; padding:8px 16px; border-radius:6px;'>⚡ Apply now</a>"
+                "</div>"
+            )
+        hot_lane_section = (
+            "<div style='border:1px solid #FB923C; border-left:6px solid #EA580C; background:#FFF7ED; "
+            "padding:12px; border-radius:8px; margin-bottom:14px;'>"
+            "<div style='font-weight:bold; color:#9A3412; margin-bottom:8px; font-size:15px;'>"
+            "🔥 Apply now — fresh &amp; low-competition</div>"
+            + "".join(cards)
+            + f"<div style='color:#9A3412; font-size:11px; margin-top:4px;'>"
+            f"Verified fresh as of {digest_time}. These fill fast — apply early.</div>"
             "</div>"
         )
 
@@ -181,6 +218,7 @@ def build_email_html(records: List[JobRecord], window_hours: int) -> str:
         f"<p style='color:#555; margin-top:0;'>Preferences: {config.PREFERENCES}</p>"
         f"<p style='color:#555; margin-top:0;'>Sources checked: {build_sources_summary(compact=True)}</p>"
         f"<p style='color:#333; font-weight:bold;'>Matches found: {len(records)}</p>"
+        + hot_lane_section
         + top_pick_section
         + table
         + "</div>"

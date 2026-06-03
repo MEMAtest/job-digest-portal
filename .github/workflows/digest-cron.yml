@@ -138,6 +138,18 @@ jobs:
           fi
           python scripts/daily_job_search.py --force --skip-post-hooks --fast-email --skip-enrichment $EXTRA_FLAGS
 
+      - name: Pre-warm application packs
+        if: always()
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+        run: |
+          BASE="${SITE_URL:-https://adejob.netlify.app}"
+          BASE="${BASE%/}"
+          echo "Triggering pack pre-warm at $BASE"
+          curl -s -m 30 -X POST "$BASE/.netlify/functions/auto-apply-queue-background" \
+            -H "Content-Type: application/json" \
+            -d '{"mode":"prewarm"}' || echo "prewarm trigger failed (non-fatal)"
+
       - name: Save digest state cache
         if: always()
         uses: actions/cache/save@v4
