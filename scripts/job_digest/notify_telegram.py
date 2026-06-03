@@ -85,7 +85,11 @@ def send_alert(record: JobRecord) -> bool:
         lines.append(location)
     text = "\n".join(lines)
 
-    reply_markup = None
+    buttons = []
     if link:
-        reply_markup = {"inline_keyboard": [[{"text": "⚡ Apply now", "url": link}]]}
+        buttons.append({"text": "⚡ Apply now", "url": link})
+    # Also offer the raw ATS listing so you can eyeball the original posting.
+    if record.link and record.link != link:
+        buttons.append({"text": "🔗 View listing", "url": record.link})
+    reply_markup = {"inline_keyboard": [buttons]} if buttons else None
     return send_message(text, reply_markup=reply_markup)
