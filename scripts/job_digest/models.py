@@ -45,3 +45,7 @@ class JobRecord:
     source_family: str = ""
     email_bucket: str = "main"
     alternate_links: List[Dict[str, str]] = field(default_factory=list)
+    # Freshness/scarcity ranking (computed in runner; see utils.compute_priority_score)
+    priority_score: float = 0.0
+    hours_since_posted: float | None = None
+    applicant_bucket: str = ""

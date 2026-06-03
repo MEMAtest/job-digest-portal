@@ -235,6 +235,142 @@ def parse_applicant_count(value: str) -> Optional[int]:
         return None
 
 
+def hours_since_posted(record: JobRecord) -> Optional[float]:
+    """Best-effort hours since a role was posted.
+
+    Prefers the structured `posted_date`; falls back to parsing the relative
+    text ("2 hours ago", "new", "yesterday") the same way
+    `parse_posted_within_window` does. Returns None when unparseable — callers
+    must treat None as "unknown", never as "old".
+    """
+    dt = parse_posted_date_value(record.posted_date or "")
+    if dt:
+        delta = (now_utc() - dt).total_seconds() / 3600.0
+        return max(0.0, delta)
+
+    text = (record.posted_raw or record.posted or "").lower().strip()
+    if not text:
+        return None
+    if text == "new" or "newly posted" in text or "just now" in text or "today" in text:
+        return 0.5
+    if "minute" in text or re.search(r"\bmins?\b", text):
+        return 0.5
+    if "yesterday" in text:
+        return 24.0
+    match = re.search(r"(\d+)", text)
+    number = int(match.group(1)) if match else None
+    if number is None:
+        return None
+    if "hour" in text:
+        return float(number)
+    if "day" in text:
+        return float(number * 24)
+    if "week" in text:
+        return float(number * 7 * 24)
+    if "month" in text:
+        return float(number * 30 * 24)
+    return None
+
+
+def applicant_bucket_label(n: Optional[int]) -> str:
+    if n is None:
+        return ""
+    if n <= 10:
+        return "low"
+    if n <= 25:
+        return "medium"
+    if n <= 50:
+        return "high"
+    return "saturated"
+
+
+def compute_priority_score(record: JobRecord) -> float:
+    """Rank score = fit + capped (recency + scarcity) boosts.
+
+    Fit stays dominant: the combined boost is capped at FRESHNESS_MAX_BOOST,
+    which is smaller than the typical fit gap between roles, so a high-fit
+    stale role stays above a low-fit fresh one — but a fresh, low-applicant
+    near-miss can overtake a stale strong-fit role. Stamps hours_since_posted,
+    applicant_bucket and priority_score on the record as a side effect.
+    """
+    fit = float(record.fit_score or 0)
+    if not config.FRESHNESS_RANKING_ENABLED:
+        record.priority_score = fit
+        return fit
+
+    hours = hours_since_posted(record)
+    record.hours_since_posted = hours
+    recency_boost = 0
+    if hours is not None:
+        if hours <= 2:
+            recency_boost = config.FRESH_BOOST_2H
+        elif hours <= 4:
+            recency_boost = config.FRESH_BOOST_4H
+        elif hours <= 12:
+            recency_boost = config.FRESH_BOOST_12H
+        elif hours <= 24:
+            recency_boost = config.FRESH_BOOST_24H
+
+    n = parse_applicant_count(record.applicant_count)
+    record.applicant_bucket = applicant_bucket_label(n)
+    scarcity_boost = 0
+    if n is not None:
+        if n <= 10:
+            scarcity_boost = config.SCARCITY_BOOST_LOW
+        elif n <= 25:
+            scarcity_boost = config.SCARCITY_BOOST_MED
+        elif n <= 50:
+            scarcity_boost = config.SCARCITY_BOOST_HIGH
+
+    boost = min(recency_boost + scarcity_boost, config.FRESHNESS_MAX_BOOST)
+    score = fit + boost
+    record.priority_score = score
+    return score
+
+
+def _record_ats_family(record: JobRecord) -> str:
+    fam = (record.ats_family or "").strip().lower()
+    if fam:
+        return fam
+    link = (record.link or "").lower()
+    for ats in config.HOT_LANE_SUPPORTED_ATS:
+        if ats in link:
+            return ats
+    return ""
+
+
+_HOT_LANE_DEFAULT_LIMIT = object()
+
+
+def select_hot_lane(records: List[JobRecord], *, min_fit: Optional[int] = None,
+                    limit=_HOT_LANE_DEFAULT_LIMIT) -> List[JobRecord]:
+    """Fresh + high-fit + low-applicant + supported-ATS roles, best first.
+
+    `min_fit` defaults to HOT_LANE_MIN_FIT (digest email lane). `limit` defaults
+    to HOT_LANE_MAX_ROLES; pass `limit=None` for no cap (hot-scan alerts).
+    """
+    threshold = config.HOT_LANE_MIN_FIT if min_fit is None else min_fit
+    hot: List[JobRecord] = []
+    for rec in records:
+        hours = rec.hours_since_posted
+        if hours is None:
+            hours = hours_since_posted(rec)
+        if hours is None or hours > config.HOT_LANE_MAX_HOURS:
+            continue
+        if int(rec.fit_score or 0) < threshold:
+            continue
+        n = parse_applicant_count(rec.applicant_count)
+        if n is not None and n > config.HOT_LANE_MAX_APPLICANTS:
+            continue
+        if config.HOT_LANE_SUPPORTED_ATS_ONLY and _record_ats_family(rec) not in config.HOT_LANE_SUPPORTED_ATS:
+            continue
+        hot.append(rec)
+    hot.sort(key=lambda r: (r.priority_score or float(r.fit_score or 0)), reverse=True)
+    if limit is _HOT_LANE_DEFAULT_LIMIT:
+        limit = config.HOT_LANE_MAX_ROLES
+    return hot[:limit] if limit else hot
+
+
 def load_seen_cache(path: Path) -> Dict[str, str]:
     if not path.exists():
         return {}

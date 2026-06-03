@@ -1,0 +1,78 @@
+name: Hot Scan (Fast Detection)
+
+# Fast detection (Part F): a lightweight ATS-only scan that Telegram-alerts
+# fresh, high-fit roles within minutes of them appearing — no LLM, no LinkedIn,
+# no job boards, no digest email. Complements the 6x/day full digest.
+#
+# NOTE on cadence: GitHub-scheduled workflows are not precise — they queue and
+# drift 5-60 min and can be skipped under load. "*/20" realistically yields a
+# ~20-45 min detection latency (still a big drop from the digest's ~4-5h). For
+# true sub-5-min latency, run scripts/daily_job_search.py --hot-scan from an
+# always-on poller (Tier 2) — run_hot_scan() is already a standalone callable.
+
+on:
+  schedule:
+    - cron: '*/20 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: hot-scan
+  cancel-in-progress: true
+
+jobs:
+  hot-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install python-dotenv
+
+      - name: Restore hot-scan cache
+        uses: actions/cache@v4
+        with:
+          path: hot-scan-data
+          key: hot-scan-state-${{ github.run_id }}
+          restore-keys: |
+            hot-scan-state-
+
+      - name: Write Firebase service account JSON
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          mkdir -p secrets
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > secrets/firebase.json
+          python -c "import json; json.load(open('secrets/firebase.json'))"
+
+      - name: Run hot scan
+        env:
+          # Firebase (so the #apply-now deep link resolves + hot_alerted_at dedup)
+          FIREBASE_SERVICE_ACCOUNT_PATH: secrets/firebase.json
+          FIREBASE_COLLECTION: ${{ secrets.FIREBASE_COLLECTION }}
+          # Telegram push alerts
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+          # Output / cache location (cloud-friendly; separate from the digest dir)
+          JOB_DIGEST_BASE_DIR: ${{ github.workspace }}/hot-scan-data
+          JOB_DIGEST_TZ: ${{ secrets.JOB_DIGEST_TZ }}
+          JOB_DIGEST_SEEN_CACHE_DAYS: ${{ secrets.JOB_DIGEST_SEEN_CACHE_DAYS }}
+          # Tuning (optional overrides; sensible defaults in config.py)
+          JOB_DIGEST_HOT_SCAN_MIN_FIT: ${{ secrets.JOB_DIGEST_HOT_SCAN_MIN_FIT }}
+          # Keep the watchdog short — this scan should finish in well under a minute
+          JOB_DIGEST_RUN_DEADLINE_SECONDS: '300'
+        run: |
+          mkdir -p hot-scan-data/digests
+          python scripts/daily_job_search.py --hot-scan
