@@ -253,9 +253,127 @@ export const quickApply = async (job, card) => {
   }
 };
 
+// One-click apply (Part D): open the pre-filled form ready for the user to
+// review + Submit. Reuses launchApplyAssistant (which ensures the pack and
+// opens the local browser, NOT auto-submitting). Falls back to copy+open when
+// the local assistant is offline so "Apply now" always does something useful.
+export const applyNow = async (job) => {
+  if (!job) return;
+  if (isApplyAssistantSupported(job)) {
+    if (isApplyAssistantBusy(job.id)) return;
+    const result = await launchApplyAssistant(job, { autoSubmit: false });
+    // launchApplyAssistant sets launch_failed (in memory + Firestore) and shows
+    // a toast if the local server is down — fall back to copy + open the link.
+    if (job.apply_assistant_status === "launch_failed") {
+      showToast("Local assistant offline — copied your CV and opened the listing.");
+      await quickApply(job);
+    }
+    return result;
+  }
+  // Unsupported ATS: copy tailored CV + cover letter and open the listing.
+  await quickApply(job);
+};
+
+const HOT_LANE_MIN_FIT = 78;
+const HOT_LANE_MAX_HOURS = 4;
+const HOT_LANE_MAX_APPLICANTS = 25;
+
+const hoursSincePosted = (job) => {
+  const raw = job.posted_date || "";
+  if (raw) {
+    const t = Date.parse(raw.replace(" ", "T"));
+    if (!Number.isNaN(t)) return (Date.now() - t) / 3600000;
+  }
+  const text = String(job.posted || job.posted_raw || "").toLowerCase();
+  if (!text) return null;
+  if (/\bnew\b|just now|today|minute|\bmins?\b/.test(text)) return 0.5;
+  if (text.includes("yesterday")) return 24;
+  const m = text.match(/(\d+)/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  if (text.includes("hour")) return n;
+  if (text.includes("day")) return n * 24;
+  if (text.includes("week")) return n * 168;
+  return null;
+};
+
+const isHotLaneJob = (job) => {
+  const status = (job.application_status || "saved").toLowerCase();
+  if (["applied", "rejected", "dismissed"].includes(status)) return false;
+  if (!isApplyAssistantSupported(job)) return false;  // supported ATS + has link
+  const hours = hoursSincePosted(job);
+  if (hours === null || hours > HOT_LANE_MAX_HOURS) return false;
+  if ((job.fit_score || 0) < HOT_LANE_MIN_FIT) return false;
+  const n = parseApplicantCount(job.applicant_count);
+  if (n !== null && n > HOT_LANE_MAX_APPLICANTS) return false;
+  return true;
+};
+
+// Defensive portal hot lane (Part B): only renders into an optional #hot-lane
+// container if present and there are qualifying roles. Never throws into the UI.
+export const renderHotLane = () => {
+  const container = document.getElementById("hot-lane");
+  if (!container) return;
+  const jobs = (state.jobs || [])
+    .filter(isHotLaneJob)
+    .sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0))
+    .slice(0, 5);
+  if (!jobs.length) {
+    container.innerHTML = "";
+    container.style.display = "none";
+    return;
+  }
+  const cards = jobs
+    .map((job) => {
+      const n = parseApplicantCount(job.applicant_count);
+      const applicants = n !== null ? `${n} applicants` : "few applicants";
+      const ready = job.apply_assistant_status === "pack_ready" ? "✓ Pack ready" : "";
+      return `
+        <div class="hot-lane__card">
+          <div class="hot-lane__role">${escapeHtml(job.role || "Role")}</div>
+          <div class="hot-lane__meta">${escapeHtml(job.company || "")} · ${escapeHtml(job.location || "")}</div>
+          <div class="hot-lane__meta">Fit ${job.fit_score || 0}% · ${escapeHtml(applicants)} · ${escapeHtml(String(job.posted || ""))} <span class="hot-lane__ready">${ready}</span></div>
+          <button class="btn-hot-apply" data-job-id="${escapeHtml(job.id)}">⚡ Apply now</button>
+        </div>`;
+    })
+    .join("");
+  container.style.display = "";
+  container.innerHTML = `
+    <div class="hot-lane__header">🔥 Apply now — fresh &amp; low-competition</div>
+    ${cards}`;
+  container.querySelectorAll(".btn-hot-apply").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const job = (state.jobs || []).find((j) => j.id === btn.dataset.jobId);
+      if (job) applyNow(job);
+    });
+  });
+};
+
+// Deep link from the digest email / Telegram alert: #apply-now=<docId> opens
+// one-click apply for that role as soon as jobs are loaded.
+export const handleApplyNowDeepLink = async () => {
+  const hash = window.location.hash || "";
+  const match = hash.match(/apply-now=([A-Za-z0-9_-]+)/);
+  if (!match) return;
+  const jobId = match[1];
+  try {
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+  } catch (_) {
+    // ignore
+  }
+  const job = (state.jobs || []).find((j) => j.id === jobId);
+  if (!job) {
+    showToast("That role isn't loaded yet — open the Jobs tab and try again.");
+    return;
+  }
+  showToast(`Opening one-click apply: ${job.role || "role"}`);
+  await applyNow(job);
+};
+
 export const renderApplyHub = () => {
   const hubContainer = document.getElementById("apply-hub");
   if (!hubContainer) return;
+  renderHotLane();
 
   const existingNotes = hubContainer.querySelectorAll?.(".hub-notes") || [];
   existingNotes.forEach((textarea) => {

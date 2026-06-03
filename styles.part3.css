@@ -3629,3 +3629,14 @@
 .pod-article__apply p { margin: 0; color: #451a03; line-height: 1.55; }
 .pod-article__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 /* ─────────────────────────────────────────────────────────────── */
+
+/* Apply Now hot lane (Part B) */
+.hot-lane { border: 1px solid #fb923c; border-left: 6px solid #ea580c; background: #fff7ed; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+.hot-lane__header { font-weight: 700; color: #9a3412; font-size: 15px; margin-bottom: 10px; }
+.hot-lane__card { background: #fff; border: 1px solid #ffd5c2; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.hot-lane__role { font-size: 15px; font-weight: 700; color: #9a3412; }
+.hot-lane__meta { color: #6b7280; font-size: 12px; margin-top: 3px; }
+.hot-lane__ready { color: #15803d; font-weight: 600; margin-left: 6px; }
+.btn-hot-apply { margin-top: 8px; background: #ea580c; color: #fff; border: 0; font-weight: 700; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+.btn-hot-apply:hover { background: #c2410c; }
+
