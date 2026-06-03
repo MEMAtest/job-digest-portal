@@ -72,6 +72,35 @@ const checkAssistantHealth = async () => {
   return res.json();
 };
 
+// Part E reliability: turn the silent "server down" failure into a visible,
+// pre-emptive indicator. Updates an optional #assistant-health element so the
+// user knows to start the local server before clicking Apply now.
+let _assistantHealthTimer = null;
+export const pollAssistantHealth = (intervalMs = 30000) => {
+  const el = document.getElementById("assistant-health");
+  if (!el) return;
+  const update = async () => {
+    let online = false;
+    try {
+      await checkAssistantHealth();
+      online = true;
+    } catch (_) {
+      online = false;
+    }
+    el.classList.toggle("assistant-health--online", online);
+    el.classList.toggle("assistant-health--offline", !online);
+    el.textContent = online
+      ? "● Apply Assistant online"
+      : "● Assistant offline — run: npm run apply-assistant";
+    el.title = online
+      ? "Local one-click apply is ready"
+      : "Start it from the repo root with: npm run apply-assistant";
+  };
+  update();
+  if (_assistantHealthTimer) clearInterval(_assistantHealthTimer);
+  _assistantHealthTimer = setInterval(update, intervalMs);
+};
+
 const buildChecklistUpdate = (job, result) => {
   const existing = job.apply_checklist || {};
   return {

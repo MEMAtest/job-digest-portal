@@ -3640,3 +3640,8 @@
 .btn-hot-apply { margin-top: 8px; background: #ea580c; color: #fff; border: 0; font-weight: 700; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
 .btn-hot-apply:hover { background: #c2410c; }
 
+/* Apply Assistant health indicator (Part E) */
+.assistant-health { font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+.assistant-health--online { color: #15803d; }
+.assistant-health--offline { color: #b91c1c; }
+

@@ -58,6 +58,7 @@ import {
 } from "./app.core.js";
 import { renderFilters, renderJobs } from "./app.jobs.js";
 import { renderApplyHub, handleApplyNowDeepLink } from "./app.applyhub.js";
+import { pollAssistantHealth } from "./app.applyassistant.js";
 import { renderCvHub } from "./app.cvhub.js";
 import { loadBaseCvFromFirestore } from "./app.cv.js";
 import {
@@ -249,6 +250,8 @@ const applyLoadedJobs = async ({ jobs, stats, suggestions, candidatePrep, meta }
   renderTriagePrompt(state.jobs);
   // Email/Telegram "Apply now" deep link (#apply-now=<id>) — jobs are loaded now.
   handleApplyNowDeepLink();
+  // Show whether the local Apply Assistant is running (pre-empts silent failure).
+  pollAssistantHealth();
 
   const nowLabel = new Date().toLocaleString();
   const generatedAt = new Date(resolvedMeta.generated_at || Date.now());
