@@ -3,6 +3,7 @@ import {
   db,
   collectionName,
   doc,
+  getDoc,
   updateDoc,
   parseDateValue,
   parseApplicantCount,
@@ -361,7 +362,20 @@ export const handleApplyNowDeepLink = async () => {
   } catch (_) {
     // ignore
   }
-  const job = (state.jobs || []).find((j) => j.id === jobId);
+  let job = (state.jobs || []).find((j) => j.id === jobId);
+  // Brand-new alerted roles may not be in the (500-cap) loaded set yet — fetch
+  // the doc directly by id and add it to state so the apply flow finds it.
+  if (!job && db) {
+    try {
+      const snap = await getDoc(doc(db, collectionName, jobId));
+      if (snap && snap.exists()) {
+        job = { id: jobId, ...snap.data() };
+        if (Array.isArray(state.jobs)) state.jobs.push(job);
+      }
+    } catch (err) {
+      console.error("apply-now deep link fetch failed:", err);
+    }
+  }
   if (!job) {
     showToast("That role isn't loaded yet — open the Jobs tab and try again.");
     return;
