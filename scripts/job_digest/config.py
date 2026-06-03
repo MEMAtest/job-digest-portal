@@ -110,30 +110,52 @@ def _env_bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _env_int(name: str, default: int) -> int:
+    # GitHub Actions injects unset secrets as "" — fall back to default rather
+    # than crashing on int("").
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw.strip())
+    except ValueError:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return float(raw.strip())
+    except ValueError:
+        return default
+
+
 # --- Freshness + scarcity ranking (Part A) ---
 # Fit stays dominant; these additive boosts let fresh, low-applicant high-fit
 # roles float to the top. Missing signals never penalise (boost = 0).
 FRESHNESS_RANKING_ENABLED = _env_bool("JOB_DIGEST_FRESHNESS_RANKING_ENABLED", True)
-FRESHNESS_MAX_BOOST = int(os.getenv("JOB_DIGEST_FRESHNESS_MAX_BOOST", "18"))
-FRESH_BOOST_2H = int(os.getenv("JOB_DIGEST_FRESH_BOOST_2H", "12"))
-FRESH_BOOST_4H = int(os.getenv("JOB_DIGEST_FRESH_BOOST_4H", "8"))
-FRESH_BOOST_12H = int(os.getenv("JOB_DIGEST_FRESH_BOOST_12H", "4"))
-FRESH_BOOST_24H = int(os.getenv("JOB_DIGEST_FRESH_BOOST_24H", "2"))
-SCARCITY_BOOST_LOW = int(os.getenv("JOB_DIGEST_SCARCITY_BOOST_LOW", "8"))    # <= 10 applicants
-SCARCITY_BOOST_MED = int(os.getenv("JOB_DIGEST_SCARCITY_BOOST_MED", "5"))    # <= 25
-SCARCITY_BOOST_HIGH = int(os.getenv("JOB_DIGEST_SCARCITY_BOOST_HIGH", "2"))  # <= 50
+FRESHNESS_MAX_BOOST = _env_int("JOB_DIGEST_FRESHNESS_MAX_BOOST", 18)
+FRESH_BOOST_2H = _env_int("JOB_DIGEST_FRESH_BOOST_2H", 12)
+FRESH_BOOST_4H = _env_int("JOB_DIGEST_FRESH_BOOST_4H", 8)
+FRESH_BOOST_12H = _env_int("JOB_DIGEST_FRESH_BOOST_12H", 4)
+FRESH_BOOST_24H = _env_int("JOB_DIGEST_FRESH_BOOST_24H", 2)
+SCARCITY_BOOST_LOW = _env_int("JOB_DIGEST_SCARCITY_BOOST_LOW", 8)    # <= 10 applicants
+SCARCITY_BOOST_MED = _env_int("JOB_DIGEST_SCARCITY_BOOST_MED", 5)    # <= 25
+SCARCITY_BOOST_HIGH = _env_int("JOB_DIGEST_SCARCITY_BOOST_HIGH", 2)  # <= 50
 
 # --- "Apply now" hot lane (Part B) ---
-HOT_LANE_MAX_HOURS = float(os.getenv("JOB_DIGEST_HOT_LANE_MAX_HOURS", "4"))
-HOT_LANE_MIN_FIT = int(os.getenv("JOB_DIGEST_HOT_LANE_MIN_FIT", "78"))
-HOT_LANE_MAX_APPLICANTS = int(os.getenv("JOB_DIGEST_HOT_LANE_MAX_APPLICANTS", "25"))
+HOT_LANE_MAX_HOURS = _env_float("JOB_DIGEST_HOT_LANE_MAX_HOURS", 4.0)
+HOT_LANE_MIN_FIT = _env_int("JOB_DIGEST_HOT_LANE_MIN_FIT", 78)
+HOT_LANE_MAX_APPLICANTS = _env_int("JOB_DIGEST_HOT_LANE_MAX_APPLICANTS", 25)
 HOT_LANE_SUPPORTED_ATS_ONLY = _env_bool("JOB_DIGEST_HOT_LANE_SUPPORTED_ATS_ONLY", True)
-HOT_LANE_MAX_ROLES = int(os.getenv("JOB_DIGEST_HOT_LANE_MAX_ROLES", "5"))
+HOT_LANE_MAX_ROLES = _env_int("JOB_DIGEST_HOT_LANE_MAX_ROLES", 5)
 HOT_LANE_SUPPORTED_ATS = {"greenhouse", "lever", "ashby", "workable"}
 
 # --- Fast detection hot-scan + Telegram (Part F) ---
 HOT_SCAN_ENABLED = _env_bool("JOB_DIGEST_HOT_SCAN_ENABLED", True)
-HOT_SCAN_MIN_FIT = int(os.getenv("JOB_DIGEST_HOT_SCAN_MIN_FIT", str(HOT_LANE_MIN_FIT)))
+HOT_SCAN_MIN_FIT = _env_int("JOB_DIGEST_HOT_SCAN_MIN_FIT", HOT_LANE_MIN_FIT)
 HOT_ALERTED_CACHE_PATH = Path(
     os.getenv("JOB_DIGEST_HOT_ALERTED_CACHE", str(DIGEST_DIR / "hot_alerted.json"))
 )
