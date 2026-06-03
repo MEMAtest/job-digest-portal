@@ -29,6 +29,7 @@ import {
   launchApplyAssistant,
   formatApplyAssistantStatus,
   isApplyAssistantBusy,
+  isAssistantOnline,
 } from "./app.applyassistant.js";
 
 const loadHubSort = () => {
@@ -262,14 +263,14 @@ export const applyNow = async (job) => {
   if (!job) return;
   if (isApplyAssistantSupported(job)) {
     if (isApplyAssistantBusy(job.id)) return;
-    const result = await launchApplyAssistant(job, { autoSubmit: false });
-    // launchApplyAssistant sets launch_failed (in memory + Firestore) and shows
-    // a toast if the local server is down — fall back to copy + open the link.
-    if (job.apply_assistant_status === "launch_failed") {
-      showToast("Local assistant offline — copied your CV and opened the listing.");
-      await quickApply(job);
+    // Probe first (fast) so we never make the user wait through a doomed launch
+    // attempt on a phone, where the Mac's local assistant is unreachable.
+    if (await isAssistantOnline()) {
+      return await launchApplyAssistant(job, { autoSubmit: false });
     }
-    return result;
+    showToast("Apply Assistant offline — CV copied, opening the listing.");
+    await quickApply(job);
+    return;
   }
   // Unsupported ATS: copy tailored CV + cover letter and open the listing.
   await quickApply(job);

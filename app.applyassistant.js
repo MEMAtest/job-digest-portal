@@ -72,6 +72,21 @@ const checkAssistantHealth = async () => {
   return res.json();
 };
 
+// Fast, non-throwing probe used to decide the apply path before any UI churn.
+// On a phone the Mac's 127.0.0.1 is unreachable, so this returns false quickly
+// (aborts after timeoutMs) instead of hanging on a connection that can't succeed.
+export const isAssistantOnline = async (timeoutMs = 1500) => {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(`${LOCAL_ASSISTANT_BASE_URL}/health`, { signal: controller.signal });
+    clearTimeout(timer);
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+};
+
 // Part E reliability: turn the silent "server down" failure into a visible,
 // pre-emptive indicator. Updates an optional #assistant-health element so the
 // user knows to start the local server before clicking Apply now.
