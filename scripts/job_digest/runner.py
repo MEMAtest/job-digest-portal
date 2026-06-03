@@ -2024,7 +2024,8 @@ def main(
     if top_pick and top_pick not in top_records:
         top_records = [top_pick] + top_records
         top_records = top_records[: max(config.MAX_EMAIL_ROLES, config.MIN_EMAIL_ROLES)]
-    html_body = build_email_html(top_records + borderline_records, config.WINDOW_HOURS)
+    hot_lane = select_hot_lane(top_records + borderline_records)
+    html_body = build_email_html(top_records + borderline_records, config.WINDOW_HOURS, hot_lane=hot_lane)
     delivery_summary_html = (
         "<div style='background:#ECFDF5; border:1px solid #BBF7D0; padding:10px; "
         "border-radius:8px; margin-bottom:14px; font-size:14px; color:#064E3B;'>"
