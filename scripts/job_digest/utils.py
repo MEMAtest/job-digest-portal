@@ -343,11 +343,17 @@ _HOT_LANE_DEFAULT_LIMIT = object()
 
 
 def select_hot_lane(records: List[JobRecord], *, min_fit: Optional[int] = None,
-                    limit=_HOT_LANE_DEFAULT_LIMIT) -> List[JobRecord]:
-    """Fresh + high-fit + low-applicant + supported-ATS roles, best first.
+                    limit=_HOT_LANE_DEFAULT_LIMIT, require_fresh: bool = True) -> List[JobRecord]:
+    """High-fit + low-applicant + supported-ATS roles, best first.
 
     `min_fit` defaults to HOT_LANE_MIN_FIT (digest email lane). `limit` defaults
     to HOT_LANE_MAX_ROLES; pass `limit=None` for no cap (hot-scan alerts).
+
+    `require_fresh` (default True, digest lane): only roles with a known posted
+    time within HOT_LANE_MAX_HOURS. The hot-scan passes `require_fresh=False`:
+    ATS feeds often omit a timestamp, and "new since last scan" is its real
+    freshness signal — so a missing timestamp is included, and only a KNOWN
+    date older than HOT_SCAN_MAX_AGE_HOURS is dropped (avoids backfill spam).
     """
     threshold = config.HOT_LANE_MIN_FIT if min_fit is None else min_fit
     hot: List[JobRecord] = []
@@ -355,8 +361,13 @@ def select_hot_lane(records: List[JobRecord], *, min_fit: Optional[int] = None,
         hours = rec.hours_since_posted
         if hours is None:
             hours = hours_since_posted(rec)
-        if hours is None or hours > config.HOT_LANE_MAX_HOURS:
-            continue
+        if require_fresh:
+            if hours is None or hours > config.HOT_LANE_MAX_HOURS:
+                continue
+        else:
+            # Include unknown-timestamp roles; drop only clearly-stale known ones.
+            if hours is not None and hours > config.HOT_SCAN_MAX_AGE_HOURS:
+                continue
         if int(rec.fit_score or 0) < threshold:
             continue
         n = parse_applicant_count(rec.applicant_count)
