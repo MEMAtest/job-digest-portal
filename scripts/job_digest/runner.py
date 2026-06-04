@@ -1776,7 +1776,9 @@ def run_hot_scan() -> int:
     for record in records:
         compute_priority_score(record)
 
-    candidates = select_hot_lane(records, min_fit=config.HOT_SCAN_MIN_FIT, limit=None, require_fresh=False)
+    candidates = select_hot_lane(
+        records, min_fit=config.HOT_SCAN_MIN_FIT, limit=config.HOT_SCAN_MAX_ALERTS, require_fresh=False
+    )
     print(f"hot-scan: {len(records)} ATS records, {len(candidates)} fresh high-fit candidates")
     if not candidates:
         return 0

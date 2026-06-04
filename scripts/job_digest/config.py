@@ -155,10 +155,14 @@ HOT_LANE_SUPPORTED_ATS = {"greenhouse", "lever", "ashby", "workable"}
 
 # --- Fast detection hot-scan + Telegram (Part F) ---
 HOT_SCAN_ENABLED = _env_bool("JOB_DIGEST_HOT_SCAN_ENABLED", True)
-# Scanner threshold is intentionally below the digest hot-lane's (HOT_LANE_MIN_FIT):
-# the scanner's job is breadth (ping on any strong new role), the digest's is a
-# curated daily summary.
-HOT_SCAN_MIN_FIT = _env_int("JOB_DIGEST_HOT_SCAN_MIN_FIT", 72)
+# Scanner threshold is on the FAST HEURISTIC score scale (no LLM), which runs
+# ~10-15pts lower than the digest's LLM scores — strong, on-target roles (e.g. a
+# KYC/Product PM at Veriff/Marqeta/Monzo) top out around 63-67 on the heuristic.
+# So this floor is intentionally well below the digest hot-lane's HOT_LANE_MIN_FIT.
+HOT_SCAN_MIN_FIT = _env_int("JOB_DIGEST_HOT_SCAN_MIN_FIT", 63)
+# Cap alerts per scan so a backlog of currently-open matches can't flood the chat
+# in one burst (the rest carry to the next scan via the not-yet-alerted dedup).
+HOT_SCAN_MAX_ALERTS = _env_int("JOB_DIGEST_HOT_SCAN_MAX_ALERTS", 8)
 # The scanner doesn't require a sub-4h posted timestamp (ATS feeds often omit it);
 # "new since last scan" is the freshness signal. Still drop roles with a KNOWN
 # posted date older than this, so a first scan doesn't alert on ancient backfill.
