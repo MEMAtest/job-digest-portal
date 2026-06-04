@@ -155,7 +155,14 @@ HOT_LANE_SUPPORTED_ATS = {"greenhouse", "lever", "ashby", "workable"}
 
 # --- Fast detection hot-scan + Telegram (Part F) ---
 HOT_SCAN_ENABLED = _env_bool("JOB_DIGEST_HOT_SCAN_ENABLED", True)
-HOT_SCAN_MIN_FIT = _env_int("JOB_DIGEST_HOT_SCAN_MIN_FIT", HOT_LANE_MIN_FIT)
+# Scanner threshold is intentionally below the digest hot-lane's (HOT_LANE_MIN_FIT):
+# the scanner's job is breadth (ping on any strong new role), the digest's is a
+# curated daily summary.
+HOT_SCAN_MIN_FIT = _env_int("JOB_DIGEST_HOT_SCAN_MIN_FIT", 72)
+# The scanner doesn't require a sub-4h posted timestamp (ATS feeds often omit it);
+# "new since last scan" is the freshness signal. Still drop roles with a KNOWN
+# posted date older than this, so a first scan doesn't alert on ancient backfill.
+HOT_SCAN_MAX_AGE_HOURS = _env_float("JOB_DIGEST_HOT_SCAN_MAX_AGE_HOURS", 168.0)  # 7 days
 HOT_ALERTED_CACHE_PATH = Path(
     os.getenv("JOB_DIGEST_HOT_ALERTED_CACHE", str(DIGEST_DIR / "hot_alerted.json"))
 )

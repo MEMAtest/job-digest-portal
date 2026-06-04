@@ -65,7 +65,32 @@ def test_hot_lane():
     assert hot[0] is capped                             # highest priority first (98 > 96)
 
 
+def test_hot_scan_lane():
+    # Scanner lane (require_fresh=False): timestamp-less ATS roles must be
+    # INCLUDED (feeds often omit a posted time), only clearly-stale known dates
+    # dropped. Uses HOT_SCAN_MIN_FIT (72) so strong-but-not-perfect roles ping.
+    notime = _mk(74, posted="", applicants="2 applicants")           # no timestamp, fit 74
+    stale = _mk(90, posted="3 weeks ago")                            # known + very old
+    weak = _mk(60, posted="")                                        # below scanner threshold
+    fresh = _mk(80, posted="1 hour ago")
+    for r in (notime, stale, weak, fresh):
+        utils.compute_priority_score(r)
+
+    scan = utils.select_hot_lane(
+        [notime, stale, weak, fresh], min_fit=72, limit=None, require_fresh=False
+    )
+    assert notime in scan, "timestamp-less role must be included in the scanner lane"
+    assert fresh in scan
+    assert weak not in scan, "below 72 fit excluded"
+    assert stale not in scan, "known date older than 7d dropped"
+
+    # The digest lane (require_fresh=True) must STILL exclude the timestamp-less one.
+    digest = utils.select_hot_lane([notime, fresh])
+    assert notime not in digest and fresh in digest
+
+
 if __name__ == "__main__":
     test_priority_score()
     test_hot_lane()
-    print("OK: fast-apply ranking + hot-lane tests passed")
+    test_hot_scan_lane()
+    print("OK: fast-apply ranking + hot-lane + hot-scan tests passed")
