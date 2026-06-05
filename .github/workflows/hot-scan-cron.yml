@@ -69,6 +69,13 @@ jobs:
           JOB_DIGEST_BASE_DIR: ${{ github.workspace }}/hot-scan-data
           JOB_DIGEST_TZ: ${{ secrets.JOB_DIGEST_TZ }}
           JOB_DIGEST_SEEN_CACHE_DAYS: ${{ secrets.JOB_DIGEST_SEEN_CACHE_DAYS }}
+          # CRITICAL: the ATS collectors apply a freshness WINDOW gate (on the
+          # role's updated_at) BEFORE scoring. config.py defaults this to 24h,
+          # which strips ~90% of greenhouse roles in CI and is why the scan kept
+          # ~1 role. Set a 7-day window here (matches HOT_SCAN_MAX_AGE_HOURS) so
+          # recently-posted strong roles survive to the alert gate. The hot-scan
+          # dedups via hot_alerted_at, so a wider window won't re-alert.
+          JOB_DIGEST_WINDOW_HOURS: '168'
           # Tuning (optional overrides; sensible defaults in config.py)
           JOB_DIGEST_HOT_SCAN_MIN_FIT: ${{ secrets.JOB_DIGEST_HOT_SCAN_MIN_FIT }}
           # Keep the watchdog short — this scan should finish in well under a minute
