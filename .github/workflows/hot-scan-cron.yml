@@ -1,18 +1,16 @@
 name: Hot Scan (Fast Detection)
 
 # Fast detection (Part F): a lightweight ATS-only scan that Telegram-alerts
-# fresh, high-fit roles within minutes of them appearing — no LLM, no LinkedIn,
-# no job boards, no digest email. Complements the 6x/day full digest.
+# fresh, high-fit roles — no LLM, no LinkedIn, no job boards, no digest email.
+# Complements the 6x/day full digest. Runs entirely in the cloud (no laptop).
 #
-# NOTE on cadence: GitHub-scheduled workflows are not precise — they queue and
-# drift 5-60 min and can be skipped under load. "*/20" realistically yields a
-# ~20-45 min detection latency (still a big drop from the digest's ~4-5h). For
-# true sub-5-min latency, run scripts/daily_job_search.py --hot-scan from an
-# always-on poller (Tier 2) — run_hot_scan() is already a standalone callable.
+# Cadence: every 2 hours. GitHub-scheduled workflows still drift/queue a few
+# minutes and can be skipped under heavy load, but 2-hourly is plenty for this
+# (dedup via hot_alerted_at means each role alerts once).
 
 on:
   schedule:
-    - cron: '*/20 * * * *'
+    - cron: '0 */2 * * *'   # every 2 hours
   workflow_dispatch: {}
 
 concurrency:
