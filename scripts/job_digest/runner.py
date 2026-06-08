@@ -1810,21 +1810,29 @@ def run_hot_scan() -> int:
                 file_cache[rec.link] = now_iso
             continue
 
+        sent_ok = False
         if not is_configured():
             print(f"hot-scan: would alert {rec.company} / {rec.role} (fit {rec.fit_score}) — Telegram not configured")
         elif send_alert(rec):
             alerts += 1
+            sent_ok = True
             print(f"hot-scan alert sent: {rec.company} / {rec.role} (fit {rec.fit_score})")
+        else:
+            print(f"hot-scan: alert FAILED to send for {rec.company} / {rec.role} — will retry next scan")
 
-        if rec.link:
-            file_cache[rec.link] = now_iso
-        if client is not None:
-            try:
-                client.collection(config.FIREBASE_COLLECTION).document(doc_id).set(
-                    {"hot_alerted_at": now_iso}, merge=True
-                )
-            except Exception:
-                pass
+        # Only mark as alerted once it has ACTUALLY been delivered. Marking on a
+        # failed/blocked/unconfigured send would permanently suppress a role the
+        # user never received (the bug that silenced alerts).
+        if sent_ok:
+            if rec.link:
+                file_cache[rec.link] = now_iso
+            if client is not None:
+                try:
+                    client.collection(config.FIREBASE_COLLECTION).document(doc_id).set(
+                        {"hot_alerted_at": now_iso}, merge=True
+                    )
+                except Exception:
+                    pass
 
     save_seen_cache(config.HOT_ALERTED_CACHE_PATH, file_cache)
     print(f"hot-scan: {alerts} new alert(s) sent")
