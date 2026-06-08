@@ -150,6 +150,18 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"mode":"prewarm"}' || echo "prewarm trigger failed (non-fatal)"
 
+      - name: Sweep digest labels
+        if: always()
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          JOB_DIGEST_INBOX_LABEL: ${{ secrets.JOB_DIGEST_INBOX_LABEL }}
+          JOB_DIGEST_SKIP_INBOX: ${{ secrets.JOB_DIGEST_SKIP_INBOX }}
+        run: |
+          # Guarantee every digest (incl. SMTP-fallback deliveries that skip the
+          # IMAP label path) ends up under the Job Digest label and out of Primary.
+          python scripts/sweep_digest_labels.py || echo "label sweep failed (non-fatal)"
+
       - name: Save digest state cache
         if: always()
         uses: actions/cache/save@v4
