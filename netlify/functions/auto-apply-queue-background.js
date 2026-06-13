@@ -291,9 +291,12 @@ exports.handler = async (event) => {
     }
 
     const prefs = prefsDoc.data();
-    // Manual POST triggers bypass the enabled toggle; scheduled runs respect it
+    // Manual UI triggers ("Scan now") bypass the enabled toggle; cron-scheduled
+    // runs send {"scheduled":true} and are treated as non-manual so they respect
+    // prefs.enabled (skip silently when auto-apply is switched off).
     const body = event.body ? (() => { try { return JSON.parse(event.body); } catch { return {}; } })() : {};
-    const isManual = event.httpMethod === "POST" || body.manual === true;
+    const isScheduled = body.scheduled === true || body.mode === "scheduled";
+    const isManual = (event.httpMethod === "POST" || body.manual === true) && !isScheduled;
 
     // --- Pack pre-warming (Part C) ---
     // Build application packs ahead of time for fresh, high-fit, supported-ATS,
