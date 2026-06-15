@@ -1,0 +1,66 @@
+name: Auto-Apply Now (manual)
+
+# On-demand auto-apply pass: trigger the review scan and send Telegram GO/NO-GO
+# pings — without waiting for the next digest cron. Same two steps the digest
+# cron runs, factored out so it's fast to run and easy to test.
+#
+# Respects the portal's Auto-Apply `enabled` toggle (the scan sends
+# {"scheduled":true}); flip it on in the portal first or nothing is queued.
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: auto-apply-now
+  cancel-in-progress: true
+
+jobs:
+  auto-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Write Firebase service account JSON
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          mkdir -p secrets
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > secrets/firebase.json
+          python -c "import json; json.load(open('secrets/firebase.json'))"
+
+      - name: Trigger auto-apply scan
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+        run: |
+          BASE="${SITE_URL:-https://adejob.netlify.app}"
+          BASE="${BASE%/}"
+          echo "Triggering auto-apply scheduled scan at $BASE"
+          curl -s -m 30 -X POST "$BASE/.netlify/functions/auto-apply-queue-background" \
+            -H "Content-Type: application/json" \
+            -d '{"scheduled":true}' || echo "auto-apply scan trigger failed (non-fatal)"
+
+      - name: Notify auto-apply reviews (Telegram)
+        env:
+          # config.py mkdir's BASE_DIR at import — point it at a writable path.
+          JOB_DIGEST_BASE_DIR: ${{ github.workspace }}/digest-data
+          FIREBASE_SERVICE_ACCOUNT_PATH: secrets/firebase.json
+          FIREBASE_COLLECTION: ${{ secrets.FIREBASE_COLLECTION }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+          AUTO_APPLY_HMAC_SECRET: ${{ secrets.AUTO_APPLY_HMAC_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python scripts/notify_auto_apply_reviews.py

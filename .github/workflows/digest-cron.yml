@@ -168,6 +168,9 @@ jobs:
       - name: Notify auto-apply reviews (Telegram)
         if: always()
         env:
+          # config.py mkdir's BASE_DIR at import — must point it at a writable
+          # workspace path or it crashes trying to create the default /Users path.
+          JOB_DIGEST_BASE_DIR: ${{ github.workspace }}/digest-data
           FIREBASE_SERVICE_ACCOUNT_PATH: secrets/firebase.json
           FIREBASE_COLLECTION: ${{ secrets.FIREBASE_COLLECTION }}
           SITE_URL: ${{ secrets.SITE_URL }}
