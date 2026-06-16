@@ -63,4 +63,4 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python scripts/notify_auto_apply_reviews.py
+          python scripts/notify_auto_apply_reviews.py || echo "auto-apply telegram notify failed (non-fatal)"

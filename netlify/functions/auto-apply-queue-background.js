@@ -86,8 +86,33 @@ const jobHoursSince = (job) => {
 };
 
 // Application statuses that mean "don't queue this for auto-apply" — already
-// applied, explicitly rejected/dismissed by the user, etc.
-const SKIP_APP_STATUSES = new Set(["applied", "rejected", "dismissed"]);
+// applied, explicitly rejected/dismissed, or already progressing (interview/
+// offer) so we must not re-apply.
+const SKIP_APP_STATUSES = new Set(["applied", "rejected", "dismissed", "interview", "offer"]);
+
+// Probe whether a listing still resolves. Only drops a role on POSITIVE evidence
+// it's gone (404/410/451) — keeps it on 200, redirects, 403/5xx, or any network
+// error, so a flaky board or a HEAD-hostile ATS never wrongly discards a good
+// role. This is the fix for "fresh but already-closed" roles slipping the
+// freshness gate (the listing closed inside its posting window).
+const isListingLive = async (url) => {
+  if (!/^https?:\/\//i.test(url || "")) return true;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const resp = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; adejob-autoapply/1.0)" },
+    });
+    return ![404, 410, 451].includes(resp.status);
+  } catch {
+    return true; // network/timeout — fail open, don't discard a possibly-good role
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 const buildAtsKeywordCoverage = (job, tailoredSections) => {
   const requirements = Array.isArray(job.key_requirements) ? job.key_requirements : [];
@@ -348,11 +373,11 @@ exports.handler = async (event) => {
         .filter((job) => {
           if (!SUPPORTED_ATS.has(job.ats_family)) return false;
           const appStatus = (job.application_status || "").toLowerCase();
-          if (["applied", "rejected", "dismissed"].includes(appStatus)) return false;
+          if (SKIP_APP_STATUSES.has(appStatus)) return false;
           if (job.is_closed === true) return false;
           if (job.tailored_cv_sections && Object.keys(job.tailored_cv_sections).length) return false;
           const h = hoursSince(job);
-          if (h === null || h > maxHours) return false;
+          if (h === null || h < 0 || h > maxHours) return false;
           const n = parseApplicants(job.applicant_count);
           if (n !== null && n > maxApplicants) return false;
           return true;
@@ -415,9 +440,9 @@ exports.handler = async (event) => {
         const appStatus = (job.application_status || "").toLowerCase();
         if (SKIP_APP_STATUSES.has(appStatus)) return false;
         if (job.is_closed === true) return false;
-        // Freshness gate: skip undateable or stale roles (likely closed).
+        // Freshness gate: skip undateable, future-dated, or stale roles.
         const h = jobHoursSince(job);
-        if (h === null || h > maxHours) return false;
+        if (h === null || h < 0 || h > maxHours) return false;
         if (matchesExcludeKeywords(job, excludeKeywords)) return false;
         if (excludeCompanies.includes(String(job.company || "").toLowerCase().trim())) return false;
         if (prefs.require_salary_stated && !job.salary_range && !job.salary_min) return false;
@@ -436,7 +461,14 @@ exports.handler = async (event) => {
       })
       .slice(0, 5);
 
-    console.log(`auto-apply-queue: ${candidates.length} candidates to process`);
+    // Drop roles whose listing has already closed (404/410/451) even though
+    // they're inside the freshness window — the "dead link" the user saw.
+    const liveness = await Promise.all(candidates.map((job) => isListingLive(job.link)));
+    const liveCandidates = candidates.filter((_, i) => liveness[i]);
+    const droppedDead = candidates.length - liveCandidates.length;
+    if (droppedDead > 0) console.log(`auto-apply-queue: dropped ${droppedDead} role(s) with dead listings`);
+
+    console.log(`auto-apply-queue: ${liveCandidates.length} candidates to process`);
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -448,7 +480,7 @@ exports.handler = async (event) => {
     const emailTo = prefs.email_to || process.env.TO_EMAIL || process.env.SMTP_USER || "ademolaomosanya@gmail.com";
     const results = [];
 
-    for (const job of candidates) {
+    for (const job of liveCandidates) {
       try {
         const now = new Date().toISOString();
         await db.collection("jobs").doc(job.id).update({
@@ -474,11 +506,14 @@ exports.handler = async (event) => {
           html: htmlBody,
         });
 
+        // Email already sent — the timestamp is nice-to-have. Swallow errors so
+        // a failed update here can't trip the catch below and reset the role to
+        // null, which would re-queue it and send a DUPLICATE email next run.
         const emailSentAt = new Date().toISOString();
         await db.collection("jobs").doc(job.id).update({
           auto_apply_email_sent_at: emailSentAt,
           updated_at: emailSentAt,
-        });
+        }).catch((e) => console.error(`auto-apply-queue: post-send update failed for ${job.id}:`, e.message));
 
         results.push({ jobId: job.id, status: "email_sent" });
         console.log(`auto-apply-queue: email sent for ${job.id} (${job.role})`);

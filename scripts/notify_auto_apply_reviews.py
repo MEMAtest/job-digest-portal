@@ -147,7 +147,9 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 — fail soft, never break the job
             print(f"Error notifying {job.get('id')}: {type(exc).__name__}: {exc}")
 
-    print(f"Done. Sent {sent}/{len(pending[:MAX_ROLES_PER_RUN])} ping(s).")
+    deferred = max(0, len(pending) - MAX_ROLES_PER_RUN)
+    suffix = f" ({deferred} more deferred to next run)" if deferred else ""
+    print(f"Done. Sent {sent}/{len(pending[:MAX_ROLES_PER_RUN])} ping(s){suffix}.")
     return 0
 
 
