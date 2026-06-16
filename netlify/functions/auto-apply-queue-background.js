@@ -63,6 +63,32 @@ const generateToken = (jobId) => {
   return crypto.createHmac("sha256", secret).update(jobId).digest("hex");
 };
 
+// Hours since a role was posted, or null if undateable. Used to keep the scan
+// off stale roles whose listings have since closed (the "out of date links"
+// problem). Prefers the parsed posted_date; falls back to relative text.
+const jobHoursSince = (job) => {
+  const raw = job.posted_date || "";
+  if (raw) {
+    const t = Date.parse(String(raw).replace(" ", "T"));
+    if (!Number.isNaN(t)) return (Date.now() - t) / 3600000;
+  }
+  const text = String(job.posted || job.posted_raw || "").toLowerCase();
+  if (!text) return null;
+  if (/\bnew\b|just now|today|minute|\bmins?\b/.test(text)) return 0.5;
+  if (text.includes("yesterday")) return 24;
+  const m = text.match(/(\d+)/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  if (text.includes("hour")) return n;
+  if (text.includes("day")) return n * 24;
+  if (text.includes("week")) return n * 168;
+  return null;
+};
+
+// Application statuses that mean "don't queue this for auto-apply" — already
+// applied, explicitly rejected/dismissed by the user, etc.
+const SKIP_APP_STATUSES = new Set(["applied", "rejected", "dismissed"]);
+
 const buildAtsKeywordCoverage = (job, tailoredSections) => {
   const requirements = Array.isArray(job.key_requirements) ? job.key_requirements : [];
   if (!requirements.length) return null;
@@ -310,24 +336,7 @@ exports.handler = async (event) => {
       const maxHours = Number(process.env.HOT_LANE_MAX_HOURS || 4);
       const maxApplicants = Number(process.env.HOT_LANE_MAX_APPLICANTS || 25);
 
-      const hoursSince = (job) => {
-        const raw = job.posted_date || "";
-        if (raw) {
-          const t = Date.parse(String(raw).replace(" ", "T"));
-          if (!Number.isNaN(t)) return (Date.now() - t) / 3600000;
-        }
-        const text = String(job.posted || job.posted_raw || "").toLowerCase();
-        if (!text) return null;
-        if (/\bnew\b|just now|today|minute|\bmins?\b/.test(text)) return 0.5;
-        if (text.includes("yesterday")) return 24;
-        const m = text.match(/(\d+)/);
-        if (!m) return null;
-        const n = parseInt(m[1], 10);
-        if (text.includes("hour")) return n;
-        if (text.includes("day")) return n * 24;
-        if (text.includes("week")) return n * 168;
-        return null;
-      };
+      const hoursSince = jobHoursSince;
       const parseApplicants = (v) => {
         const m = String(v || "").match(/\d[\d,]*/);
         return m ? parseInt(m[0].replace(/,/g, ""), 10) : null;
@@ -393,14 +402,22 @@ exports.handler = async (event) => {
       .where("fit_score", ">=", minFitScore)
       .get();
 
+    // Only queue roles posted recently — otherwise the scan surfaces months-old
+    // high-fit roles from history whose listings have closed, so every GO/NO-GO
+    // and "View listing" link is dead ("all the links were out of date").
+    const maxHours = Number(process.env.AUTO_APPLY_MAX_HOURS || 168);
+
     const candidates = jobsSnap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .filter((job) => {
         if (!SUPPORTED_ATS.has(job.ats_family)) return false;
         if (job.auto_apply_status) return false;
         const appStatus = (job.application_status || "").toLowerCase();
-        if (appStatus === "applied" || appStatus === "rejected") return false;
+        if (SKIP_APP_STATUSES.has(appStatus)) return false;
         if (job.is_closed === true) return false;
+        // Freshness gate: skip undateable or stale roles (likely closed).
+        const h = jobHoursSince(job);
+        if (h === null || h > maxHours) return false;
         if (matchesExcludeKeywords(job, excludeKeywords)) return false;
         if (excludeCompanies.includes(String(job.company || "").toLowerCase().trim())) return false;
         if (prefs.require_salary_stated && !job.salary_range && !job.salary_min) return false;
@@ -409,6 +426,13 @@ exports.handler = async (event) => {
           if (jobMax > 0 && jobMax < Number(prefs.min_salary)) return false;
         }
         return true;
+      })
+      // Freshest first, then highest fit — so the 5 we queue are the most
+      // likely to still be open and worth applying to.
+      .sort((a, b) => {
+        const ha = jobHoursSince(a) ?? Infinity;
+        const hb = jobHoursSince(b) ?? Infinity;
+        return ha - hb || (b.fit_score || 0) - (a.fit_score || 0);
       })
       .slice(0, 5);
 
