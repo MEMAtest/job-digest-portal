@@ -2,15 +2,16 @@ name: Hot Scan (Fast Detection)
 
 # Fast detection (Part F): a lightweight ATS-only scan that Telegram-alerts
 # fresh, high-fit roles — no LLM, no LinkedIn, no job boards, no digest email.
-# Complements the 6x/day full digest. Runs entirely in the cloud (no laptop).
+# Complements the 4x/day full digest. Runs entirely in the cloud (no laptop).
 #
-# Cadence: every 2 hours. GitHub-scheduled workflows still drift/queue a few
-# minutes and can be skipped under heavy load, but 2-hourly is plenty for this
-# (dedup via hot_alerted_at means each role alerts once).
+# Cadence: every 3 hours (down from 2h to cut Actions minutes). GitHub-scheduled
+# workflows still drift/queue a few minutes and can be skipped under heavy load,
+# but 3-hourly is plenty for this (dedup via hot_alerted_at means each role
+# alerts once).
 
 on:
   schedule:
-    - cron: '0 */2 * * *'   # every 2 hours
+    - cron: '0 */3 * * *'   # every 3 hours
   workflow_dispatch: {}
 
 concurrency:
