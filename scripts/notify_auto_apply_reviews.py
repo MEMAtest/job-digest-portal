@@ -38,7 +38,10 @@ from scripts.job_digest.firestore import init_firestore_client  # noqa: E402
 REVIEW_STATUS = "review_pending"
 MAX_ROLES_PER_RUN = int(os.getenv("AUTO_APPLY_TELEGRAM_MAX", "10"))
 # Poll for the async scan to finish marking jobs (it generates a CV per role).
-POLL_SECONDS = int(os.getenv("AUTO_APPLY_TELEGRAM_POLL_SECONDS", "90"))
+# Kept short to save Actions minutes: the scan writes review_pending BEFORE CV
+# generation, so fast roles appear within ~20s; anything slower is caught on the
+# next run via the auto_apply_telegram_sent dedup flag (delayed, never lost).
+POLL_SECONDS = int(os.getenv("AUTO_APPLY_TELEGRAM_POLL_SECONDS", "30"))
 POLL_INTERVAL = 10
 
 
