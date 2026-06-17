@@ -16,7 +16,7 @@ from .utils import parse_applicant_count, select_top_pick
 
 def build_sources_summary(*, compact: bool = False) -> str:
     if compact:
-        return "LinkedIn, eFinancialCareers, Workday, ATS feeds, and selected job boards"
+        return "LinkedIn, eFinancialCareers, Workday, ATS feeds, recruiter pages, and selected job boards"
 
     if config.SOURCES_SUMMARY_OVERRIDE:
         return config.SOURCES_SUMMARY_OVERRIDE
@@ -40,6 +40,7 @@ def build_sources_summary(*, compact: bool = False) -> str:
         [
             "LinkedIn (guest search + company search)",
             company_summary,
+            "Recruiter pages (free contract/change search)",
             boards_summary,
             ats_summary,
         ]
@@ -119,7 +120,9 @@ def build_email_html(records: List[JobRecord], window_hours: int, hot_lane: List
             f"{top_pick.role}</a></div>"
             f"<div style='color:#555; margin-top:4px;'>{top_pick.company} · {top_pick.location}</div>"
             f"<div style='margin-top:8px; color:#333;'><strong>Released:</strong> {display_posted(top_pick.posted)} "
-            f"· <strong>Source:</strong> {top_pick.source} · <strong>Fit:</strong> {top_pick.fit_score}%</div>"
+            f"· <strong>Source:</strong> {top_pick.source} · <strong>Type:</strong> {escape(top_pick.employment_type or 'Unknown')} "
+            f"· <strong>Status:</strong> {escape(top_pick.verification_status or 'Unverified')} "
+            f"· <strong>Fit:</strong> {top_pick.fit_score}%</div>"
             f"<div style='margin-top:8px; color:#333;'><strong>Why you fit:</strong> "
             f"{escape(compact_text(top_pick.why_fit, 190))}</div>"
             f"<div style='margin-top:8px; color:#333;'><strong>Action:</strong> "
@@ -139,7 +142,8 @@ def build_email_html(records: List[JobRecord], window_hours: int, hot_lane: List
                 "<div style='background:#fff; border:1px solid #FFD5C2; border-radius:8px; padding:10px 12px; margin-bottom:8px;'>"
                 f"<div style='font-size:15px; font-weight:bold; color:#9A3412;'>{escape(rec.role)}</div>"
                 f"<div style='color:#555; font-size:13px; margin-top:2px;'>{escape(rec.company)} · {escape(rec.location)}</div>"
-                f"<div style='color:#777; font-size:12px; margin-top:4px;'>Fit {rec.fit_score}% · {escape(applicants)} · posted {display_posted(rec.posted)}</div>"
+            f"<div style='color:#777; font-size:12px; margin-top:4px;'>Fit {rec.fit_score}% · {escape(applicants)} · posted {display_posted(rec.posted)}</div>"
+                f"<div style='color:#777; font-size:12px; margin-top:4px;'>{escape(rec.employment_type or 'Unknown')} · {escape(rec.verification_status or 'Unverified')}</div>"
                 f"<a href='{link}' style='display:inline-block; margin-top:8px; background:#EA580C; color:#fff; "
                 "text-decoration:none; font-weight:bold; padding:8px 16px; border-radius:6px;'>⚡ Apply now</a>"
                 "</div>"
@@ -165,36 +169,80 @@ def build_email_html(records: List[JobRecord], window_hours: int, hot_lane: List
         rec for rec in records
         if rec.email_bucket == "borderline" and rec.link != top_pick_link
     ]
-    ordered_records = main_records + borderline_records
-    for idx, rec in enumerate(ordered_records):
-        if rec.fit_score >= 85:
-            fit_color = "#1B7F5D"
-        elif rec.fit_score >= 75:
-            fit_color = "#2B6CB0"
-        else:
-            fit_color = "#8A5A0B"
 
-        row_bg = "#FFF7ED" if rec.email_bucket == "borderline" else ("#FFFFFF" if idx % 2 == 0 else "#F9FBFD")
-        badge = ""
+    section_order = [
+        "Fresh Apply First",
+        "Fresh Worth Reviewing",
+        "Contract / FTC / Inside IR35",
+        "Strategic Older/Reposted",
+        "Fallback Adjacent",
+        "Maybe / Lower Confidence",
+    ]
+
+    def section_for(rec: JobRecord) -> str:
         if rec.email_bucket == "borderline":
-            badge = (
-                "<span style='display:inline-block; margin-left:8px; padding:2px 6px; "
-                "border-radius:10px; background:#D97706; color:#fff; font-size:11px; "
-                "font-weight:bold;'>Maybe</span>"
-            )
+            return "Maybe / Lower Confidence"
+        if rec.digest_section:
+            return rec.digest_section
+        if rec.employment_type == "Contract":
+            return "Contract / FTC / Inside IR35"
+        if rec.freshness_bucket == "Fresh 24h":
+            return "Fresh Apply First"
+        if rec.freshness_bucket == "Fresh 72h":
+            return "Fresh Worth Reviewing"
+        if rec.freshness_bucket in {"Last 7d", "Older/Reposted"}:
+            return "Strategic Older/Reposted"
+        return "Fallback Adjacent"
 
+    grouped: dict[str, list[JobRecord]] = {section: [] for section in section_order}
+    for rec in main_records + borderline_records:
+        grouped.setdefault(section_for(rec), []).append(rec)
+
+    row_index = 0
+    for section in section_order:
+        section_records = grouped.get(section, [])
+        if not section_records:
+            continue
         rows.append(
-            f"<tr style='background:{row_bg};'>"
-            f"<td style='padding:10px;'><a href='{rec.link}' style='color:#0B4F8A; text-decoration:none;'><strong>{rec.role}</strong></a>{badge}"
-            f"<div style='color:#666; font-size:12px; margin-top:4px;'>{rec.company} · {rec.location}</div>"
-            f"<div style='color:#777; font-size:12px; margin-top:4px;'>Released {display_posted(rec.posted)}</div></td>"
-            f"<td style='padding:10px; color:#333; white-space:nowrap;'>{escape(rec.source)}</td>"
-            f"<td style='padding:10px;'><span style='display:inline-block; padding:4px 8px; border-radius:12px; "
-            f"background:{fit_color}; color:#fff; font-weight:bold;'>{rec.fit_score}%</span></td>"
-            f"<td style='padding:10px; color:#333;'>{escape(compact_text(rec.why_fit, 160))}</td>"
-            f"<td style='padding:10px; color:#333;'>{escape(action_line(rec))}</td>"
+            "<tr>"
+            f"<td colspan='7' style='padding:9px 10px; background:#EAF2FF; color:#0B4F8A; "
+            f"font-weight:bold; border-top:1px solid #D8E2F0;'>{escape(section)}</td>"
             "</tr>"
         )
+        for rec in section_records:
+            idx = row_index
+            row_index += 1
+            if rec.fit_score >= 85:
+                fit_color = "#1B7F5D"
+            elif rec.fit_score >= 75:
+                fit_color = "#2B6CB0"
+            else:
+                fit_color = "#8A5A0B"
+
+            row_bg = "#FFF7ED" if rec.email_bucket == "borderline" else ("#FFFFFF" if idx % 2 == 0 else "#F9FBFD")
+            badge = ""
+            if rec.email_bucket == "borderline":
+                badge = (
+                    "<span style='display:inline-block; margin-left:8px; padding:2px 6px; "
+                    "border-radius:10px; background:#D97706; color:#fff; font-size:11px; "
+                    "font-weight:bold;'>Maybe</span>"
+                )
+
+            rows.append(
+                f"<tr style='background:{row_bg};'>"
+                f"<td style='padding:10px;'><a href='{rec.link}' style='color:#0B4F8A; text-decoration:none;'><strong>{rec.role}</strong></a>{badge}"
+                f"<div style='color:#666; font-size:12px; margin-top:4px;'>{rec.company} · {rec.location}</div>"
+                f"<div style='color:#777; font-size:12px; margin-top:4px;'>Released {display_posted(rec.posted)} · {escape(rec.freshness_bucket or 'Freshness unknown')}</div>"
+                f"<div style='color:#777; font-size:12px; margin-top:4px;'>{escape((rec.role_bucket or '').replace('_', ' ') or 'role bucket pending')}</div></td>"
+                f"<td style='padding:10px; color:#333; white-space:nowrap;'>{escape(rec.source)}</td>"
+                f"<td style='padding:10px; color:#333; white-space:nowrap;'>{escape(rec.employment_type or 'Unknown')}</td>"
+                f"<td style='padding:10px; color:#333; white-space:nowrap;'>{escape(rec.verification_status or 'Unverified')}</td>"
+                f"<td style='padding:10px;'><span style='display:inline-block; padding:4px 8px; border-radius:12px; "
+                f"background:{fit_color}; color:#fff; font-weight:bold;'>{rec.fit_score}%</span></td>"
+                f"<td style='padding:10px; color:#333;'>{escape(compact_text(rec.why_fit, 160))}</td>"
+                f"<td style='padding:10px; color:#333;'>{escape(action_line(rec))}</td>"
+                "</tr>"
+            )
 
     table = (
         "<table style='width:100%; border-collapse:collapse; font-family:Arial, sans-serif; "
@@ -203,6 +251,8 @@ def build_email_html(records: List[JobRecord], window_hours: int, hot_lane: List
         "<tr>"
         "<th style='text-align:left; padding:10px;'>Role</th>"
         "<th style='text-align:left; padding:10px;'>Source</th>"
+        "<th style='text-align:left; padding:10px;'>Type</th>"
+        "<th style='text-align:left; padding:10px;'>Status</th>"
         "<th style='text-align:left; padding:10px;'>Fit</th>"
         "<th style='text-align:left; padding:10px;'>Why</th>"
         "<th style='text-align:left; padding:10px;'>Action / Watch</th>"

@@ -43,7 +43,14 @@ class JobRecord:
     ats_family: str = ""
     ats_account: str = ""
     source_family: str = ""
+    employment_type: str = ""
+    verification_status: str = ""
+    source_quality: str = ""
+    why_in_feed: str = ""
     email_bucket: str = "main"
+    role_bucket: str = ""
+    freshness_bucket: str = ""
+    digest_section: str = ""
     alternate_links: List[Dict[str, str]] = field(default_factory=list)
     # Freshness/scarcity ranking (computed in runner; see utils.compute_priority_score)
     priority_score: float = 0.0

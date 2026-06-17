@@ -65,6 +65,86 @@ def infer_source_family(source: str) -> str:
     return ""
 
 
+def infer_verification_status(source: str, source_family: str, link: str = "") -> str:
+    """Human-facing confidence that a role is applyable now.
+
+    This is not a live link probe; it labels the confidence implied by the source.
+    Direct ATS/employer feeds are strongest. Job boards are likely active because
+    they were fetched from the board/API in-run. Aggregators are deliberately
+    labelled weaker to avoid presenting stale indexed snippets as confirmed jobs.
+    """
+    source_value = (source or "").strip()
+    family = (source_family or infer_source_family(source_value) or "").strip()
+    link_l = (link or "").lower()
+    if source_value in ATS_FAMILY_SOURCES or family == "ATS":
+        return "Verified active"
+    if source_value == "CustomCareers" or family == "Manual":
+        return "Verified active"
+    if family == "JobBoard":
+        return "Likely active"
+    if family == "Aggregator" or "linkedin.com/jobs" in link_l:
+        return "Unverified/stale risk"
+    return "Unverified"
+
+
+def infer_source_quality(source: str, source_family: str, link: str = "") -> str:
+    status = infer_verification_status(source, source_family, link)
+    if status == "Verified active":
+        return "direct"
+    if status == "Likely active":
+        return "board"
+    return "aggregator-risk"
+
+
+def infer_employment_type(text: str) -> str:
+    text_l = (text or "").lower()
+    contract_terms = (
+        "contract",
+        "contractor",
+        "day rate",
+        "inside ir35",
+        "outside ir35",
+        "umbrella",
+        "fixed term contract",
+        "ftc",
+        "temporary",
+        "interim",
+        "6 month",
+        "six month",
+        "12 month",
+        "twelve month",
+        "per day",
+        "/day",
+        "p/d",
+        "pd ",
+    )
+    permanent_terms = ("permanent", "full-time", "full time", "employee", "salary")
+    if any(term in text_l for term in contract_terms):
+        return "Contract"
+    if any(term in text_l for term in permanent_terms):
+        return "Permanent"
+    return "Unknown"
+
+
+def build_feed_reason(record: JobRecord) -> str:
+    parts: list[str] = []
+    if record.digest_section:
+        parts.append(record.digest_section)
+    if record.role_bucket:
+        parts.append(record.role_bucket.replace("_", " "))
+    if record.freshness_bucket:
+        parts.append(record.freshness_bucket)
+    if record.employment_type:
+        parts.append(record.employment_type)
+    if record.verification_status:
+        parts.append(record.verification_status)
+    if record.posted:
+        parts.append(f"posted {record.posted}")
+    if record.source:
+        parts.append(f"source {record.source}")
+    return " · ".join(parts)
+
+
 @lru_cache(maxsize=1)
 def _target_firm_names() -> set[str]:
     from .company_coverage import read_registry
@@ -300,6 +380,16 @@ def compute_priority_score(record: JobRecord) -> float:
 
     hours = hours_since_posted(record)
     record.hours_since_posted = hours
+    if hours is None:
+        record.freshness_bucket = "Unknown"
+    elif hours <= 24:
+        record.freshness_bucket = "Fresh 24h"
+    elif hours <= 72:
+        record.freshness_bucket = "Fresh 72h"
+    elif hours <= 168:
+        record.freshness_bucket = "Last 7d"
+    else:
+        record.freshness_bucket = "Older/Reposted"
     recency_boost = 0
     if hours is not None:
         if hours <= 2:
@@ -324,6 +414,16 @@ def compute_priority_score(record: JobRecord) -> float:
 
     boost = min(recency_boost + scarcity_boost, config.FRESHNESS_MAX_BOOST)
     score = fit + boost
+    if not record.verification_status:
+        record.verification_status = infer_verification_status(record.source, record.source_family, record.link)
+    if not record.source_quality:
+        record.source_quality = infer_source_quality(record.source, record.source_family, record.link)
+    if record.verification_status == "Unverified/stale risk":
+        score -= 8
+    elif record.verification_status == "Unverified":
+        score -= 5
+    elif record.verification_status == "Verified active":
+        score += 2
     record.priority_score = score
     return score
 
@@ -427,7 +527,7 @@ def filter_new_records(records: List[JobRecord], seen: Dict[str, str]) -> List[J
 def select_top_pick(records: List[JobRecord]) -> Optional[JobRecord]:
     if not records:
         return None
-    return max(records, key=lambda r: (r.fit_score, len(r.why_fit or "")))
+    return max(records, key=lambda r: (r.priority_score or float(r.fit_score or 0), r.fit_score, len(r.why_fit or "")))
 
 
 def load_run_state(path: Path) -> Dict[str, str]:

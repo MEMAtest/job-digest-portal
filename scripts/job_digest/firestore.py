@@ -109,7 +109,14 @@ def write_records_to_firestore(records: List[JobRecord]) -> None:
             "source_family": source_family,
             "ats_family": ats_family,
             "ats_account": record.ats_account,
+            "employment_type": record.employment_type,
+            "verification_status": record.verification_status,
+            "source_quality": record.source_quality,
+            "why_in_feed": record.why_in_feed,
             "email_bucket": record.email_bucket,
+            "role_bucket": record.role_bucket,
+            "freshness_bucket": record.freshness_bucket,
+            "digest_section": record.digest_section,
             "fit_score": record.fit_score,
             "preference_match": record.preference_match,
             "why_fit": record.why_fit,
@@ -422,6 +429,10 @@ def backfill_role_summaries(limit: Optional[int] = None) -> None:
                 source_family=data.get("source_family") or "",
                 ats_family=data.get("ats_family") or "",
                 ats_account=data.get("ats_account") or "",
+                employment_type=data.get("employment_type") or "",
+                verification_status=data.get("verification_status") or "",
+                source_quality=data.get("source_quality") or "",
+                why_in_feed=data.get("why_in_feed") or "",
             )
             records.append(record)
             doc_ids.append(doc.id)

@@ -252,6 +252,18 @@ WEB_DISCOVERY_MAX_QUERIES = _env_int("JOB_DIGEST_WEB_DISCOVERY_MAX_QUERIES", 24)
 WEB_DISCOVERY_RESULTS_PER_QUERY = _env_int("JOB_DIGEST_WEB_DISCOVERY_RESULTS_PER_QUERY", 10)
 WEB_DISCOVERY_TBS = os.getenv("JOB_DIGEST_WEB_DISCOVERY_TBS", "qdr:d")
 
+# Free recruiter-page discovery. These are public recruiter job-search pages
+# aimed at contract/change roles; keep cadence lower than ATS to avoid noisy
+# repeated scraping.
+RECRUITER_PAGES_ENABLED = _env_bool("JOB_DIGEST_RECRUITER_PAGES_ENABLED", True)
+RECRUITER_PAGES_RUN_HOURS = [
+    int(part.strip())
+    for part in os.getenv("JOB_DIGEST_RECRUITER_PAGES_RUN_HOURS", "6,7,14,15").split(",")
+    if part.strip().isdigit()
+]
+RECRUITER_PAGES_MAX_SEARCH_URLS = _env_int("JOB_DIGEST_RECRUITER_PAGES_MAX_SEARCH_URLS", 4)
+RECRUITER_PAGES_MAX_DETAIL_LINKS = _env_int("JOB_DIGEST_RECRUITER_PAGES_MAX_DETAIL_LINKS", 6)
+
 WORKDAY_SITES = [
     entry.strip()
     for entry in os.getenv("JOB_DIGEST_WORKDAY_SITES", "").split(",")

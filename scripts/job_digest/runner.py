@@ -70,6 +70,7 @@ from .sources import (
     get_source_runtime_events,
     reed_search,
     remotive_search,
+    recruiter_pages_search,
     reset_source_runtime_events,
     remoteok_search,
     rss_search,
@@ -173,6 +174,22 @@ def stamp_record_quality(records: list[JobRecord]) -> list[JobRecord]:
     return records
 
 
+def should_run_recruiter_pages(*, scrape_only: bool = False, validation_digest: bool = False) -> bool:
+    if not config.RECRUITER_PAGES_ENABLED:
+        return False
+    if scrape_only or validation_digest:
+        return True
+    if not config.RECRUITER_PAGES_RUN_HOURS:
+        return True
+    try:
+        from zoneinfo import ZoneInfo
+
+        now_local = datetime.now(ZoneInfo(config.TZ_NAME))
+    except Exception:
+        now_local = datetime.now()
+    return now_local.hour in set(config.RECRUITER_PAGES_RUN_HOURS)
+
+
 def canonical_company(company: str) -> str:
     canonical = canonicalize_company_name(company)
     return canonical or (company or "").strip()
@@ -238,6 +255,7 @@ SOURCE_STAGE_NAME_MAP = {
     "ashby": "Ashby",
     "workable": "Workable",
     "workday": "Workday",
+    "recruiter_pages": "RecruiterPages",
 }
 
 
@@ -1657,6 +1675,98 @@ def collect_custom_careers_records(session: requests.Session) -> list[JobRecord]
     return records
 
 
+def collect_recruiter_page_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    raw_jobs = recruiter_pages_search(session)
+    print(f"[RecruiterPages] {len(raw_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("RecruiterPages", len(raw_jobs))
+    for job in raw_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", "") or job.get("source_firm", "") or "Recruiter")
+        raw_location = job.get("location", "")
+        location = raw_location or "United Kingdom"
+        summary = job.get("summary", "")
+        if not (
+            is_custom_careers_relevant_title(title, company, summary)
+            or is_relevant_title_direct(title)
+        ):
+            diag["dropped"]["title"] += 1
+            add_source_diagnostic_example(
+                diag,
+                "title",
+                {"company": company, "title": title, "location": raw_location, "link": job.get("link", "")},
+            )
+            continue
+        if not (
+            is_custom_careers_relevant_location(raw_location, summary, company)
+            if raw_location
+            else is_relevant_location(location, summary)
+        ):
+            diag["dropped"]["location"] += 1
+            add_source_diagnostic_example(
+                diag,
+                "location",
+                {"company": company, "title": title, "location": raw_location, "summary": summary[:200]},
+            )
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        # Recruiter pages often omit dates. Keep unknown-date roles, but reject
+        # explicit old postings outside the configured window.
+        if (posted_raw or posted_date) and not parse_posted_within_window(posted_raw or posted_display, posted_date, config.WINDOW_HOURS):
+            diag["dropped"]["window"] += 1
+            continue
+
+        full_text = f"{title} {company} {location} {summary}"
+        fit = assess_fit(full_text, company, "JobBoard", "RecruiterPages", title=title)
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, "JobBoard", "RecruiterPages")
+        keep_threshold = min(min_score, keep_score_threshold("JobBoard", "RecruiterPages"))
+        if score < keep_threshold:
+            diag["dropped"]["score"] += 1
+            add_source_diagnostic_example(
+                diag,
+                "score",
+                {
+                    "company": company,
+                    "title": title,
+                    "location": location,
+                    "score": score,
+                    "min_score": min_score,
+                    "link": job.get("link", ""),
+                },
+            )
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source="RecruiterPages",
+                source_family="JobBoard",
+                email_bucket="main" if score >= min_score else "borderline",
+                fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+            )
+        )
+        diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
+    return records
+
+
 def collect_web_discovery_records(session: requests.Session) -> list[JobRecord]:
     records: list[JobRecord] = []
     raw_jobs = web_discovery_search(session)
@@ -2092,6 +2202,11 @@ def main(
     all_jobs.extend(run_source_stage("workable", lambda: collect_workable_records(session)))
     all_jobs.extend(run_source_stage("workday", lambda: collect_workday_records(session)))
     all_jobs.extend(run_source_stage("custom_careers", lambda: collect_custom_careers_records(session)))
+    if should_run_recruiter_pages(scrape_only=scrape_only, validation_digest=validation_digest):
+        all_jobs.extend(run_source_stage("recruiter_pages", lambda: collect_recruiter_page_records(session)))
+    else:
+        diag = init_source_diagnostic("RecruiterPages", 0)
+        add_source_note(diag, "skipped by recruiter page cadence")
     if not fast_email:
         all_jobs.extend(run_source_stage("web_discovery", lambda: collect_web_discovery_records(session)))
     for source in JOB_BOARD_SOURCES:

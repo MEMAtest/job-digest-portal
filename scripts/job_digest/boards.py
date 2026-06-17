@@ -240,4 +240,7 @@ JOB_BOARD_SOURCES = [
 if os.getenv("JOB_DIGEST_ENABLE_LOW_SIGNAL_BOARDS", "false").lower() != "true":
     JOB_BOARD_SOURCES = [source for source in JOB_BOARD_SOURCES if source["name"] not in LOW_SIGNAL_BOARD_SOURCES]
 
+if os.getenv("JOB_DIGEST_ENABLE_JOBSERVE", "false").lower() != "true":
+    JOB_BOARD_SOURCES = [source for source in JOB_BOARD_SOURCES if source["name"] != "JobServe"]
+
 JOB_BOARD_URLS = {source["name"]: source["url"] for source in JOB_BOARD_SOURCES}

@@ -1603,56 +1603,66 @@ def cvlibrary_search(session: requests.Session) -> List[Dict[str, str]]:
     if not url:
         return jobs
 
+    seen_links: set[str] = set()
     for keyword in financial_services_board_search_terms()[:12]:
-        params = {
-            "key": CV_LIBRARY_API_KEY,
-            "q": keyword,
-            "geo": "London",
-            "distance": 20,
-            "tempperm": "Permanent",
-            "perpage": 50,
-            "orderby": "date",
-        }
-        try:
-            resp = session.get(url, params=params, timeout=25)
-        except requests.RequestException:
-            continue
-        if resp.status_code != 200:
-            continue
-        try:
-            data = resp.json()
-        except ValueError:
-            continue
-        for job in data.get("jobs", []) or data.get("results", []) or []:
-            title = job.get("title") or job.get("job_title") or ""
-            if not title:
+        for tempperm in ("Permanent", "Contract", "Temporary"):
+            params = {
+                "key": CV_LIBRARY_API_KEY,
+                "q": keyword,
+                "geo": "London",
+                "distance": 20,
+                "tempperm": tempperm,
+                "perpage": 50,
+                "orderby": "date",
+            }
+            try:
+                resp = session.get(url, params=params, timeout=25)
+            except requests.RequestException:
                 continue
-            cv_sal_min = int(job.get("salary_min") or 0)
-            cv_sal_max = int(job.get("salary_max") or 0)
-            if not cv_sal_min and not cv_sal_max:
-                sal_str = str(job.get("salary") or "")
-                sal_str = re.sub(r"(\d+)[kK]", lambda m: str(int(m.group(1)) * 1000), sal_str)
-                sal_nums = re.findall(r"\d+", sal_str.replace(",", ""))
-                if len(sal_nums) >= 2:
-                    cv_sal_min = int(sal_nums[0])
-                    cv_sal_max = int(sal_nums[1])
-                elif len(sal_nums) == 1:
-                    cv_sal_max = int(sal_nums[0])
-            jobs.append(
-                {
-                    "title": title,
-                    "company": job.get("company") or job.get("company_name") or "",
-                    "location": job.get("location") or job.get("geo") or "",
-                    "link": job.get("job_url") or job.get("joburl") or job.get("url") or "",
-                    "posted_text": "",
-                    "posted_date": job.get("date") or job.get("posted") or job.get("date_posted") or "",
-                    "summary": trim_summary(job.get("description") or job.get("short_description") or ""),
-                    "source": "CVLibrary",
-                    "salary_min": cv_sal_min,
-                    "salary_max": cv_sal_max,
-                }
-            )
-        time.sleep(0.2)
+            if resp.status_code != 200:
+                continue
+            try:
+                data = resp.json()
+            except ValueError:
+                continue
+            for job in data.get("jobs", []) or data.get("results", []) or []:
+                title = job.get("title") or job.get("job_title") or ""
+                if not title:
+                    continue
+                link = job.get("job_url") or job.get("joburl") or job.get("url") or ""
+                if link and link in seen_links:
+                    continue
+                if link:
+                    seen_links.add(link)
+                cv_sal_min = int(job.get("salary_min") or 0)
+                cv_sal_max = int(job.get("salary_max") or 0)
+                if not cv_sal_min and not cv_sal_max:
+                    sal_str = str(job.get("salary") or "")
+                    sal_str = re.sub(r"(\d+)[kK]", lambda m: str(int(m.group(1)) * 1000), sal_str)
+                    sal_nums = re.findall(r"\d+", sal_str.replace(",", ""))
+                    if len(sal_nums) >= 2:
+                        cv_sal_min = int(sal_nums[0])
+                        cv_sal_max = int(sal_nums[1])
+                    elif len(sal_nums) == 1:
+                        cv_sal_max = int(sal_nums[0])
+                summary = trim_summary(job.get("description") or job.get("short_description") or "")
+                if tempperm != "Permanent":
+                    summary = trim_summary(f"{tempperm} · {summary}")
+                jobs.append(
+                    {
+                        "title": title,
+                        "company": job.get("company") or job.get("company_name") or "",
+                        "location": job.get("location") or job.get("geo") or "",
+                        "link": link,
+                        "posted_text": "",
+                        "posted_date": job.get("date") or job.get("posted") or job.get("date_posted") or "",
+                        "summary": summary,
+                        "source": "CVLibrary",
+                        "salary_min": cv_sal_min,
+                        "salary_max": cv_sal_max,
+                    }
+                )
+            time.sleep(0.2)
     return jobs
 
 
@@ -1741,15 +1751,22 @@ def extract_jobpostings_from_jsonld(html: str, base_url: str, default_company: s
             job_location = node.get("jobLocation")
             if isinstance(job_location, list) and job_location:
                 job_location = job_location[0]
+            def address_part(value: object) -> str:
+                if isinstance(value, str):
+                    return value
+                if isinstance(value, list):
+                    return ", ".join(str(item) for item in value if item)
+                return str(value) if value else ""
+
             if isinstance(job_location, dict):
                 address = job_location.get("address")
                 if isinstance(address, dict):
                     location = ", ".join(
                         part
                         for part in [
-                            address.get("addressLocality"),
-                            address.get("addressRegion"),
-                            address.get("addressCountry"),
+                            address_part(address.get("addressLocality")),
+                            address_part(address.get("addressRegion")),
+                            address_part(address.get("addressCountry")),
                         ]
                         if part
                     )
@@ -1789,15 +1806,22 @@ def parse_job_detail_jsonld(html: str, fallback_title: str = "") -> Dict[str, st
             job_location = node.get("jobLocation")
             if isinstance(job_location, list) and job_location:
                 job_location = job_location[0]
+            def address_part(value: object) -> str:
+                if isinstance(value, str):
+                    return value
+                if isinstance(value, list):
+                    return ", ".join(str(item) for item in value if item)
+                return str(value) if value else ""
+
             if isinstance(job_location, dict):
                 address = job_location.get("address")
                 if isinstance(address, dict):
                     location = ", ".join(
                         part
                         for part in [
-                            address.get("addressLocality"),
-                            address.get("addressRegion"),
-                            address.get("addressCountry"),
+                            address_part(address.get("addressLocality")),
+                            address_part(address.get("addressRegion")),
+                            address_part(address.get("addressCountry")),
                         ]
                         if part
                     )
@@ -2249,6 +2273,275 @@ def efinancialcareers_search(session: requests.Session) -> List[Dict[str, str]]:
     if jobs:
         return jobs
     return efinancialcareers_html_search(session)
+
+
+RECRUITER_PAGE_TARGETS = [
+    {
+        "name": "Hunter Bond",
+        "url": "https://www.hunterbond.com/job-search/",
+        "query_template": "https://www.hunterbond.com/job-search/?keyword={query}",
+        "notes": "Risk/governance recruiter; page accessible but may expose few roles server-side.",
+    },
+    {
+        "name": "Eames Consulting",
+        "url": "https://www.eamesconsulting.com/jobs",
+        "notes": "Insurance/FS recruiter; Next data page.",
+    },
+    {
+        "name": "McGregor Boyall",
+        "url": "https://www.mcgregor-boyall.com/jobs/",
+        "query_template": "https://www.mcgregor-boyall.com/jobs/?keyword={query}",
+        "notes": "FS/technology recruiter with permanent and contract jobs.",
+    },
+    {
+        "name": "Harrington Starr",
+        "url": "https://www.harringtonstarr.com/candidates/job-search/",
+        "query_template": "https://www.harringtonstarr.com/candidates/job-search/?keyword={query}",
+        "contract_query_template": "https://www.harringtonstarr.com/candidates/job-search/?keyword={query}&jobtype=Contract",
+        "notes": "Fintech/product/contract recruiter.",
+    },
+    {
+        "name": "Morson/Cornwallis Elt",
+        "url": "",
+        "query_template": "https://www.morson.com/jobs?title={query}&location=London&sort_by=created",
+        "notes": "Cornwallis Elt redirects to Morson; broad contract source.",
+    },
+    {
+        "name": "twenty84",
+        "url": "https://twenty84.com/jobs/",
+        "query_template": "https://twenty84.com/jobs/?ofsearch={query}&ofsubmitted=1",
+        "notes": "Governance/risk/compliance recruiter.",
+    },
+    {
+        "name": "Lorien",
+        "url": "https://www.lorienglobal.com/jobs",
+        "notes": "Technology recruiter; Next data page.",
+    },
+]
+
+RECRUITER_PAGE_SEARCH_TERMS = [
+    "kyc",
+    "kyb",
+    "financial crime",
+    "aml",
+    "clm",
+    "fenergo",
+    "client onboarding",
+    "business analyst",
+    "transformation",
+    "product manager",
+    "contract",
+]
+
+
+def _recruiter_target_urls(target: Dict[str, str]) -> List[str]:
+    urls: List[str] = []
+    if target.get("url"):
+        urls.append(target["url"])
+    templates = [target.get("query_template", "")]
+    if target.get("contract_query_template"):
+        templates.append(target["contract_query_template"])
+    for template in templates:
+        if not template:
+            continue
+        for term in RECRUITER_PAGE_SEARCH_TERMS:
+            urls.append(template.format(query=quote_plus(term)))
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for url in urls:
+        if url and url not in seen:
+            seen.add(url)
+            deduped.append(url)
+    return deduped
+
+
+def _extract_next_data_jobs(html: str, base_url: str, default_company: str) -> List[Dict[str, str]]:
+    soup = BeautifulSoup(html, "html.parser")
+    script = soup.find("script", id="__NEXT_DATA__")
+    if not script:
+        return []
+    try:
+        data = json.loads(script.string or script.get_text() or "{}")
+    except ValueError:
+        return []
+
+    jobs: List[Dict[str, str]] = []
+    seen: set[str] = set()
+    for node in iter_job_like_nodes(data):
+        title = ""
+        for key in ("title", "jobTitle", "name"):
+            if isinstance(node.get(key), str):
+                title = node.get(key) or title
+        if not title:
+            continue
+        company = default_company
+        for key in ("company", "companyName", "company_name", "client"):
+            if isinstance(node.get(key), str):
+                company = node.get(key) or company
+        link = ""
+        for key in ("url", "jobUrl", "job_url", "applyUrl", "slug"):
+            if isinstance(node.get(key), str):
+                link = node.get(key) or link
+        if link and not link.startswith("http"):
+            link = urljoin(base_url, link)
+        link = clean_link(link or base_url)
+        if not link or link in seen:
+            continue
+        location = ""
+        for key in ("location", "jobLocation", "city"):
+            if isinstance(node.get(key), str):
+                location = node.get(key) or location
+        posted_date = ""
+        for key in ("datePosted", "postedDate", "createdAt", "publishedAt", "updatedAt"):
+            if isinstance(node.get(key), str):
+                posted_date = node.get(key) or posted_date
+        summary = ""
+        for key in ("description", "summary", "content"):
+            if isinstance(node.get(key), str):
+                summary = trim_summary(node.get(key))
+        jobs.append(
+            {
+                "title": normalize_text(title),
+                "company": normalize_text(company or default_company),
+                "location": normalize_text(location),
+                "link": link,
+                "posted_text": "",
+                "posted_date": posted_date,
+                "summary": summary,
+                "source": "RecruiterPages",
+            }
+        )
+        seen.add(link)
+    return jobs
+
+
+def _extract_recruiter_card_links(html: str, base_url: str, default_company: str) -> List[Dict[str, str]]:
+    soup = BeautifulSoup(html, "html.parser")
+    jobs: List[Dict[str, str]] = []
+    seen: set[str] = set()
+    job_path_pattern = re.compile(r"/candidate[s]?/job/|/job/|/jobs/[^#?]+|jobid=", re.IGNORECASE)
+    generic_pattern = re.compile(r"^(view job|apply|read more|search jobs|job search|jobs)$", re.IGNORECASE)
+    relevant_hint = re.compile(
+        r"analyst|manager|lead|product|risk|fraud|financial crime|compliance|aml|kyc|clm|onboarding|"
+        r"screening|sanctions|contract|business analyst|transformation|programme|project",
+        re.IGNORECASE,
+    )
+
+    for anchor in soup.find_all("a", href=True):
+        href = clean_link(urljoin(base_url, anchor.get("href", "")))
+        if not href or href in seen or not job_path_pattern.search(href):
+            continue
+        anchor_text = normalize_text(anchor.get_text(" ") or anchor.get("title", "") or anchor.get("aria-label", ""))
+        title = anchor_text
+        summary = ""
+        location = ""
+        if not title or generic_pattern.search(title):
+            container = anchor
+            for _ in range(5):
+                if container.parent is None:
+                    break
+                container = container.parent
+                text = normalize_text(container.get_text(" "))
+                if len(text) >= 20:
+                    summary = trim_summary(text)
+                    break
+            # Prefer headings in the same card over "View job" text.
+            for heading in container.find_all(["h1", "h2", "h3", "h4"], limit=3) if container else []:
+                heading_text = normalize_text(heading.get_text(" "))
+                if heading_text and not generic_pattern.search(heading_text):
+                    title = heading_text
+                    break
+        if not title or generic_pattern.search(title):
+            title = summary[:120]
+        if not title or not relevant_hint.search(f"{title} {summary}"):
+            continue
+        if should_skip_custom_careers_page(title, href, summary):
+            continue
+        seen.add(href)
+        jobs.append(
+            {
+                "title": normalize_text(title)[:160],
+                "company": default_company,
+                "location": location,
+                "link": href,
+                "posted_text": extract_relative_posted_text(summary),
+                "posted_date": "",
+                "summary": summary,
+                "source": "RecruiterPages",
+            }
+        )
+    return jobs
+
+
+def recruiter_pages_search(session: requests.Session) -> List[Dict[str, str]]:
+    """Scrape public recruiter pages for free contract/change-role discovery."""
+    jobs: List[Dict[str, str]] = []
+    seen: set[str] = set()
+    for target in RECRUITER_PAGE_TARGETS:
+        name = target["name"]
+        extracted: List[Dict[str, str]] = []
+        urls = _recruiter_target_urls(target)[: config.RECRUITER_PAGES_MAX_SEARCH_URLS]
+        for url in urls:
+            try:
+                resp = session.get(url, timeout=10)
+            except requests.RequestException:
+                mark_source_runtime_event("RecruiterPages", failed=1, note=f"{name} request failed")
+                continue
+            if resp.status_code != 200:
+                if resp.status_code in {403, 429}:
+                    mark_source_runtime_event("RecruiterPages", blocked=1, note=f"{name} returned {resp.status_code}")
+                else:
+                    mark_source_runtime_event("RecruiterPages", failed=1, note=f"{name} returned {resp.status_code}")
+                continue
+
+            extracted.extend(extract_jobpostings_from_jsonld(resp.text, url, name))
+            extracted.extend(_extract_next_data_jobs(resp.text, url, name))
+            extracted.extend(_extract_recruiter_card_links(resp.text, url, name))
+            time.sleep(0.15)
+
+        target_seen: set[str] = set()
+        target_extracted: List[Dict[str, str]] = []
+        for job in extracted:
+            link = job.get("link", "")
+            if not link or link in target_seen:
+                continue
+            target_seen.add(link)
+            target_extracted.append(job)
+        extracted = target_extracted
+        detail_limit = config.RECRUITER_PAGES_MAX_DETAIL_LINKS
+        for job in extracted[:detail_limit]:
+            link = job.get("link", "")
+            if not link or link in seen:
+                continue
+            try:
+                detail_resp = session.get(link, timeout=10)
+            except requests.RequestException:
+                detail_resp = None
+            if detail_resp is not None and detail_resp.status_code == 200:
+                details = parse_job_detail_jsonld(detail_resp.text, job.get("title", "")) or parse_job_detail_fallback(detail_resp.text)
+                if details.get("title"):
+                    job["title"] = details["title"]
+                if details.get("company"):
+                    # Keep the recruiter as the source/company unless the detail
+                    # page explicitly names a hiring org.
+                    job["company"] = details["company"]
+                if details.get("location"):
+                    job["location"] = details["location"]
+                if details.get("posted_date"):
+                    job["posted_date"] = details["posted_date"]
+                if details.get("summary"):
+                    job["summary"] = details["summary"]
+            if should_skip_custom_careers_page(job.get("title", ""), link, job.get("summary", "")):
+                continue
+            job["source"] = "RecruiterPages"
+            if not job.get("company"):
+                job["company"] = name
+            if link not in seen:
+                jobs.append(job)
+                seen.add(link)
+        mark_source_runtime_event("RecruiterPages", raw=len(jobs), query_count=len(urls), note=f"{name} extracted {len(extracted)}")
+        time.sleep(0.25)
+    return jobs
 
 
 def technojobs_search(session: requests.Session) -> List[Dict[str, str]]:
