@@ -41,6 +41,7 @@ from .scoring import (
     build_gaps,
     build_preference_match,
     build_reasons,
+    classify_target_role_bucket,
     is_relevant_location,
     is_relevant_title,
     is_relevant_title_direct,
@@ -75,6 +76,7 @@ from .sources import (
     save_custom_careers_health_state,
     smartrecruiters_search,
     technojobs_search,
+    web_discovery_search,
     weloveproduct_search,
     workable_search,
     workday_search,
@@ -86,8 +88,12 @@ from .utils import (
     canonicalize_posted_fields,
     canonical_job_link,
     compute_priority_score,
+    build_feed_reason,
     due_run_slot,
     filter_new_records,
+    infer_employment_type,
+    infer_source_quality,
+    infer_verification_status,
     is_target_firm,
     load_run_state,
     load_seen_cache,
@@ -104,6 +110,67 @@ from .utils import (
 
 def normalize_posted(job: dict) -> tuple[str, str, str]:
     return canonicalize_posted_fields(job.get("posted_text", "") or job.get("posted", ""), job.get("posted_date", ""))
+
+
+def stamp_record_quality(records: list[JobRecord]) -> list[JobRecord]:
+    for record in records:
+        text = " ".join(
+            part
+            for part in (
+                record.role,
+                record.company,
+                record.location,
+                record.notes,
+                record.role_summary,
+                record.apply_tips,
+            )
+            if part
+        )
+        if not record.employment_type:
+            record.employment_type = infer_employment_type(text)
+        if not record.verification_status:
+            record.verification_status = infer_verification_status(record.source, record.source_family, record.link)
+        if not record.source_quality:
+            record.source_quality = infer_source_quality(record.source, record.source_family, record.link)
+        if not record.role_bucket:
+            record.role_bucket = classify_target_role_bucket(text)
+        if not record.freshness_bucket:
+            if record.hours_since_posted is None:
+                compute_priority_score(record)
+            hours = record.hours_since_posted
+            if hours is None:
+                record.freshness_bucket = "Unknown"
+            elif hours <= 24:
+                record.freshness_bucket = "Fresh 24h"
+            elif hours <= 72:
+                record.freshness_bucket = "Fresh 72h"
+            elif hours <= 168:
+                record.freshness_bucket = "Last 7d"
+            else:
+                record.freshness_bucket = "Older/Reposted"
+        if not record.digest_section:
+            contractish = record.employment_type == "Contract" or record.role_bucket == "contract_ba_transformation"
+            if record.freshness_bucket == "Fresh 24h" and record.role_bucket in {
+                "core_product",
+                "product_compliance",
+                "screening_sanctions_product",
+                "clm_product_owner",
+                "regtech_product",
+            }:
+                record.digest_section = "Fresh Apply First"
+            elif contractish and record.freshness_bucket in {"Fresh 24h", "Fresh 72h", "Last 7d", "Unknown"}:
+                record.digest_section = "Contract / FTC / Inside IR35"
+            elif record.freshness_bucket in {"Fresh 24h", "Fresh 72h"} and record.role_bucket in {
+                "selective_transformation",
+                "fallback_adjacent",
+            }:
+                record.digest_section = "Fresh Worth Reviewing"
+            elif record.freshness_bucket in {"Last 7d", "Older/Reposted"}:
+                record.digest_section = "Strategic Older/Reposted"
+            else:
+                record.digest_section = "Fallback Adjacent"
+        record.why_in_feed = build_feed_reason(record)
+    return records
 
 
 def canonical_company(company: str) -> str:
@@ -428,8 +495,26 @@ def print_source_health_summary() -> None:
 def min_score_for_fit(fit: dict, source_family: str, source: str) -> int:
     min_score = config.MIN_SCORE
     role_family = str(fit.get("role_family", "stretch"))
+    role_bucket = str(fit.get("role_bucket", "out_of_scope"))
     domain_anchor = bool(fit.get("domain_anchor"))
     negative_hits = list(fit.get("negative_hits", []))
+
+    if role_bucket in {
+        "core_product",
+        "product_compliance",
+        "screening_sanctions_product",
+        "clm_product_owner",
+        "regtech_product",
+    }:
+        return 60 if source_family == "ATS" else 66
+    if role_bucket == "contract_ba_transformation":
+        return 58 if source_family == "ATS" else 62
+    if role_bucket == "selective_transformation":
+        return 62 if source_family == "ATS" else 66
+    if role_bucket == "generic_product":
+        return 76
+    if role_bucket == "out_of_scope":
+        return 80
 
     if source_family == "ATS":
         if role_family == "core":
@@ -719,7 +804,14 @@ def write_digest_outputs(records: list[JobRecord], *, suffix: str = "") -> tuple
             "Link": r.link,
             "Posted": r.posted,
             "Source": r.source,
+            "Employment_Type": r.employment_type,
+            "Verification_Status": r.verification_status,
+            "Source_Quality": r.source_quality,
+            "Why_In_Feed": r.why_in_feed,
             "Email_Bucket": r.email_bucket,
+            "Role_Bucket": r.role_bucket,
+            "Freshness_Bucket": r.freshness_bucket,
+            "Digest_Section": r.digest_section,
             "Fit_Score_%": r.fit_score,
             "Fit_Verdict": r.fit_verdict,
             "Preference_Match": r.preference_match,
@@ -991,7 +1083,7 @@ def collect_linkedin_records(session: requests.Session) -> list[JobRecord]:
 
         summary = desc_text[:2500]
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "Aggregator", "LinkedIn")
+        fit = assess_fit(full_text, company, "Aggregator", "LinkedIn", title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "Aggregator", "LinkedIn")
         if is_target_firm(company) or is_linkedin_included_company(company):
@@ -1072,7 +1164,7 @@ def collect_greenhouse_records(session: requests.Session) -> list[JobRecord]:
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "ATS", "Greenhouse")
+        fit = assess_fit(full_text, company, "ATS", "Greenhouse", title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Greenhouse")
         if score < keep_score_threshold("ATS", "Greenhouse"):
@@ -1140,7 +1232,7 @@ def collect_lever_records(session: requests.Session) -> list[JobRecord]:
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "ATS", "Lever")
+        fit = assess_fit(full_text, company, "ATS", "Lever", title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Lever")
         if score < keep_score_threshold("ATS", "Lever"):
@@ -1208,7 +1300,7 @@ def collect_smartrecruiters_records(session: requests.Session) -> list[JobRecord
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "ATS", "SmartRecruiters")
+        fit = assess_fit(full_text, company, "ATS", "SmartRecruiters", title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "SmartRecruiters")
         if score < keep_score_threshold("ATS", "SmartRecruiters"):
@@ -1276,7 +1368,7 @@ def collect_ashby_records(session: requests.Session) -> list[JobRecord]:
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "ATS", "Ashby")
+        fit = assess_fit(full_text, company, "ATS", "Ashby", title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Ashby")
         if score < keep_score_threshold("ATS", "Ashby"):
@@ -1344,7 +1436,7 @@ def collect_workable_records(session: requests.Session) -> list[JobRecord]:
             continue
 
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "ATS", "Workable")
+        fit = assess_fit(full_text, company, "ATS", "Workable", title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Workable")
         if score < keep_score_threshold("ATS", "Workable"):
@@ -1408,7 +1500,7 @@ def collect_workday_records(session: requests.Session) -> list[JobRecord]:
             diag["dropped"]["window"] += 1
             continue
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "ATS", "Workday")
+        fit = assess_fit(full_text, company, "ATS", "Workday", title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "Workday")
         if score < keep_score_threshold("ATS", "Workday"):
@@ -1526,7 +1618,7 @@ def collect_custom_careers_records(session: requests.Session) -> list[JobRecord]
 
         summary = job.get("summary", "")
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "ATS", "DirectCareers")
+        fit = assess_fit(full_text, company, "ATS", "DirectCareers", title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "ATS", "DirectCareers")
         if score < keep_score_threshold("ATS", "DirectCareers"):
@@ -1547,6 +1639,103 @@ def collect_custom_careers_records(session: requests.Session) -> list[JobRecord]
                 source_family="ATS",
                 ats_family="DirectCareers",
                 ats_account=job.get("source_firm", ""),
+                email_bucket="main" if score >= min_score else "borderline",
+                fit_score=score,
+                fit_verdict=str(fit["fit_verdict"]),
+                preference_match=build_preference_match(full_text, company, location),
+                why_fit=build_reasons(full_text),
+                cv_gap=build_gaps(full_text),
+                notes=summary,
+            )
+        )
+        diag["kept"] += 1
+        add_source_diagnostic_example(
+            diag,
+            "kept",
+            {"company": company, "title": title, "location": location, "score": score, "link": job.get("link", "")},
+        )
+    return records
+
+
+def collect_web_discovery_records(session: requests.Session) -> list[JobRecord]:
+    records: list[JobRecord] = []
+    raw_jobs = web_discovery_search(session)
+    print(f"[WebDiscovery] {len(raw_jobs)} raw results fetched (before filtering)")
+    diag = init_source_diagnostic("WebDiscovery", len(raw_jobs))
+    for job in raw_jobs:
+        title = job.get("title", "")
+        company = canonical_company(job.get("company", ""))
+        location = job.get("location", "") or "London / UK"
+        summary = job.get("summary", "")
+        source = job.get("source", "WebDiscovery")
+        source_family = job.get("source_family", "Aggregator")
+
+        title_ok = is_relevant_title_direct(title) if source_family == "ATS" else is_relevant_title(title)
+        if not title_ok:
+            diag["dropped"]["title"] += 1
+            add_source_diagnostic_example(diag, "title", {"company": company, "title": title, "link": job.get("link", "")})
+            continue
+        location_ok = (
+            is_direct_ats_relevant_location(location, summary, company)
+            if source_family == "ATS"
+            else is_relevant_location(location, summary)
+        )
+        if not location_ok:
+            diag["dropped"]["location"] += 1
+            add_source_diagnostic_example(
+                diag,
+                "location",
+                {"company": company, "title": title, "location": location, "link": job.get("link", "")},
+            )
+            continue
+        if not should_keep_role_company(company, source_family, source):
+            diag["dropped"]["company"] += 1
+            add_source_diagnostic_example(diag, "company", {"company": company, "title": title, "link": job.get("link", "")})
+            continue
+
+        posted_display, posted_raw, posted_date = normalize_posted(job)
+        if not parse_posted_within_window(posted_raw or posted_display, posted_date, max(config.WINDOW_HOURS, 24)):
+            diag["dropped"]["window"] += 1
+            add_source_diagnostic_example(
+                diag,
+                "window",
+                {
+                    "company": company,
+                    "title": title,
+                    "posted_display": posted_display,
+                    "posted_raw": posted_raw,
+                    "posted_date": posted_date,
+                    "link": job.get("link", ""),
+                },
+            )
+            continue
+
+        full_text = f"{title} {company} {summary}"
+        fit = assess_fit(full_text, company, source_family, source, title=title)
+        score = int(fit["score"])
+        min_score = min_score_for_fit(fit, source_family, source)
+        if score < min(min_score, keep_score_threshold(source_family, source)):
+            diag["dropped"]["score"] += 1
+            add_source_diagnostic_example(
+                diag,
+                "score",
+                {"company": company, "title": title, "score": score, "min_score": min_score, "link": job.get("link", "")},
+            )
+            continue
+
+        records.append(
+            JobRecord(
+                role=title,
+                company=company,
+                location=location,
+                link=job.get("link", ""),
+                posted=posted_display,
+                posted_raw=posted_raw,
+                posted_date=posted_date,
+                source=source,
+                source_family=source_family,
+                ats_family=job.get("ats_family", ""),
+                ats_account=job.get("ats_account", ""),
                 email_bucket="main" if score >= min_score else "borderline",
                 fit_score=score,
                 fit_verdict=str(fit["fit_verdict"]),
@@ -1657,7 +1846,7 @@ def collect_job_board_records(session: requests.Session, source: dict) -> list[J
             continue
 
         full_text = f"{title} {company} {summary}"
-        fit = assess_fit(full_text, company, "JobBoard", effective_source_name)
+        fit = assess_fit(full_text, company, "JobBoard", effective_source_name, title=title)
         score = int(fit["score"])
         min_score = min_score_for_fit(fit, "JobBoard", effective_source_name)
         if score < min(min_score, keep_score_threshold("JobBoard", effective_source_name)):
@@ -1903,6 +2092,8 @@ def main(
     all_jobs.extend(run_source_stage("workable", lambda: collect_workable_records(session)))
     all_jobs.extend(run_source_stage("workday", lambda: collect_workday_records(session)))
     all_jobs.extend(run_source_stage("custom_careers", lambda: collect_custom_careers_records(session)))
+    if not fast_email:
+        all_jobs.extend(run_source_stage("web_discovery", lambda: collect_web_discovery_records(session)))
     for source in JOB_BOARD_SOURCES:
         if source["name"] == "Workday":
             continue
@@ -1918,6 +2109,7 @@ def main(
         )
 
     records = run_step("dedupe_records", lambda: dedupe_records(sorted(all_jobs, key=lambda x: x.fit_score, reverse=True)))
+    records = stamp_record_quality(records)
     records = sorted(records, key=lambda record: record.fit_score, reverse=True)
 
     pre_seen_records = list(records)
@@ -1930,20 +2122,33 @@ def main(
 
     if not skip_enrichment:
         records = run_step("enhance_records_with_groq", lambda: enhance_records_with_groq(records))
+        records = stamp_record_quality(records)
         records = [record for record in records if int(record.fit_score or 0) >= config.EMAIL_BORDERLINE_MIN_SCORE]
         records = sorted(records, key=lambda record: record.fit_score, reverse=True)
-    records = ensure_record_richness(records)
+    records = stamp_record_quality(ensure_record_richness(records))
     # Freshness + scarcity ranking (Part A): stamp priority_score and re-order so
     # fresh, low-applicant high-fit roles float up. Bucket split below stays on
     # raw fit_score, so "Maybe" classification is unchanged — only order shifts.
     for record in records:
         compute_priority_score(record)
     records = sorted(records, key=lambda record: record.priority_score, reverse=True)
-    main_records = [record for record in records if int(record.fit_score or 0) > config.EMAIL_BORDERLINE_MAX_SCORE]
+    for record in records:
+        if record.verification_status == "Unverified/stale risk":
+            record.email_bucket = "borderline"
+    main_records = [
+        record
+        for record in records
+        if int(record.fit_score or 0) > config.EMAIL_BORDERLINE_MAX_SCORE
+        and record.verification_status != "Unverified/stale risk"
+    ]
     borderline_candidates = [
         record
         for record in records
-        if config.EMAIL_BORDERLINE_MIN_SCORE <= int(record.fit_score or 0) <= config.EMAIL_BORDERLINE_MAX_SCORE
+        if config.EMAIL_BORDERLINE_MIN_SCORE <= int(record.fit_score or 0)
+        and (
+            int(record.fit_score or 0) <= config.EMAIL_BORDERLINE_MAX_SCORE
+            or record.verification_status == "Unverified/stale risk"
+        )
     ]
     borderline_records = borderline_candidates[: config.MAX_BORDERLINE_EMAIL_ROLES]
     if config.MIN_LINKEDIN_BORDERLINE_ROLES > 0:
@@ -1973,8 +2178,9 @@ def main(
         delivery_records = main_records
     else:
         delivery_records = build_delivery_records(main_records, pre_seen_records)
-    delivery_records = ensure_record_richness(delivery_records)
+    delivery_records = stamp_record_quality(ensure_record_richness(delivery_records))
     email_records = delivery_records + borderline_records
+    email_records = stamp_record_quality(email_records)
     RUN_SUMMARY["delivery_roles"] = len(delivery_records)
     RUN_SUMMARY["new_roles"] = len(records)
     RUN_SUMMARY["delivery_top_up_roles"] = max(0, len(delivery_records) - len(main_records))
@@ -2071,7 +2277,8 @@ def main(
         text_lines.append("Top pick:")
         text_lines.append(
             f"- {top_pick.role} | {top_pick.company} | {top_pick.posted} | "
-            f"Source {top_pick.source} | Fit {top_pick.fit_score}%"
+            f"Source {top_pick.source} | Type {top_pick.employment_type or 'Unknown'} | "
+            f"Status {top_pick.verification_status or 'Unverified'} | Fit {top_pick.fit_score}%"
         )
         text_lines.append(f"  Preference match: {top_pick.preference_match}")
         text_lines.append(f"  Why: {compact_text(top_pick.why_fit)}")
@@ -2086,7 +2293,8 @@ def main(
             continue
         text_lines.append(
             f"- {rec.role} | {rec.company} | {rec.posted} | "
-            f"Source {rec.source} | Fit {rec.fit_score}%"
+            f"Source {rec.source} | Type {rec.employment_type or 'Unknown'} | "
+            f"Status {rec.verification_status or 'Unverified'} | Fit {rec.fit_score}%"
         )
         text_lines.append(f"  Preference match: {rec.preference_match}")
         text_lines.append(f"  Why: {compact_text(rec.why_fit)}")

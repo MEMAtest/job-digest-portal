@@ -260,6 +260,370 @@ def _merge_linkedin_card(existing: Dict[str, str], incoming: Dict[str, str]) -> 
     return merged
 
 
+def linkedin_search_terms() -> List[str]:
+    """Fincrime-first LinkedIn terms.
+
+    LinkedIn is the easiest source to exhaust: generic keyword x location x page
+    creates hundreds of requests and can time out before it reaches the strongest
+    newly added terms. Keep exact KYC/AML/FinCrime terms at the front, then add
+    a bounded adjacent/exploratory tail.
+    """
+    priority_terms = [
+        "senior product manager financial crime",
+        "financial crime product manager",
+        "financial crime product owner",
+        "fincrime product manager",
+        "product manager fincrime",
+        "senior product manager kyc kyb",
+        "product manager kyc kyb",
+        "product manager customer risk",
+        "product compliance manager kyc",
+        "senior product compliance manager kyc",
+        "product compliance manager onboarding",
+        "product compliance lead financial crime",
+        "fenergo product owner",
+        "fenx product owner",
+        "client lifecycle management product owner",
+        "kyc systems product owner",
+        "name screening product manager",
+        "payment screening product manager",
+        "sanctions screening product manager",
+        "aml platform product manager",
+        "compliance automation product manager",
+        "case management product manager",
+        "financial crime business analyst",
+        "financial crime business architect",
+        "financial crime manager",
+        "financial crime senior manager systems controls",
+        "financial crime compliance manager",
+        "head of kyc transformation",
+        "head of onboarding transformation",
+        "head of financial crime operations transformation",
+        "payments financial crime manager",
+        "payments compliance product manager",
+        "payment risk product manager",
+        "partner onboarding product manager",
+        "merchant onboarding product manager",
+        "financial crime transformation",
+        "financial crime transformation lead",
+        "1lod controls transformation lead",
+        "aml product manager",
+        "aml product owner",
+        "aml business analyst",
+        "aml transformation lead",
+        "aml transformation contract",
+        "kyc product manager",
+        "kyc product owner",
+        "kyc transformation",
+        "kyc transformation lead",
+        "kyc transformation contract",
+        "kyc business analyst inside ir35",
+        "kyb product manager",
+        "kyb product owner",
+        "cdd business analyst",
+        "edd business analyst",
+        "clm product owner",
+        "clm business analyst",
+        "clm business analyst inside ir35",
+        "clm transformation lead",
+        "client lifecycle transformation",
+        "client transformation",
+        "client onboarding transformation",
+        "client onboarding transformation contract",
+        "client operations transformation",
+        "client services operating model",
+        "client onboarding business analyst",
+        "client transformation business analyst",
+        "client onboarding transformation business analyst",
+        "client operations transformation business analyst",
+        "sanctions product manager",
+        "sanctions business analyst",
+        "transaction monitoring product manager",
+        "transaction monitoring business analyst",
+        "product manager risk fraud",
+        "risk fraud product manager",
+        "risk and fraud product manager",
+        "screening product manager",
+        "screening business analyst",
+        "fiu business analyst",
+        "sar business analyst",
+        "pep screening business analyst",
+        "adverse media business analyst",
+    ]
+
+    def dedupe(items: Iterable[str]) -> List[str]:
+        seen: set[str] = set()
+        values: List[str] = []
+        for item in items:
+            text = normalize_text(item or "")
+            key = text.lower()
+            if not text or key in seen:
+                continue
+            seen.add(key)
+            values.append(text)
+        return values
+
+    core = dedupe(priority_terms + config.TIER1_CORE_BOARD_KEYWORDS + SEARCH_KEYWORDS)
+    adjacent = dedupe(config.TIER2_ADJACENT_BOARD_KEYWORDS)
+    exploratory = dedupe(config.TIER3_EXPLORATORY_BOARD_KEYWORDS)
+    terms = dedupe(
+        core[: config.LINKEDIN_CORE_QUERY_BUDGET]
+        + adjacent[: config.LINKEDIN_ADJACENT_QUERY_BUDGET]
+        + exploratory[: config.LINKEDIN_EXPLORATORY_QUERY_BUDGET]
+    )
+    return terms[: config.LINKEDIN_MAX_GENERIC_TERMS]
+
+
+def linkedin_company_search_terms() -> List[str]:
+    priority = [
+        "financial crime product manager",
+        "financial crime product owner",
+        "financial crime business analyst",
+        "financial crime transformation",
+        "aml product manager",
+        "aml business analyst",
+        "kyc product manager",
+        "kyc product owner",
+        "kyc transformation",
+        "clm product owner",
+        "client onboarding",
+        "client transformation",
+        "client onboarding transformation",
+        "client operations transformation",
+        "sanctions business analyst",
+        "payments product manager",
+        "payments product owner",
+        "business analyst",
+        "product manager",
+    ]
+    terms: List[str] = []
+    seen: set[str] = set()
+    for item in priority + COMPANY_SEARCH_TERMS:
+        text = normalize_text(item or "")
+        key = text.lower()
+        if text and key not in seen:
+            seen.add(key)
+            terms.append(text)
+    return terms[: config.LINKEDIN_COMPANY_TERM_LIMIT]
+
+
+def web_discovery_search_terms() -> List[str]:
+    """Terms for Google-indexed discovery.
+
+    This layer is meant to find roles before they appear in job-board feeds:
+    direct ATS pages, niche consultancies, and recruiter pages with exact CLM /
+    client-onboarding language. Keep it compact; every term fans out across
+    several domain strategies.
+    """
+    priority_terms = [
+        "senior product manager financial crime",
+        "financial crime product manager",
+        "financial crime product owner",
+        "fincrime product manager",
+        "product manager kyc kyb",
+        "product compliance manager kyc",
+        "senior product compliance manager kyc",
+        "fenergo product owner",
+        "fenx product owner",
+        "name screening product manager",
+        "payment screening product manager",
+        "sanctions screening product manager",
+        "aml platform product manager",
+        "CLM transformation business analyst",
+        "client onboarding transformation contract",
+        "client onboarding business analyst KYC",
+        "client lifecycle management business analyst",
+        "CLM business analyst inside IR35",
+        "OBKYC business analyst",
+        "KYC transformation business analyst",
+        "financial crime manager",
+        "financial crime senior manager systems controls",
+        "financial crime compliance manager",
+        "head of KYC transformation",
+        "head of onboarding transformation",
+        "head of financial crime operations transformation",
+        "payments financial crime manager",
+        "payments compliance product manager",
+        "payment risk product manager",
+        "partner onboarding product manager",
+        "merchant onboarding product manager",
+        "product manager risk fraud",
+        "risk fraud product manager",
+        "AML transformation manager",
+        "financial crime transformation lead contract",
+        "1LOD controls transformation lead",
+        "sanctions screening product manager",
+        "transaction monitoring product owner",
+        "client operations transformation financial services",
+        "client services operating model financial services",
+        "wealth client onboarding business analyst",
+        "regulatory change business analyst financial crime",
+        "payments risk compliance product manager",
+    ]
+
+    terms: List[str] = []
+    seen: set[str] = set()
+    for item in priority_terms + config.TIER1_CORE_BOARD_KEYWORDS + config.TIER2_ADJACENT_BOARD_KEYWORDS:
+        text = normalize_text(item or "")
+        key = text.lower()
+        if text and key not in seen:
+            seen.add(key)
+            terms.append(text)
+    return terms
+
+
+def _classify_web_discovery_source(link: str) -> Tuple[str, str, str]:
+    link_l = (link or "").lower()
+    if "greenhouse.io" in link_l:
+        return "Greenhouse", "ATS", "Greenhouse"
+    if "jobs.lever.co" in link_l:
+        return "Lever", "ATS", "Lever"
+    if "ashbyhq.com" in link_l:
+        return "Ashby", "ATS", "Ashby"
+    if "workable.com" in link_l:
+        return "Workable", "ATS", "Workable"
+    if "myworkdayjobs.com" in link_l or "workdayjobs.com" in link_l:
+        return "Workday", "ATS", "Workday"
+    return "WebDiscovery", "Aggregator", ""
+
+
+def _company_from_web_result(result: Dict[str, object]) -> str:
+    link = str(result.get("link") or "")
+    parsed = urlparse(link)
+    path_parts = [part for part in parsed.path.split("/") if part]
+    host = parsed.netloc.lower().replace("www.", "")
+    if "jobs.lever.co" in host and path_parts:
+        return path_parts[0].replace("-", " ").replace("_", " ").title()
+    if "boards.greenhouse.io" in host and path_parts:
+        return path_parts[0].replace("-", " ").replace("_", " ").title()
+    if "jobs.ashbyhq.com" in host and path_parts:
+        return path_parts[0].replace("-", " ").replace("_", " ").title()
+    if "apply.workable.com" in host and path_parts:
+        return path_parts[0].replace("-", " ").replace("_", " ").title()
+
+    title = normalize_text(str(result.get("title") or ""))
+    for separator in (" - ", " | ", " at "):
+        if separator in title:
+            candidate = title.split(separator)[-1].strip()
+            if candidate and len(candidate) <= 80:
+                return candidate
+
+    source = str(result.get("source") or "").strip()
+    if source:
+        return source
+    if not host:
+        return ""
+    host = host.split(".")[0]
+    return host.replace("-", " ").replace("_", " ").title()
+
+
+def _build_web_discovery_queries() -> List[str]:
+    domains = [
+        "site:jobs.lever.co",
+        "site:boards.greenhouse.io",
+        "site:jobs.ashbyhq.com",
+        "site:apply.workable.com",
+        "site:myworkdayjobs.com",
+        "",
+    ]
+    queries: List[str] = []
+    seen: set[str] = set()
+    for term in web_discovery_search_terms():
+        for domain in domains:
+            query = normalize_text(f"{domain} {term} London OR UK job")
+            key = query.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            queries.append(query)
+            if len(queries) >= config.WEB_DISCOVERY_MAX_QUERIES:
+                return queries
+    return queries
+
+
+def web_discovery_search(session: requests.Session) -> List[Dict[str, str]]:
+    """Search Google-indexed role pages via Serper.
+
+    Direct Google scraping is intentionally avoided. When SERPER_API_KEY is not
+    configured this source exits cleanly and records a runtime note, so local and
+    CI runs remain deterministic.
+    """
+    if not config.WEB_DISCOVERY_ENABLED:
+        mark_source_runtime_event("WebDiscovery", note="disabled by config", mode="disabled")
+        return []
+    if not config.SERPER_API_KEY:
+        mark_source_runtime_event("WebDiscovery", note="SERPER_API_KEY not configured", mode="disabled")
+        return []
+
+    jobs: List[Dict[str, str]] = []
+    seen_links: set[str] = set()
+    queries = _build_web_discovery_queries()
+    endpoint = "https://google.serper.dev/search"
+    headers = {
+        "X-API-KEY": config.SERPER_API_KEY,
+        "Content-Type": "application/json",
+    }
+
+    for query in queries:
+        payload = {
+            "q": query,
+            "gl": "gb",
+            "hl": "en",
+            "num": config.WEB_DISCOVERY_RESULTS_PER_QUERY,
+            "tbs": config.WEB_DISCOVERY_TBS,
+        }
+        try:
+            resp = session.post(endpoint, headers=headers, json=payload, timeout=20)
+        except requests.RequestException:
+            mark_source_runtime_event("WebDiscovery", failed=1, query_count=len(queries))
+            continue
+        if resp.status_code in {401, 403}:
+            mark_source_runtime_event("WebDiscovery", failed=1, note=f"auth failed status={resp.status_code}", mode="serper")
+            break
+        if resp.status_code == 429:
+            mark_source_runtime_event("WebDiscovery", blocked=1, note="rate limited", mode="serper")
+            break
+        if resp.status_code != 200:
+            mark_source_runtime_event("WebDiscovery", failed=1, note=f"status={resp.status_code}", mode="serper")
+            continue
+        try:
+            data = resp.json()
+        except ValueError:
+            mark_source_runtime_event("WebDiscovery", failed=1, note="invalid json", mode="serper")
+            continue
+
+        for result in data.get("organic", []) or []:
+            if not isinstance(result, dict):
+                continue
+            link = clean_link(str(result.get("link") or ""))
+            title = normalize_text(str(result.get("title") or ""))
+            if not link or not title or link in seen_links:
+                continue
+            seen_links.add(link)
+            source, source_family, ats_family = _classify_web_discovery_source(link)
+            snippet = normalize_text(str(result.get("snippet") or ""))
+            date_text = normalize_text(str(result.get("date") or "")) or "Indexed today"
+            jobs.append(
+                {
+                    "title": title,
+                    "company": _company_from_web_result(result),
+                    "location": "London / UK",
+                    "link": link,
+                    "posted_text": date_text,
+                    "posted_date": "",
+                    "summary": snippet,
+                    "source": source,
+                    "source_family": source_family,
+                    "ats_family": ats_family,
+                    "search_query": query,
+                }
+            )
+        time.sleep(0.15)
+
+    mark_source_runtime_event("WebDiscovery", raw=len(jobs), mode="serper", query_count=len(queries))
+    return jobs
+
+
 def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
     base_url = "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
     headers = {"User-Agent": USER_AGENT}
@@ -276,9 +640,11 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
         remaining = deadline_seconds - int(time.monotonic() - started)
         return max(5, min(20, remaining))
 
-    for keywords in SEARCH_KEYWORDS:
+    generic_terms = linkedin_search_terms()
+    for term_index, keywords in enumerate(generic_terms):
         for location in SEARCH_LOCATIONS:
-            for start in [0, 25]:
+            starts = [0, 25] if term_index < 12 else [0]
+            for start in starts:
                 if deadline_reached():
                     return list(jobs.values())
                 params = {
@@ -334,8 +700,9 @@ def linkedin_search(session: requests.Session) -> List[Dict[str, str]]:
                 time.sleep(0.3)
 
     # Company-focused searches (narrower paging to reduce load)
-    for company in select_company_batch(SEARCH_COMPANIES):
-        for base_term in COMPANY_SEARCH_TERMS:
+    company_terms = linkedin_company_search_terms()
+    for company in select_company_batch(SEARCH_COMPANIES)[: config.LINKEDIN_COMPANY_LIMIT]:
+        for base_term in company_terms:
             keywords = f"{base_term} {company}"
             for location in SEARCH_LOCATIONS:
                 for start in [0]:
@@ -1044,7 +1411,7 @@ def meetfrank_search(session: requests.Session) -> List[Dict[str, str]]:
     if not url:
         return jobs
 
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms()[:12]:
         params = {
             "q": keyword,
             "country": "United Kingdom",
@@ -1090,7 +1457,7 @@ def adzuna_search(session: requests.Session) -> List[Dict[str, str]]:
     if not url:
         return jobs
 
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms()[:12]:
         params = {
             "app_id": ADZUNA_APP_ID,
             "app_key": ADZUNA_APP_KEY,
@@ -1143,7 +1510,7 @@ def jooble_search(session: requests.Session) -> List[Dict[str, str]]:
         return jobs
     url = f"{base_url.rstrip('/')}/{JOOBLE_API_KEY}"
 
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms()[:12]:
         payload = {
             "keywords": keyword,
             "location": "London",
@@ -1188,7 +1555,7 @@ def reed_search(session: requests.Session) -> List[Dict[str, str]]:
     if not url:
         return jobs
 
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms()[:12]:
         params = {
             "keywords": keyword,
             "locationName": "London",
@@ -1236,7 +1603,7 @@ def cvlibrary_search(session: requests.Session) -> List[Dict[str, str]]:
     if not url:
         return jobs
 
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms()[:12]:
         params = {
             "key": CV_LIBRARY_API_KEY,
             "q": keyword,
@@ -1540,7 +1907,7 @@ def build_manual_record(session: requests.Session, link: str) -> Optional[JobRec
         return None
 
     full_text = f"{title} {company} {summary}"
-    fit = assess_fit(full_text, company, "Manual", "Manual")
+    fit = assess_fit(full_text, company, "Manual", "Manual", title=title)
     score = int(fit["score"])
     why_fit = build_reasons(full_text)
     cv_gap = build_gaps(full_text)
@@ -1594,7 +1961,7 @@ def workday_search(session: requests.Session) -> List[Dict[str, str]]:
         if not host or not tenant or not site:
             continue
         api_url = f"{scheme}://{host}/wday/cxs/{tenant}/{site}/jobs"
-        for keyword in BROAD_BOARD_KEYWORDS[:3]:
+        for keyword in financial_services_board_search_terms()[:12]:
             payload = {
                 "limit": 20,
                 "offset": 0,
@@ -1648,13 +2015,13 @@ def html_board_search(
     session: requests.Session,
     source_name: str,
     base_url: str,
-    keyword_limit: int = 3,
+    keyword_limit: int = 12,
     max_details: int = 12,
 ) -> List[Dict[str, str]]:
     jobs: List[Dict[str, str]] = []
     job_map: Dict[str, Dict[str, str]] = {}
 
-    for keyword in BOARD_KEYWORDS[:keyword_limit]:
+    for keyword in financial_services_board_search_terms()[:keyword_limit]:
         slug = slugify(keyword)
         search_url = f"{base_url}/jobs/{slug}/in-london"
         generic_title_variants = {
@@ -1894,7 +2261,7 @@ def technojobs_search(session: requests.Session) -> List[Dict[str, str]]:
         base_urls.append(base_url.replace("https://www.", "https://"))
 
     job_map: Dict[str, Dict[str, str]] = {}
-    for keyword in BROAD_BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms()[:12]:
         slug = slugify(keyword)
         for current_base in base_urls:
             search_urls = [
@@ -2018,18 +2385,7 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
     }
 
     search_terms: List[str] = []
-    for keyword in (
-        BOARD_KEYWORDS[:8]
-        + BROAD_BOARD_KEYWORDS[:8]
-        + [
-            "client lifecycle management",
-            "lead business analyst",
-            "business analyst onboarding",
-            "operations strategy",
-            "financial crime transformation",
-            "senior manager operations strategy",
-        ]
-    ):
+    for keyword in financial_services_board_search_terms()[:24]:
         cleaned = normalize_text(keyword)
         if cleaned and cleaned not in search_terms:
             search_terms.append(cleaned)
@@ -2037,7 +2393,7 @@ def indeed_search(session: requests.Session) -> List[Dict[str, str]]:
     locations = ["London", "United Kingdom", "Remote"]
     company_queries: List[Tuple[str, str]] = []
     for company in select_company_batch(SEARCH_COMPANIES)[:18]:
-        for term in ("product manager", "product owner", "business analyst", "operations strategy"):
+        for term in ("product manager", "product owner", "business analyst", "transformation", "financial crime", "payments"):
             company_queries.append((f"\"{company}\" {term}", "United Kingdom"))
             company_queries.append((f"{company} {term}", "London"))
 
@@ -2494,34 +2850,46 @@ def builtin_london_search(session: requests.Session) -> List[Dict[str, str]]:
 
 
 def financial_services_board_search_terms() -> List[str]:
-    """High-signal terms for finance job boards where broad searches create noise."""
-    terms = [
-        "financial crime product manager",
-        "financial crime product owner",
-        "senior product manager kyc",
-        "senior product manager kyb",
-        "kyc product manager",
-        "kyb product manager",
-        "aml kyc product manager",
-        "client lifecycle product manager",
-        "client lifecycle regulatory solutions",
-        "clm product manager",
-        "fenergo product manager",
-        "fenergo product owner",
-        "transaction monitoring product manager",
-        "sanctions screening product manager",
-        "customer screening product manager",
-        "financial crime transformation",
-        "kyc transformation manager",
-        "clm transformation manager",
-        "aml transformation manager",
-        "financial crime business analyst",
-        "financial crime project manager",
-    ]
-    for keyword in BOARD_KEYWORDS:
-        if keyword not in terms:
-            terms.append(keyword)
-    return terms[:20]
+    """Tiered, rotating board terms.
+
+    Discovery should be wide, but repeatedly hammering the same first 20 terms
+    misses contract/change roles and increases block risk. Core terms are always
+    searched first; adjacent/exploratory terms rotate daily within a bounded
+    budget so the market surface broadens over several runs.
+    """
+
+    def dedupe(items: Iterable[str]) -> List[str]:
+        seen: set[str] = set()
+        values: List[str] = []
+        for item in items:
+            text = normalize_text(item or "")
+            key = text.lower()
+            if not text or key in seen:
+                continue
+            seen.add(key)
+            values.append(text)
+        return values
+
+    def rotate(items: List[str], budget: int, offset_seed: int) -> List[str]:
+        if budget <= 0 or not items:
+            return []
+        if len(items) <= budget:
+            return items
+        offset = offset_seed % len(items)
+        rotated = items[offset:] + items[:offset]
+        return rotated[:budget]
+
+    today_seed = datetime.now(timezone.utc).date().toordinal()
+    core_terms = dedupe(config.TIER1_CORE_BOARD_KEYWORDS + BOARD_KEYWORDS)
+    adjacent_terms = dedupe(config.TIER2_ADJACENT_BOARD_KEYWORDS + BROAD_BOARD_KEYWORDS)
+    exploratory_terms = dedupe(config.TIER3_EXPLORATORY_BOARD_KEYWORDS)
+
+    terms = dedupe(
+        core_terms[: config.BOARD_CORE_QUERY_BUDGET]
+        + rotate(adjacent_terms, config.BOARD_ADJACENT_QUERY_BUDGET, today_seed * 3)
+        + rotate(exploratory_terms, config.BOARD_EXPLORATORY_QUERY_BUDGET, today_seed * 7)
+    )
+    return terms[: config.BOARD_MAX_QUERY_BUDGET]
 
 
 def jobserve_search(session: requests.Session) -> List[Dict[str, str]]:
@@ -2552,7 +2920,11 @@ def jobserve_search(session: requests.Session) -> List[Dict[str, str]]:
     post_url = urljoin(url, action)
 
     job_map: Dict[str, Dict[str, str]] = {}
-    for keyword in financial_services_board_search_terms():
+    search_terms = financial_services_board_search_terms()
+    if os.getenv("JOB_DIGEST_ENABLE_JOBSERVE", "false").lower() != "true":
+        mark_source_runtime_event("JobServe", note="JobServe disabled after IP restriction")
+        return jobs
+    for keyword in search_terms[: config.JOBSERVE_QUERY_BUDGET]:
         payload = dict(base_payload)
         payload["ctl00$main$srch$ctl_qs$txtKey"] = keyword
         payload["ctl00$main$srch$ctl_qs$txtTitle"] = ""
@@ -2737,7 +3109,7 @@ def workinstartups_search(session: requests.Session) -> List[Dict[str, str]]:
     job_map: Dict[str, Dict[str, str]] = {}
 
     search_urls = [f"{base_url}/job-board/jobs-in/london?f=7"]
-    for keyword in BOARD_KEYWORDS[:3]:
+    for keyword in financial_services_board_search_terms()[:12]:
         slug = slugify(keyword)
         search_urls.append(f"{base_url}/job-board/jobs-in/london/{slug}?f=7")
 
