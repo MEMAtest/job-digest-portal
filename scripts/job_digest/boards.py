@@ -63,6 +63,26 @@ GREENHOUSE_BOARDS = [
     "liberis",
     "lyst",
     "zego",
+    # --- product-builders / RegTech & fincrime product vendors (added) ---
+    "form3",
+    "feedzai",
+    "featurespace",
+    "sardine",
+    "hawkai",
+    "resistantai",
+    "elliptic",
+    "chainalysis",
+    "trmlabs",
+    "seon",
+    "persona",
+    "unit21",
+    "hummingbird",
+    "fourthline",
+    "silenteight",
+    "lucinity",
+    "griffin",
+    "allica",
+    "primer",
 ]
 
 LEVER_BOARDS = [
@@ -110,6 +130,12 @@ LEVER_BOARDS = [
     "liberis",
     "lyst",
     "zego",
+    # --- product-builders (added) ---
+    "form3",
+    "sardine",
+    "lucinity",
+    "fourthline",
+    "feedzai",
 ]
 
 SMARTRECRUITERS_COMPANIES = [
@@ -151,6 +177,13 @@ ASHBY_BOARDS = [
     "truelayer",
     "mambu",
     "thoughtmachine",
+    # --- product-builders / RegTech vendors (added) ---
+    "oscilar",
+    "sardine",
+    "persona",
+    "unit21",
+    "hummingbird",
+    "alloy",
 ]
 
 WORKABLE_ACCOUNTS = [

@@ -171,6 +171,11 @@ OFFLANE_TITLE_PATTERNS = (
     "accountant",
     "engineer",
     "developer",
+    # consulting/advisory titles — Ade wants in-house PRODUCT roles, not consulting
+    # (a genuine product/owner title still overrides these, see is_offlane_title)
+    "consultant",
+    "consulting",
+    "advisory",
 )
 
 # A genuine product-role TITLE overrides generic off-lane words (e.g. "manager").
