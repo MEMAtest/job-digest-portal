@@ -83,6 +83,47 @@ GREENHOUSE_BOARDS = [
     "griffin",
     "allica",
     "primer",
+    # --- more product-builders: payments / banking / crypto / RegTech (added) ---
+    "adyen",
+    "nium",
+    "currencycloud",
+    "sumup",
+    "pleo",
+    "spendesk",
+    "payhawk",
+    "soldo",
+    "teya",
+    "paysafe",
+    "nuvei",
+    "atombank",
+    "monese",
+    "coinbase",
+    "kraken",
+    "fireblocks",
+    "notabene",
+    "tookitaki",
+    "sentilink",
+    "incode",
+    "jumio",
+    "idnow",
+    "shuftipro",
+    "smartsearch",
+    "themis",
+    "salv",
+    "greenlite",
+    "parcha",
+    "normai",
+    "hawk",
+    "moonpay",
+    "wegift",
+    "navro",
+    "volt",
+    "banked",
+    "token",
+    "yapily",
+    "bud",
+    "moneyhub",
+    "ophelos",
 ]
 
 LEVER_BOARDS = [
@@ -136,6 +177,15 @@ LEVER_BOARDS = [
     "lucinity",
     "fourthline",
     "feedzai",
+    # --- more product-builders (added) ---
+    "nium",
+    "currencycloud",
+    "paysafe",
+    "sumup",
+    "dojo",
+    "moonpay",
+    "primer",
+    "navro",
 ]
 
 SMARTRECRUITERS_COMPANIES = [
@@ -184,6 +234,14 @@ ASHBY_BOARDS = [
     "unit21",
     "hummingbird",
     "alloy",
+    # --- more product-builders on Ashby (added) ---
+    "navan",
+    "melio",
+    "fingerprint",
+    "greenlite",
+    "parcha",
+    "incode",
+    "primer",
 ]
 
 WORKABLE_ACCOUNTS = [
