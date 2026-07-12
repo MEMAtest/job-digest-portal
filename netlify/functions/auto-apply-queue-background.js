@@ -123,6 +123,29 @@ const isListingLive = async (url) => {
   }
 };
 
+const expireStaleReviewItems = async (db, maxHours) => {
+  const pendingSnap = await db.collection("jobs").where("auto_apply_status", "==", "review_pending").get();
+  const expiredAt = new Date().toISOString();
+  const stale = pendingSnap.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .filter((job) => {
+      const hours = jobHoursSince(job);
+      return hours !== null && hours > maxHours;
+    });
+
+  await Promise.all(
+    stale.map((job) =>
+      db.collection("jobs").doc(job.id).update({
+        auto_apply_status: "expired",
+        auto_apply_expired_at: expiredAt,
+        auto_apply_expired_reason: `Listing is older than the ${maxHours}-hour review window`,
+        updated_at: expiredAt,
+      }),
+    ),
+  );
+  return stale.length;
+};
+
 const buildEmailHtml = (job, pack, token, siteUrl) => {
   const answers = pack.answers || {};
   const tailoredSections = pack.tailoredCvSections || {};
@@ -412,6 +435,10 @@ exports.handler = async (event) => {
     // high-fit roles from history whose listings have closed, so every GO/NO-GO
     // and "View listing" link is dead ("all the links were out of date").
     const maxHours = Number(prefs.max_role_age_hours ?? process.env.AUTO_APPLY_MAX_HOURS ?? 72);
+    const expiredReviewItems = await expireStaleReviewItems(db, maxHours);
+    if (expiredReviewItems > 0) {
+      console.log(`auto-apply-queue: expired ${expiredReviewItems} stale review item(s)`);
+    }
 
     const candidates = jobsSnap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
@@ -533,7 +560,10 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 200, body: JSON.stringify({ processed: results.length, results }) };
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ processed: results.length, expired: expiredReviewItems, results }),
+    };
   } catch (error) {
     console.error("auto-apply-queue error:", error);
     return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
