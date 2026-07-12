@@ -28,14 +28,26 @@ const getRoleFocus = (job) => {
     : "product ownership, regulated platform delivery and cross-functional execution";
 };
 
+const INTERNAL_CONTEXT_PATTERN =
+  /\b(?:strongest angle|match should be positioned|lead the application|de-?emphasi[sz]e|likely role focus|your background)\b/i;
+
+const getCompanyContext = (job) => {
+  const context = cleanText(job?.company_insights || job?.company_context || "");
+  if (context.length < 50 || INTERNAL_CONTEXT_PATTERN.test(context)) return "";
+  const company = normalizeForComparison(job?.company);
+  return company && normalizeForComparison(context).includes(company) ? context : "";
+};
+
 const buildApplicationAnswers = ({ job = {}, profile = {}, tailoredSections = {} } = {}) => {
   const role = cleanText(job.role) || "the advertised role";
   const company = cleanText(job.company) || "the organisation";
   const focus = getRoleFocus(job);
   const evidence = getEvidenceStatements(tailoredSections);
+  const companyContext = getCompanyContext(job);
   const summary = cleanText(tailoredSections.summary || tailoredSections.professional_summary);
   const evidenceOne = evidence[0] || summary;
   const evidenceTwo = evidence[1] || summary;
+  const companyEvidence = evidence[2] || evidenceTwo;
 
   const whyThisRole = [
     `I am interested in the ${role} role because its focus on ${focus} closely matches my experience.`,
@@ -45,8 +57,10 @@ const buildApplicationAnswers = ({ job = {}, profile = {}, tailoredSections = {}
     .join(" ");
 
   const whyThisCompany = [
-    `I am interested in ${company} because the ${role} position offers the opportunity to work on ${focus}.`,
-    `One directly relevant achievement is: ${sentence(evidenceOne)}`,
+    `I am interested in ${company}.`,
+    companyContext ? sentence(companyContext) : "",
+    `The ${role} position offers the opportunity to work on ${focus}.`,
+    `One directly relevant achievement is: ${sentence(companyEvidence)}`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -55,6 +69,7 @@ const buildApplicationAnswers = ({ job = {}, profile = {}, tailoredSections = {}
     "Dear Hiring Team,",
     "",
     `I am applying for the ${role} position at ${company}.`,
+    companyContext ? sentence(companyContext) : "",
     summary,
     "",
     `The role's priorities around ${focus} align closely with my experience. Relevant achievements include:`,
@@ -113,6 +128,7 @@ const validateApplicationAnswers = ({ job = {}, profile = {}, answers = {}, tail
   const role = cleanText(job.role);
   const company = cleanText(job.company);
   const evidence = getEvidenceStatements(tailoredSections);
+  const companyContext = getCompanyContext(job);
 
   ["fullName", "email", "phone", "location", "rightToWorkUk"].forEach((field) => {
     if (!cleanText(answers[field])) errors.push(`Required application field is missing: ${field}`);
@@ -166,6 +182,13 @@ const validateApplicationAnswers = ({ job = {}, profile = {}, answers = {}, tail
   if (normalizedRole && !whyRole.includes(normalizedRole)) errors.push("Why this role does not name the target role");
   if (normalizedCompany && !whyCompany.includes(normalizedCompany)) errors.push("Why this company does not name the target company");
   if (normalizedRole && !whyCompany.includes(normalizedRole)) warnings.push("Why this company does not name the target role");
+  if (!companyContext) {
+    errors.push("Company-specific context is unavailable or not sufficiently grounded");
+  } else {
+    const normalizedContext = normalizeForComparison(companyContext);
+    if (!whyCompany.includes(normalizedContext)) errors.push("Why this company does not use the approved company context");
+    if (!cover.includes(normalizedContext)) errors.push("Cover letter does not use the approved company context");
+  }
 
   if (evidence.length < 2) {
     errors.push("The accepted CV does not contain enough achievement evidence for an application");

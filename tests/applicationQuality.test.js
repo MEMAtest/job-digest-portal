@@ -21,6 +21,8 @@ const job = {
     "Cross-functional delivery with engineering",
     "Screening APIs and regulated onboarding",
   ],
+  company_insights:
+    "Example Bank builds regulated payment and onboarding products for financial institutions, with a focus on reliable controls and customer outcomes.",
 };
 
 const tailoredSections = {
@@ -84,5 +86,19 @@ describe("application answer quality", () => {
 
     expect(validation.ok).toBe(false);
     expect(validation.errors).toContain("Cover letter is not traceable to at least two accepted CV achievements");
+  });
+
+  test("rejects a generic company answer when grounded company context is unavailable", () => {
+    const jobWithoutContext = { ...job, company_insights: "" };
+    const answers = buildApplicationAnswers({ job: jobWithoutContext, profile, tailoredSections });
+    const validation = validateApplicationAnswers({
+      job: jobWithoutContext,
+      profile,
+      answers,
+      tailoredSections,
+    });
+
+    expect(validation.ok).toBe(false);
+    expect(validation.errors).toContain("Company-specific context is unavailable or not sufficiently grounded");
   });
 });
