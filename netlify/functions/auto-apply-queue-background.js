@@ -7,6 +7,7 @@ const {
   validateCvVariant,
   finalizeTailoredCvSections,
 } = require("./_cv_schema");
+const { assessApplicationPackQuality, buildAtsKeywordCoverage } = require("./_auto_apply_quality");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
@@ -89,6 +90,14 @@ const jobHoursSince = (job) => {
 // applied, explicitly rejected/dismissed, or already progressing (interview/
 // offer) so we must not re-apply.
 const SKIP_APP_STATUSES = new Set(["applied", "rejected", "dismissed", "interview", "offer"]);
+const PREPARING_LOCK_MS = 60 * 60 * 1000;
+
+const hasActiveAutoApplyStatus = (job) => {
+  if (!job.auto_apply_status) return false;
+  if (job.auto_apply_status !== "preparing") return true;
+  const queuedAt = Date.parse(job.auto_apply_queued_at || "");
+  return Number.isFinite(queuedAt) && Date.now() - queuedAt < PREPARING_LOCK_MS;
+};
 
 // Probe whether a listing still resolves. Only drops a role on POSITIVE evidence
 // it's gone (404/410/451) — keeps it on 200, redirects, 403/5xx, or any network
@@ -114,34 +123,6 @@ const isListingLive = async (url) => {
   }
 };
 
-const buildAtsKeywordCoverage = (job, tailoredSections) => {
-  const requirements = Array.isArray(job.key_requirements) ? job.key_requirements : [];
-  if (!requirements.length) return null;
-  const cvText = [
-    tailoredSections.summary || "",
-    ...(tailoredSections.key_achievements || []),
-    ...(tailoredSections.vistra_bullets || []),
-    ...(tailoredSections.ebury_bullets || []),
-    ...(tailoredSections.mema_bullets || []),
-    ...(tailoredSections.elucidate_bullets || []),
-    ...(tailoredSections.n26_bullets || []),
-  ].join(" ").toLowerCase();
-  const found = [];
-  const missing = [];
-  requirements.forEach((req) => {
-    // Include short acronyms (KYC, AML, SQL, API ≥ 3 chars) and use word-boundary matching
-    const keywords = String(req).toLowerCase().split(/[\s,;/()]+/).filter((w) => w.length >= 3);
-    const hit = keywords.some((kw) => {
-      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return new RegExp(`\\b${escaped}\\b`).test(cvText);
-    });
-    if (hit) found.push(req);
-    else missing.push(req);
-  });
-  const score = requirements.length > 0 ? Math.round((found.length / requirements.length) * 100) : 100;
-  return { score, found: found.length, total: requirements.length, missing };
-};
-
 const buildEmailHtml = (job, pack, token, siteUrl) => {
   const answers = pack.answers || {};
   const tailoredSections = pack.tailoredCvSections || {};
@@ -156,7 +137,7 @@ const buildEmailHtml = (job, pack, token, siteUrl) => {
     ? achievements.map((a) => `<li style="margin-bottom:6px;">${escHtml(String(a))}</li>`).join("")
     : "<li>See attached CV for full achievements</li>";
 
-  const cvValidation = pack.applicationPack?.cv_validation || job.cv_validation || {};
+  const cvValidation = pack.cvValidation || pack.applicationPack?.cv_validation || job.cv_validation || {};
   const qualityStatus = tailoredSections.quality_status || cvValidation.quality_status || "";
   const qualityScore = cvValidation.quality_score || cvValidation.metrics?.quality_score || "";
   const qualityNotes = Array.isArray(tailoredSections.quality_notes) ? tailoredSections.quality_notes : [];
@@ -317,7 +298,7 @@ const generatePackForJob = async (db, job) => {
     updated_at: generatedAt,
   });
 
-  return { answers, tailoredCvSections: tailoredSections, applicationPack, baseCvSections: baseCvSectionsResolved };
+  return { answers, tailoredCvSections: tailoredSections, applicationPack, baseCvSections: baseCvSectionsResolved, cvValidation };
 };
 
 const matchesExcludeKeywords = (job, keywords) => {
@@ -430,13 +411,13 @@ exports.handler = async (event) => {
     // Only queue roles posted recently — otherwise the scan surfaces months-old
     // high-fit roles from history whose listings have closed, so every GO/NO-GO
     // and "View listing" link is dead ("all the links were out of date").
-    const maxHours = Number(process.env.AUTO_APPLY_MAX_HOURS || 168);
+    const maxHours = Number(prefs.max_role_age_hours ?? process.env.AUTO_APPLY_MAX_HOURS ?? 72);
 
     const candidates = jobsSnap.docs
       .map((d) => ({ id: d.id, ...d.data() }))
       .filter((job) => {
         if (!SUPPORTED_ATS.has(job.ats_family)) return false;
-        if (job.auto_apply_status) return false;
+        if (hasActiveAutoApplyStatus(job)) return false;
         const appStatus = (job.application_status || "").toLowerCase();
         if (SKIP_APP_STATUSES.has(appStatus)) return false;
         if (job.is_closed === true) return false;
@@ -478,24 +459,52 @@ exports.handler = async (event) => {
     });
 
     const emailTo = prefs.email_to || process.env.TO_EMAIL || process.env.SMTP_USER || "ademolaomosanya@gmail.com";
+    const minAtsCoverage = Number(prefs.min_ats_coverage ?? 80);
+    const minCvQualityScore = Number(prefs.min_cv_quality_score ?? 90);
+    const requireAtsCoverage = prefs.require_ats_coverage !== false;
     const results = [];
 
     for (const job of liveCandidates) {
       try {
         const now = new Date().toISOString();
         await db.collection("jobs").doc(job.id).update({
-          auto_apply_status: "review_pending",
+          auto_apply_status: "preparing",
           auto_apply_queued_at: now,
         });
 
         const pack = await generatePackForJob(db, job);
-        const token = generateToken(job.id);
+        const qualityGate = assessApplicationPackQuality({
+          job,
+          pack,
+          minAtsCoverage,
+          minCvQualityScore,
+          requireAtsCoverage,
+        });
+        const gateCheckedAt = new Date().toISOString();
+        const gateData = {
+          passed: qualityGate.passed,
+          reasons: qualityGate.reasons,
+          cv_quality_score: qualityGate.cvQualityScore,
+          cv_quality_status: qualityGate.cvQualityStatus,
+          min_cv_quality_score: minCvQualityScore,
+          min_ats_coverage: minAtsCoverage,
+          checked_at: gateCheckedAt,
+        };
+        await db.collection("jobs").doc(job.id).update({
+          auto_apply_quality_gate: gateData,
+          ats_keyword_coverage: qualityGate.atsCoverage,
+          updated_at: gateCheckedAt,
+        });
 
-        // Store ATS keyword coverage so the UI can display it
-        const atsCoverage = buildAtsKeywordCoverage(job, pack.tailoredCvSections || {});
-        if (atsCoverage) {
-          await db.collection("jobs").doc(job.id).update({ ats_keyword_coverage: atsCoverage }).catch(() => {});
+        if (!qualityGate.passed) {
+          await db.collection("jobs").doc(job.id).update({ auto_apply_status: "quality_hold" });
+          results.push({ jobId: job.id, status: "quality_hold", reasons: qualityGate.reasons });
+          console.log(`auto-apply-queue: quality hold for ${job.id}: ${qualityGate.reasons.join("; ")}`);
+          continue;
         }
+
+        const token = generateToken(job.id);
+        await db.collection("jobs").doc(job.id).update({ auto_apply_status: "review_pending" });
 
         const htmlBody = buildEmailHtml(job, pack, token, siteUrl);
 

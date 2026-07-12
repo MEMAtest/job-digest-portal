@@ -280,6 +280,33 @@ const renderApprovedSection = (container, jobs) => {
   });
 };
 
+const renderQualityHoldsSection = (container, jobs) => {
+  const held = jobs.filter((job) => job.auto_apply_status === "quality_hold");
+  container.innerHTML = `
+    <div class="aa-section">
+      <h3 class="aa-section__title">Quality Holds <span class="aa-badge aa-badge--pending">${held.length}</span></h3>
+      ${held.length === 0
+        ? '<p class="aa-empty">No applications held by the ATS or CV quality gates.</p>'
+        : held.map((job) => {
+          const gate = job.auto_apply_quality_gate || {};
+          const reasons = Array.isArray(gate.reasons) ? gate.reasons : [];
+          return `
+          <div class="aa-job-card">
+            <div class="aa-job-card__info">
+              <div class="aa-job-card__role">${escHtml(job.role || "Role")}</div>
+              <div class="aa-job-card__company">${escHtml(job.company || "")}${job.fit_score ? ` · ${job.fit_score}/100` : ""}</div>
+              <div class="aa-job-card__badges">${getQualityBadgeHtml(job)}</div>
+              ${reasons.length ? `<div class="aa-ats-missing">${escHtml(reasons.join(" · "))}</div>` : ""}
+            </div>
+            <div class="aa-job-card__actions">
+              ${job.link ? `<a href="${escHtml(job.link)}" target="_blank" rel="noopener" class="btn btn-secondary">Review manually</a>` : ""}
+            </div>
+          </div>`;
+        }).join("")}
+    </div>
+  `;
+};
+
 const renderHistorySection = (container, decisions) => {
   const patterns = groupNogoReasons(decisions);
 
@@ -323,14 +350,16 @@ export const renderAutoApplyQueue = async (container) => {
 
   const pendingEl = document.createElement("div");
   const approvedEl = document.createElement("div");
+  const qualityHoldsEl = document.createElement("div");
   const historyEl = document.createElement("div");
 
   renderPendingSection(pendingEl, jobs);
   renderApprovedSection(approvedEl, jobs);
+  renderQualityHoldsSection(qualityHoldsEl, jobs);
   renderHistorySection(historyEl, decisions);
 
   container.innerHTML = "";
-  container.append(pendingEl, approvedEl, historyEl);
+  container.append(pendingEl, approvedEl, qualityHoldsEl, historyEl);
 };
 
 export const initAutoApplyQueue = () => {
