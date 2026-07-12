@@ -8,6 +8,7 @@ const DEFAULT_PREFS = {
   min_fit_score: 80,
   min_ats_coverage: 80,
   min_cv_quality_score: 90,
+  min_application_quality_score: 90,
   require_ats_coverage: true,
   max_role_age_hours: 72,
   min_salary: 0,
@@ -77,6 +78,10 @@ export const renderAutoApplyPrefs = (container) => {
           <label for="aa-pref-min-cv-quality">Minimum CV quality: <strong id="aa-pref-min-cv-quality-label">90</strong></label>
           <input type="range" id="aa-pref-min-cv-quality" min="80" max="100" step="5" value="90" />
         </div>
+        <div class="aa-prefs-field">
+          <label for="aa-pref-min-app-quality">Minimum application quality: <strong id="aa-pref-min-app-quality-label">90</strong></label>
+          <input type="range" id="aa-pref-min-app-quality" min="80" max="100" step="5" value="90" />
+        </div>
         <label class="aa-prefs-toggle">
           <span>Require measurable ATS coverage</span>
           <input type="checkbox" id="aa-pref-require-ats" checked />
@@ -134,6 +139,8 @@ export const renderAutoApplyPrefs = (container) => {
   const minAtsLabel = container.querySelector("#aa-pref-min-ats-label");
   const minCvQualityRange = container.querySelector("#aa-pref-min-cv-quality");
   const minCvQualityLabel = container.querySelector("#aa-pref-min-cv-quality-label");
+  const minAppQualityRange = container.querySelector("#aa-pref-min-app-quality");
+  const minAppQualityLabel = container.querySelector("#aa-pref-min-app-quality-label");
   const requireAtsCb = container.querySelector("#aa-pref-require-ats");
   const maxAgeInput = container.querySelector("#aa-pref-max-age");
   const minSalaryInput = container.querySelector("#aa-pref-min-salary");
@@ -161,6 +168,7 @@ export const renderAutoApplyPrefs = (container) => {
     if (minFitRange) { minFitRange.value = prefs.min_fit_score; if (minFitLabel) minFitLabel.textContent = prefs.min_fit_score; }
     if (minAtsRange) { minAtsRange.value = prefs.min_ats_coverage; if (minAtsLabel) minAtsLabel.textContent = `${prefs.min_ats_coverage}%`; }
     if (minCvQualityRange) { minCvQualityRange.value = prefs.min_cv_quality_score; if (minCvQualityLabel) minCvQualityLabel.textContent = prefs.min_cv_quality_score; }
+    if (minAppQualityRange) { minAppQualityRange.value = prefs.min_application_quality_score; if (minAppQualityLabel) minAppQualityLabel.textContent = prefs.min_application_quality_score; }
     if (requireAtsCb) requireAtsCb.checked = prefs.require_ats_coverage;
     if (maxAgeInput) maxAgeInput.value = prefs.max_role_age_hours;
     if (minSalaryInput) minSalaryInput.value = prefs.min_salary;
@@ -185,6 +193,11 @@ export const renderAutoApplyPrefs = (container) => {
       if (minCvQualityLabel) minCvQualityLabel.textContent = minCvQualityRange.value;
     });
   }
+  if (minAppQualityRange) {
+    minAppQualityRange.addEventListener("input", () => {
+      if (minAppQualityLabel) minAppQualityLabel.textContent = minAppQualityRange.value;
+    });
+  }
 
   if (saveBtn) {
     saveBtn.addEventListener("click", async () => {
@@ -196,6 +209,7 @@ export const renderAutoApplyPrefs = (container) => {
           min_fit_score: Number(minFitRange?.value || 80),
           min_ats_coverage: Number(minAtsRange?.value || 80),
           min_cv_quality_score: Number(minCvQualityRange?.value || 90),
+          min_application_quality_score: Number(minAppQualityRange?.value || 90),
           require_ats_coverage: requireAtsCb?.checked ?? true,
           max_role_age_hours: Number(maxAgeInput?.value || 72),
           min_salary: Number(minSalaryInput?.value || 0),

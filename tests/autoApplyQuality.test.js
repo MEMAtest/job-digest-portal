@@ -38,6 +38,7 @@ describe("auto-apply ATS quality gate", () => {
       pack: {
         tailoredCvSections: { ...strongSections, quality_status: "accepted" },
         cvValidation: { ok: true, decision: "accept", quality_score: 96 },
+        applicationValidation: { ok: true, quality_score: 95 },
       },
       minAtsCoverage: 80,
       minCvQualityScore: 90,
@@ -54,6 +55,7 @@ describe("auto-apply ATS quality gate", () => {
       pack: {
         tailoredCvSections: { ...strongSections, quality_status: "accepted" },
         cvValidation: { ok: true, decision: "accept", quality_score: 96 },
+        applicationValidation: { ok: true, quality_score: 95 },
       },
       minAtsCoverage: 80,
       minCvQualityScore: 90,
@@ -61,5 +63,21 @@ describe("auto-apply ATS quality gate", () => {
 
     expect(result.passed).toBe(true);
     expect(result.reasons).toEqual([]);
+  });
+
+  test("holds a pack whose application answers fail validation", () => {
+    const result = assessApplicationPackQuality({
+      job: { key_requirements: ["KYC and AML"] },
+      pack: {
+        tailoredCvSections: { ...strongSections, quality_status: "accepted" },
+        cvValidation: { ok: true, decision: "accept", quality_score: 96 },
+        applicationValidation: { ok: false, quality_score: 60 },
+      },
+      minApplicationQualityScore: 90,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.reasons).toContain("Application answers did not pass validation");
+    expect(result.reasons).toContain("Application quality 60 is below 90");
   });
 });

@@ -142,17 +142,21 @@ const renderPendingSection = (container, jobs) => {
 const getQualityBadgeHtml = (job) => {
   const qs = job.cv_validation?.quality_status || job.tailored_cv_sections?.quality_status || "";
   const score = job.cv_validation?.quality_score || job.cv_validation?.metrics?.quality_score || "";
+  const appScore = job.application_validation?.quality_score || "";
   const atsCov = job.ats_keyword_coverage;
   const atsHtml = atsCov
     ? `<span class="aa-badge ${atsCov.score >= 80 ? "aa-badge--approved" : "aa-badge--pending"}" title="ATS keyword coverage">ATS ${atsCov.score}%</span>`
     : "";
+  const appHtml = appScore
+    ? `<span class="aa-badge ${job.application_validation?.ok && appScore >= 90 ? "aa-badge--approved" : "aa-badge--pending"}" title="Application answer quality">Application ${appScore}/100</span>`
+    : "";
   if (qs === "accepted") {
-    return `<span class="aa-badge aa-badge--approved" title="AI tailored CV">AI Tailored${score ? ` ${score}/100` : ""}</span>${atsHtml}`;
+    return `<span class="aa-badge aa-badge--approved" title="AI tailored CV">AI Tailored${score ? ` ${score}/100` : ""}</span>${appHtml}${atsHtml}`;
   }
   if (qs === "fallback_master") {
-    return `<span class="aa-badge aa-badge--pending" title="Master CV was used — tailored version was weaker">Master CV</span>${atsHtml}`;
+    return `<span class="aa-badge aa-badge--pending" title="Master CV was used — tailored version was weaker">Master CV</span>${appHtml}${atsHtml}`;
   }
-  return atsHtml;
+  return `${appHtml}${atsHtml}`;
 };
 
 const renderApprovedSection = (container, jobs) => {

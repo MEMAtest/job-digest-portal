@@ -80,6 +80,7 @@ const assessApplicationPackQuality = ({
   pack,
   minAtsCoverage = 80,
   minCvQualityScore = 90,
+  minApplicationQualityScore = 90,
   requireAtsCoverage = true,
 } = {}) => {
   const tailoredSections = pack?.tailoredCvSections || {};
@@ -87,6 +88,8 @@ const assessApplicationPackQuality = ({
   const cvQualityStatus = tailoredSections.quality_status || cvValidation.quality_status || "unknown";
   const cvQualityScore = Number(cvValidation.quality_score || cvValidation.metrics?.quality_score || 0);
   const atsCoverage = buildAtsKeywordCoverage(job, tailoredSections);
+  const applicationValidation = pack?.applicationValidation || job?.application_validation || {};
+  const applicationQualityScore = Number(applicationValidation.quality_score || 0);
   const reasons = [];
 
   if (cvValidation.ok !== true || cvValidation.decision !== "accept") {
@@ -97,6 +100,15 @@ const assessApplicationPackQuality = ({
   }
   if (cvQualityScore < Number(minCvQualityScore)) {
     reasons.push(`CV quality ${cvQualityScore} is below ${Number(minCvQualityScore)}`);
+  }
+  if (applicationValidation.ok !== true) {
+    reasons.push("Application answers did not pass validation");
+    (Array.isArray(applicationValidation.errors) ? applicationValidation.errors : [])
+      .slice(0, 3)
+      .forEach((error) => reasons.push(`Application: ${error}`));
+  }
+  if (applicationQualityScore < Number(minApplicationQualityScore)) {
+    reasons.push(`Application quality ${applicationQualityScore} is below ${Number(minApplicationQualityScore)}`);
   }
   if (!atsCoverage) {
     if (requireAtsCoverage) reasons.push("ATS coverage could not be measured because requirements are missing");
@@ -110,6 +122,7 @@ const assessApplicationPackQuality = ({
     atsCoverage,
     cvQualityScore,
     cvQualityStatus,
+    applicationQualityScore,
   };
 };
 

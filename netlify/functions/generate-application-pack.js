@@ -8,6 +8,8 @@ const {
   validateCvVariant,
   finalizeTailoredCvSections,
 } = require("./_cv_schema");
+const { buildApplicationAnswers, validateApplicationAnswers } = require("./_application_quality");
+const { assessApplicationPackQuality } = require("./_auto_apply_quality");
 
 const SUPPORTED_ATS = new Set(["Greenhouse", "Lever", "Ashby", "Workable"]);
 
@@ -24,41 +26,6 @@ const DEFAULT_APPLICATION_PROFILE = {
 };
 
 const cleanText = (value) => String(value || "").replace(/\s+/g, " ").trim();
-
-const buildWhyThisRole = (job) => {
-  const parts = [
-    cleanText(job.tailored_summary),
-    cleanText(job.why_fit),
-    cleanText(job.role_summary),
-  ].filter(Boolean);
-  return parts.join("\n\n").slice(0, 3000);
-};
-
-const buildWhyThisCompany = (job) => {
-  const parts = [cleanText(job.company_insights), cleanText(job.match_notes)].filter(Boolean);
-  if (parts.length) return parts.join("\n\n").slice(0, 2000);
-  if (job.company) {
-    return `I am interested in ${job.company} because the role aligns with my background in onboarding, KYC, screening and regulated product delivery.`;
-  }
-  return "";
-};
-
-const buildCoverLetterFallback = (job, profile) => {
-  const whyRole = buildWhyThisRole(job);
-  const whyCompany = buildWhyThisCompany(job);
-  return [
-    `Dear ${job.company || "Hiring Team"},`,
-    "",
-    `I am applying for the ${job.role || "role"} role${job.company ? ` at ${job.company}` : ""}.`,
-    whyRole,
-    whyCompany,
-    "",
-    `Kind regards,`,
-    profile.fullName || DEFAULT_APPLICATION_PROFILE.fullName,
-  ]
-    .filter(Boolean)
-    .join("\n");
-};
 
 const inferAtsFamily = (job) => {
   const ats = String(job.ats_family || job.source || "").trim();
@@ -133,20 +100,28 @@ exports.handler = async (event) => {
       tailoredSections: tailoredSections,
     });
 
-    const answers = {
-      fullName: applicationProfile.fullName,
-      email: applicationProfile.email,
-      phone: applicationProfile.phone,
-      location: applicationProfile.location,
-      linkedinUrl: applicationProfile.linkedinUrl || "",
-      portfolioUrl: applicationProfile.portfolioUrl || "",
-      rightToWorkUk: applicationProfile.rightToWorkUk || "Yes",
-      noticePeriod: applicationProfile.noticePeriod || "",
-      salaryExpectation: applicationProfile.salaryExpectation || "",
-      whyThisRole: buildWhyThisRole(job),
-      whyThisCompany: buildWhyThisCompany(job),
-      coverLetter: job.cover_letter || buildCoverLetterFallback(job, applicationProfile),
-    };
+    const answers = buildApplicationAnswers({
+      job,
+      profile: applicationProfile,
+      tailoredSections,
+    });
+    const applicationValidation = validateApplicationAnswers({
+      job,
+      profile: applicationProfile,
+      answers,
+      tailoredSections,
+    });
+
+    const prefsDoc = await db.collection("settings").doc("auto_apply_preferences").get();
+    const prefs = prefsDoc.exists ? prefsDoc.data() || {} : {};
+    const qualityGate = assessApplicationPackQuality({
+      job,
+      pack: { tailoredCvSections: tailoredSections, cvValidation, applicationValidation },
+      minAtsCoverage: Number(prefs.min_ats_coverage ?? 80),
+      minCvQualityScore: Number(prefs.min_cv_quality_score ?? 90),
+      minApplicationQualityScore: Number(prefs.min_application_quality_score ?? 90),
+      requireAtsCoverage: prefs.require_ats_coverage !== false,
+    });
 
     const generatedAt = new Date().toISOString();
     const applicationPack = {
@@ -155,6 +130,18 @@ exports.handler = async (event) => {
       cv_ready: true,
       answer_fields: Object.keys(answers).filter((key) => cleanText(answers[key])),
       master_cv_version: MASTER_CV_SCHEMA.version,
+      application_quality_score: applicationValidation.quality_score,
+    };
+
+    const checkedAt = new Date().toISOString();
+    const qualityGateData = {
+      passed: qualityGate.passed,
+      reasons: qualityGate.reasons,
+      cv_quality_score: qualityGate.cvQualityScore,
+      cv_quality_status: qualityGate.cvQualityStatus,
+      application_quality_score: qualityGate.applicationQualityScore,
+      ats_coverage_score: qualityGate.atsCoverage?.score ?? null,
+      checked_at: checkedAt,
     };
 
     await db.collection("jobs").doc(jobId).update({
@@ -165,9 +152,23 @@ exports.handler = async (event) => {
       application_pack: applicationPack,
       application_pack_generated_at: generatedAt,
       application_answers: answers,
-      apply_assistant_status: "pack_ready",
+      application_validation: applicationValidation,
+      ats_keyword_coverage: qualityGate.atsCoverage,
+      auto_apply_quality_gate: qualityGateData,
+      apply_assistant_status: qualityGate.passed ? "pack_ready" : "quality_hold",
       updated_at: generatedAt,
     });
+
+    if (!qualityGate.passed) {
+      return withCors(
+        {
+          error: "Application pack failed the quality gate",
+          reasons: qualityGate.reasons,
+          applicationValidation,
+        },
+        422,
+      );
+    }
 
     return withCors({
       success: true,
@@ -180,6 +181,9 @@ exports.handler = async (event) => {
         resolvedCvSections,
         masterCv: MASTER_CV_SCHEMA,
         cvValidation,
+        applicationValidation,
+        qualityGate: qualityGateData,
+        atsKeywordCoverage: qualityGate.atsCoverage,
       },
     });
   } catch (error) {

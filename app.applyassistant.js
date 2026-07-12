@@ -62,6 +62,9 @@ export const ensureApplicationPack = async (job) => {
   job.application_pack = data.pack.applicationPack;
   job.application_pack_generated_at = data.pack.applicationPack?.generated_at || new Date().toISOString();
   job.application_answers = data.pack.answers;
+  job.application_validation = data.pack.applicationValidation;
+  job.auto_apply_quality_gate = data.pack.qualityGate;
+  job.ats_keyword_coverage = data.pack.atsKeywordCoverage;
   job.apply_assistant_status = "pack_ready";
   return data;
 };

@@ -8,6 +8,7 @@ const {
   finalizeTailoredCvSections,
 } = require("./_cv_schema");
 const { assessApplicationPackQuality, buildAtsKeywordCoverage } = require("./_auto_apply_quality");
+const { buildApplicationAnswers, validateApplicationAnswers } = require("./_application_quality");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
@@ -26,37 +27,6 @@ const DEFAULT_APPLICATION_PROFILE = {
 const SUPPORTED_ATS = new Set(["Greenhouse", "Lever", "Ashby", "Workable"]);
 
 const cleanText = (value) => String(value || "").replace(/\s+/g, " ").trim();
-
-const buildWhyThisRole = (job) => {
-  const parts = [cleanText(job.tailored_summary), cleanText(job.why_fit), cleanText(job.role_summary)].filter(Boolean);
-  return parts.join("\n\n").slice(0, 3000);
-};
-
-const buildWhyThisCompany = (job) => {
-  const parts = [cleanText(job.company_insights), cleanText(job.match_notes)].filter(Boolean);
-  if (parts.length) return parts.join("\n\n").slice(0, 2000);
-  if (job.company) {
-    return `I am interested in ${job.company} because the role aligns with my background in onboarding, KYC, screening and regulated product delivery.`;
-  }
-  return "";
-};
-
-const buildCoverLetterFallback = (job, profile) => {
-  const whyRole = buildWhyThisRole(job);
-  const whyCompany = buildWhyThisCompany(job);
-  return [
-    `Dear ${job.company || "Hiring Team"},`,
-    "",
-    `I am applying for the ${job.role || "role"} role${job.company ? ` at ${job.company}` : ""}.`,
-    whyRole,
-    whyCompany,
-    "",
-    `Kind regards,`,
-    profile.fullName || DEFAULT_APPLICATION_PROFILE.fullName,
-  ]
-    .filter(Boolean)
-    .join("\n");
-};
 
 const generateToken = (jobId) => {
   const secret = process.env.AUTO_APPLY_HMAC_SECRET;
@@ -163,6 +133,8 @@ const buildEmailHtml = (job, pack, token, siteUrl) => {
   const cvValidation = pack.cvValidation || pack.applicationPack?.cv_validation || job.cv_validation || {};
   const qualityStatus = tailoredSections.quality_status || cvValidation.quality_status || "";
   const qualityScore = cvValidation.quality_score || cvValidation.metrics?.quality_score || "";
+  const applicationValidation = pack.applicationValidation || job.application_validation || {};
+  const applicationQualityScore = applicationValidation.quality_score || "";
   const qualityNotes = Array.isArray(tailoredSections.quality_notes) ? tailoredSections.quality_notes : [];
   const isAiTailored = qualityStatus === "accepted";
   const qualityLabel = isAiTailored
@@ -197,6 +169,7 @@ const buildEmailHtml = (job, pack, token, siteUrl) => {
       <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">Salary</td><td style="font-size:14px;">${escHtml(job.salary_range || "Not stated")}</td></tr>
       <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">Fit Score</td><td style="font-size:14px;font-weight:700;color:#4f46e5;">${job.fit_score || 0}/100</td></tr>
       <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">CV Quality</td><td style="font-size:14px;font-weight:600;color:${qualityColour};">${escHtml(qualityLabel)}</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">Application Quality</td><td style="font-size:14px;font-weight:600;color:${applicationValidation.ok ? "#16a34a" : "#d97706"};">${applicationQualityScore ? `${applicationQualityScore}/100` : "Not checked"}</td></tr>
       <tr><td style="padding:6px 0;color:#64748b;font-size:13px;">ATS Coverage</td><td style="font-size:14px;font-weight:600;color:${atsColour};">${escHtml(atsLabel)}</td></tr>
     </table>
     ${qualityNotes.length ? `<div style="background:#fef9c3;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#854d0e;"><strong>Quality notes:</strong><ul style="margin:6px 0 0;padding-left:18px;">${qualityNotes.map((n) => `<li>${escHtml(n)}</li>`).join("")}</ul></div>` : ""}
@@ -287,20 +260,17 @@ const generatePackForJob = async (db, job) => {
 
   const baseCvSectionsResolved = getResolvedCvSections({ baseSections: baseCvSections, tailoredSections });
 
-  const answers = {
-    fullName: applicationProfile.fullName,
-    email: applicationProfile.email,
-    phone: applicationProfile.phone,
-    location: applicationProfile.location,
-    linkedinUrl: applicationProfile.linkedinUrl || "",
-    portfolioUrl: applicationProfile.portfolioUrl || "",
-    rightToWorkUk: applicationProfile.rightToWorkUk || "Yes",
-    noticePeriod: applicationProfile.noticePeriod || "",
-    salaryExpectation: applicationProfile.salaryExpectation || "",
-    whyThisRole: buildWhyThisRole(job),
-    whyThisCompany: buildWhyThisCompany(job),
-    coverLetter: job.cover_letter || buildCoverLetterFallback(job, applicationProfile),
-  };
+  const answers = buildApplicationAnswers({
+    job,
+    profile: applicationProfile,
+    tailoredSections,
+  });
+  const applicationValidation = validateApplicationAnswers({
+    job,
+    profile: applicationProfile,
+    answers,
+    tailoredSections,
+  });
 
   const generatedAt = new Date().toISOString();
   const applicationPack = {
@@ -309,6 +279,7 @@ const generatePackForJob = async (db, job) => {
     cv_ready: true,
     answer_fields: Object.keys(answers).filter((key) => cleanText(answers[key])),
     master_cv_version: MASTER_CV_SCHEMA.version,
+    application_quality_score: applicationValidation.quality_score,
   };
 
   await db.collection("jobs").doc(job.id).update({
@@ -317,11 +288,19 @@ const generatePackForJob = async (db, job) => {
     application_pack: applicationPack,
     application_pack_generated_at: generatedAt,
     application_answers: answers,
+    application_validation: applicationValidation,
     apply_assistant_status: "pack_ready",
     updated_at: generatedAt,
   });
 
-  return { answers, tailoredCvSections: tailoredSections, applicationPack, baseCvSections: baseCvSectionsResolved, cvValidation };
+  return {
+    answers,
+    tailoredCvSections: tailoredSections,
+    applicationPack,
+    applicationValidation,
+    baseCvSections: baseCvSectionsResolved,
+    cvValidation,
+  };
 };
 
 const matchesExcludeKeywords = (job, keywords) => {
@@ -488,6 +467,7 @@ exports.handler = async (event) => {
     const emailTo = prefs.email_to || process.env.TO_EMAIL || process.env.SMTP_USER || "ademolaomosanya@gmail.com";
     const minAtsCoverage = Number(prefs.min_ats_coverage ?? 80);
     const minCvQualityScore = Number(prefs.min_cv_quality_score ?? 90);
+    const minApplicationQualityScore = Number(prefs.min_application_quality_score ?? 90);
     const requireAtsCoverage = prefs.require_ats_coverage !== false;
     const results = [];
 
@@ -505,6 +485,7 @@ exports.handler = async (event) => {
           pack,
           minAtsCoverage,
           minCvQualityScore,
+          minApplicationQualityScore,
           requireAtsCoverage,
         });
         const gateCheckedAt = new Date().toISOString();
@@ -514,6 +495,8 @@ exports.handler = async (event) => {
           cv_quality_score: qualityGate.cvQualityScore,
           cv_quality_status: qualityGate.cvQualityStatus,
           min_cv_quality_score: minCvQualityScore,
+          application_quality_score: qualityGate.applicationQualityScore,
+          min_application_quality_score: minApplicationQualityScore,
           min_ats_coverage: minAtsCoverage,
           checked_at: gateCheckedAt,
         };
