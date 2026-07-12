@@ -160,7 +160,9 @@ const getQualityBadgeHtml = (job) => {
 };
 
 const renderApprovedSection = (container, jobs) => {
-  const approved = jobs.filter((j) => j.auto_apply_status === "approved");
+  const approved = jobs.filter(
+    (job) => job.auto_apply_status === "approved" && job.auto_apply_quality_gate?.passed !== false,
+  );
   container.innerHTML = `
     <div class="aa-section">
       <h3 class="aa-section__title">Approved — Ready to Submit <span class="aa-badge aa-badge--approved">${approved.length}</span></h3>
@@ -285,7 +287,12 @@ const renderApprovedSection = (container, jobs) => {
 };
 
 const renderQualityHoldsSection = (container, jobs) => {
-  const held = jobs.filter((job) => job.auto_apply_status === "quality_hold");
+  const held = jobs.filter(
+    (job) =>
+      job.auto_apply_status === "quality_hold" ||
+      job.apply_assistant_status === "quality_hold" ||
+      job.auto_apply_quality_gate?.passed === false,
+  );
   container.innerHTML = `
     <div class="aa-section">
       <h3 class="aa-section__title">Quality Holds <span class="aa-badge aa-badge--pending">${held.length}</span></h3>
