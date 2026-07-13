@@ -80,4 +80,22 @@ describe("auto-apply ATS quality gate", () => {
     expect(result.reasons).toContain("Application answers did not pass validation");
     expect(result.reasons).toContain("Application quality 60 is below 90");
   });
+
+  test("scores ATS coverage against the complete resolved CV", () => {
+    const result = assessApplicationPackQuality({
+      job: { key_requirements: ["Payments API integrations", "Roadmap and sprint ownership"] },
+      pack: {
+        tailoredCvSections: { summary: "Role-specific summary", quality_status: "accepted" },
+        resolvedCvSections: {
+          summary: "Payments platform delivery",
+          competencies: ["API integrations", "Roadmap ownership", "Sprint delivery"],
+        },
+        cvValidation: { ok: true, decision: "accept", quality_score: 96 },
+        applicationValidation: { ok: true, quality_score: 95 },
+      },
+    });
+
+    expect(result.atsCoverage.score).toBe(100);
+    expect(result.passed).toBe(true);
+  });
 });

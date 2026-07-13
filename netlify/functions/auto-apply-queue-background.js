@@ -142,7 +142,7 @@ const buildEmailHtml = (job, pack, token, siteUrl) => {
     : qualityStatus === "fallback_master" ? "Master CV used (AI tailoring fell back)" : "Generated";
   const qualityColour = isAiTailored ? "#16a34a" : "#d97706";
 
-  const atsCoverage = buildAtsKeywordCoverage(job, tailoredSections);
+  const atsCoverage = buildAtsKeywordCoverage(job, pack.baseCvSections || tailoredSections);
   const atsLabel = atsCoverage
     ? `${atsCoverage.score}% (${atsCoverage.found}/${atsCoverage.total} requirements matched)`
     : "Not checked";

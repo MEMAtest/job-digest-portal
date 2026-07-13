@@ -116,7 +116,12 @@ exports.handler = async (event) => {
     const prefs = prefsDoc.exists ? prefsDoc.data() || {} : {};
     const qualityGate = assessApplicationPackQuality({
       job,
-      pack: { tailoredCvSections: tailoredSections, cvValidation, applicationValidation },
+      pack: {
+        tailoredCvSections: tailoredSections,
+        resolvedCvSections,
+        cvValidation,
+        applicationValidation,
+      },
       minAtsCoverage: Number(prefs.min_ats_coverage ?? 80),
       minCvQualityScore: Number(prefs.min_cv_quality_score ?? 90),
       minApplicationQualityScore: Number(prefs.min_application_quality_score ?? 90),
